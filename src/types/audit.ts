@@ -12,15 +12,22 @@ export interface AuditLog {
 export type LogStatus = 'Success' | 'Failed' | 'Warning';
 
 export interface LogSourceStatus {
+  id: string;
   source: string;
-  status: 'Online' | 'Offline' | 'Error';
+  systemName: string;
+  status: 'Online' | 'Offline' | 'Error' | 'Delayed';
   last_update: string;
+  lastLogReceived: string;
   event_count: number;
+  collectionRate: number;
+  missingLogsPercentage: number;
 }
 
 export interface LogStorageSummary {
   total_logs: number;
   storage_used: string;
+  totalCapacityTB: number;
+  usedCapacityTB: number;
   retention_period: number;
   oldest_log: string;
   newest_log: string;

@@ -35,7 +35,9 @@ const AuditLogPage: React.FC = () => {
   const [isInvestigateLogModalOpen, setIsInvestigateLogModalOpen] = useState(false);
   const [isStopCollectionModalOpen, setIsStopCollectionModalOpen] = useState(false);
   const [isForensicModalOpen, setIsForensicModalOpen] = useState(false);
-  const [quickActionFormData, setQuickActionFormData] = useState<AuditLogQuickActionFormData>({});
+  const [quickActionFormData, setQuickActionFormData] = useState<AuditLogQuickActionFormData>({
+    action: 'export'
+  });
 
 
   const fetchData = useCallback(async () => {
@@ -102,7 +104,7 @@ const AuditLogPage: React.FC = () => {
   
   // Quick Action Handlers
   const openQuickActionModal = (modalSetFunction: React.Dispatch<React.SetStateAction<boolean>>) => {
-    setQuickActionFormData({}); // Reset form data
+    setQuickActionFormData({ action: 'export' }); // Reset form data
     modalSetFunction(true);
   };
   const handleQuickActionFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -114,7 +116,7 @@ const AuditLogPage: React.FC = () => {
     await addAuditLog({ userId: user.id, username: user.username, action: `監査ログ管理: ${actionName}`, details });
     setNotification({ message: `${actionName}が正常に実行されました（シミュレーション）。`, type: NotificationType.SUCCESS });
     modalCloseFn();
-    setQuickActionFormData({});
+    setQuickActionFormData({ action: 'export' });
   };
 
   const logTableColumns: Array<{ Header: string; accessor: keyof AuditLog | ((row: AuditLog) => ReactNode) }> = [
@@ -125,13 +127,7 @@ const AuditLogPage: React.FC = () => {
     { Header: '詳細', accessor: (row: AuditLog) => <span title={row.details}>{row.details.substring(0, 100)}{row.details.length > 100 ? '...' : ''}</span> },
   ];
 
-  const logSourceStatusColumns: Array<{ Header: string; accessor: keyof LogSourceStatus | ((row: LogSourceStatus) => ReactNode) }> = [
-    { Header: 'システム名', accessor: 'systemName' },
-    { Header: '収集レート(log/s)', accessor: 'collectionRate' },
-    { Header: 'ステータス', accessor: (row) => <span className={`${row.status==='Error' ? 'text-red-500 font-bold': row.status==='Delayed' ? 'text-yellow-500' : 'text-green-500'}`}>{row.status}</span>},
-    { Header: '最終ログ受信', accessor: (row) => new Date(row.lastLogReceived).toLocaleTimeString() },
-    { Header: '欠損率(%)', accessor: (row) => row.missingLogsPercentage?.toFixed(1) ?? 'N/A'},
-  ];
+  // Commented out unused logSourceStatusColumns to fix TypeScript warnings
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-full"><Spinner size="lg" /></div>;

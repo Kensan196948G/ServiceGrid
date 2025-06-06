@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
-import { User, UserRole, MicrosoftApiCredentials } from '../types';
+import { User, MicrosoftApiCredentials } from '../types';
 import { MOCK_MS_CLIENT_ID, MOCK_MS_TENANT_ID } from '../constants';
 import * as authApi from '../services/authApiService';
 

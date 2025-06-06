@@ -1,13 +1,11 @@
 
-import React, { useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
-    AvailabilityRecord, UserRole, ServiceImportance, CurrentServiceStatus, HistoricalUptimeData,
+    AvailabilityRecord, UserRole, ServiceImportance, CurrentServiceStatus,
     AvailabilityQuickActionFormData
 } from '../types';
 import { 
     getAvailabilityRecords, addAvailabilityRecord, updateAvailabilityRecord, deleteAvailabilityRecord,
-    getIncidents, // For linking to incidents
-    getSLAs, // For linking/displaying SLA targets
     addAuditLog
 } from '../services/mockItsmService';
 import { 
@@ -36,7 +34,9 @@ const AvailabilityManagementPage: React.FC = () => {
   const [isAvailabilityReportModalOpen, setIsAvailabilityReportModalOpen] = useState(false);
   const [isMaintenanceRequestModalOpen, setIsMaintenanceRequestModalOpen] = useState(false);
   const [isMonitoringSettingsModalOpen, setIsMonitoringSettingsModalOpen] = useState(false);
-  const [quickActionFormData, setQuickActionFormData] = useState<AvailabilityQuickActionFormData>({});
+  const [quickActionFormData, setQuickActionFormData] = useState<AvailabilityQuickActionFormData>({
+    action: 'maintenance'
+  });
 
 
   const serviceImportanceOptions: ServiceImportance[] = Object.values(ServiceImportance);
@@ -76,7 +76,7 @@ const AvailabilityManagementPage: React.FC = () => {
   ];
 
   // サービスIDを自動生成する関数
-  const generateServiceId = (serviceName: string, serviceCategory: string) => {
+  const generateServiceId = (_serviceName: string, serviceCategory: string) => {
     // カテゴリ別のプレフィックス
     const categoryPrefixes: { [key: string]: string } = {
       'コミュニケーション': 'COMM',
@@ -247,7 +247,7 @@ const AvailabilityManagementPage: React.FC = () => {
   
   // Quick Action Handlers
   const openQuickActionModal = (modalSetFunction: React.Dispatch<React.SetStateAction<boolean>>, serviceId?: string) => {
-    setQuickActionFormData({ selectedServiceId: serviceId || allAvailabilityRecords[0]?.id });
+    setQuickActionFormData({ action: 'maintenance', selectedServiceId: serviceId || allAvailabilityRecords[0]?.id });
     modalSetFunction(true);
   };
   const handleQuickActionFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -261,7 +261,7 @@ const AvailabilityManagementPage: React.FC = () => {
     await addAuditLog({ userId: user.id, username: user.username, action: `可用性管理: ${actionName}`, details: detailsCallback(quickActionFormData, service) });
     setNotification({ message: `${actionName}が正常に実行されました（シミュレーション）。`, type: NotificationType.SUCCESS });
     modalCloseFn();
-    setQuickActionFormData({});
+    setQuickActionFormData({ action: 'maintenance' });
   };
 
   // Data for Dashboard Chart

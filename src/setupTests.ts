@@ -17,7 +17,7 @@ Object.defineProperty(window, 'matchMedia', {
 
 // Mock window.ResizeObserver
 global.ResizeObserver = class ResizeObserver {
-  constructor(cb: any) {}
+  constructor(_cb: any) {}
   observe() {}
   unobserve() {}
   disconnect() {}
@@ -25,10 +25,14 @@ global.ResizeObserver = class ResizeObserver {
 
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
-  constructor(cb: any) {}
+  constructor(_cb: any) {}
   observe() {}
   unobserve() {}
   disconnect() {}
+  root = null;
+  rootMargin = '';
+  thresholds = [];
+  takeRecords = () => [];
 };
 
 // Mock scrollTo

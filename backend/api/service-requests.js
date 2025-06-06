@@ -914,7 +914,7 @@ module.exports = {
   getServiceRequestStats,
   getServiceRequestById,
   createServiceRequest,
-  updateServiceRequest: require('./legacy-update'), // 下位互換性のため保持
+  updateServiceRequest: updateServiceRequest, // Legacy-updateの代わりに既存関数を使用
   approveServiceRequest,
   fulfillServiceRequest,
   transitionServiceRequest,

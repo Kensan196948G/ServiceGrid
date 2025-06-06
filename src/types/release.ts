@@ -11,4 +11,4 @@ export interface Release {
 
 export type ReleaseStatus = 'Planning' | 'Testing' | 'Deployment' | 'Completed' | 'Cancelled';
 
-export type ReleaseType = 'Major' | 'Minor' | 'Patch' | 'Hotfix' | 'Emergency';
+export type ReleaseType = 'Major' | 'Minor' | 'Patch' | 'Hotfix' | 'Emergency' | 'Maintenance';

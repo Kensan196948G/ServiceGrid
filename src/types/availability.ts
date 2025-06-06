@@ -46,6 +46,7 @@ export interface AvailabilityRecord {
 export interface AvailabilityQuickActionFormData {
   action: 'maintenance' | 'incident' | 'report' | 'alert';
   serviceId?: string;
+  selectedServiceId?: string;
   duration?: number;
   description?: string;
 }

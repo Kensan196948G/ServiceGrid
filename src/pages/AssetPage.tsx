@@ -281,7 +281,7 @@ const AssetPage: React.FC = () => {
                 />
                 <Legend 
                   wrapperStyle={{fontSize: '0.875rem', paddingTop: '10px'}}
-                  formatter={(value, entry) => `${value} (${entry.payload.value}件)`}
+                  formatter={(value, entry) => `${value} (${entry.payload?.value || 0}件)`}
                 />
               </PieChart>
             </ResponsiveContainer>
