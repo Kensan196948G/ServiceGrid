@@ -7,12 +7,13 @@
 - **プロトコル**: HTTP/HTTPS
 - **データ形式**: JSON
 - **文字エンコーディング**: UTF-8
-- **認証方式**: JWT Bearer Token
+- **認証方式**: JWT Bearer Token (モック実装)
 
-### 1.2 API構成
-ServiceGridは二層のAPI構成を採用：
-1. **Node.js/Express API** (メイン) - JavaScript実装・SQLite連携
-2. **PowerShell API** (レガシー) - Windows環境用PowerShellモジュール
+### 1.2 API構成（実装済み）
+ServiceGridは完全にNode.js/Express APIに移行済み：
+- **Node.js/Express API** - JavaScript実装・SQLite連携
+- **実装済みモジュール**: incidents, assets, compliance, auth
+- **セキュリティ機能**: CORS, Helmet, Rate Limiting, 入力検証
 
 ## 2. 認証・認可
 
@@ -36,7 +37,7 @@ Content-Type: application/json
 | user | 読み書き | 基本操作権限 |
 | readonly | 読み取り専用 | 閲覧のみ |
 
-### 2.3 認証エンドポイント
+### 2.3 認証エンドポイント（実装済み）
 
 #### ログイン
 ```http
@@ -49,68 +50,75 @@ Content-Type: application/json
 }
 ```
 
-**レスポンス**:
+**レスポンス（実装済み）**:
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "success": true,
+  "token": "mock-jwt-token-1640995200000",
   "user": {
     "id": 1,
     "username": "admin",
     "role": "administrator",
-    "email": "admin@example.com"
+    "email": "admin@company.com"
   },
-  "expiresIn": 3600
+  "message": "✅ Login successful (mock)"
 }
 ```
 
-#### ユーザー情報取得
-```http
-GET /api/auth/me
-Authorization: Bearer <token>
+**エラーレスポンス**:
+```json
+{
+  "error": "Invalid credentials"
+}
 ```
 
-## 3. コアAPI仕様
+#### 実装済み認証ユーザー
+- **admin/admin123** → role: administrator
+- **operator/operator123** → role: operator
 
-### 3.1 インシデント管理API
+## 3. 実装済みコアAPI仕様
+
+### 3.1 インシデント管理API（完全実装済み）
 
 #### 3.1.1 インシデント一覧取得
 ```http
 GET /api/incidents?page=1&limit=20&status=Open&priority=High
 ```
 
-**クエリパラメータ**:
-| パラメータ | 型 | デフォルト | 説明 |
-|-----------|---|-----------|------|
-| page | integer | 1 | ページ番号 |
-| limit | integer | 20 | 1ページあたりの件数(最大100) |
-| status | enum | - | Open,In Progress,Resolved,Closed,Pending |
-| priority | enum | - | Low,Medium,High,Critical |
-| category | string | - | カテゴリフィルタ |
-| assigned_to | string | - | 担当者フィルタ |
-| search | string | - | タイトル・説明文検索 |
+**実装済みクエリパラメータ**:
+| パラメータ | 型 | デフォルト | 説明 | 実装状況 |
+|-----------|---|-----------|------|---------|
+| page | integer | 1 | ページ番号 | ✅ 実装済み |
+| limit | integer | 20 | 1ページあたりの件数(最大100) | ✅ 実装済み |
+| status | enum | - | Open,In Progress,Resolved,Closed,Pending | ✅ 実装済み |
+| priority | enum | - | Low,Medium,High,Critical | ✅ 実装済み |
+| category | string | - | カテゴリフィルタ | ✅ 実装済み |
+| assigned_to | string | - | 担当者フィルタ | ✅ 実装済み |
+| search | string | - | タイトル・説明文検索 | ✅ 実装済み |
 
-**レスポンス**:
+**実装済みレスポンス**:
 ```json
 {
   "data": [
     {
       "id": 1,
-      "title": "システム障害",
-      "description": "Webサーバーが応答しない",
+      "title": "Webサーバーダウン",
+      "description": "メインWebサーバー（srv-web-01）が応答しません。",
+      "reported_by": "user01",
+      "assigned_to": "admin",
       "status": "Open",
       "priority": "Critical",
       "category": "Infrastructure",
-      "reported_by": "user1",
-      "assigned_to": "admin",
       "impact": "High",
       "urgency": "High",
       "created_at": "2024-01-01T09:00:00Z",
       "updated_at": "2024-01-01T09:30:00Z",
-      "due_date": "2024-01-01T17:00:00Z",
+      "resolved_at": null,
+      "closed_at": null,
       "resolution": null,
       "workaround": "代替サーバーに切り替え",
-      "related_assets": ["SRV-001", "SRV-002"],
-      "tags": ["urgent", "production"]
+      "relatedAssets": ["SRV-001"],
+      "tags": ["production", "critical"]
     }
   ],
   "pagination": {
@@ -121,7 +129,7 @@ GET /api/incidents?page=1&limit=20&status=Open&priority=High
   },
   "filters": {
     "status": "Open",
-    "priority": "High"
+    "priority": "Critical"
   }
 }
 ```
@@ -194,22 +202,84 @@ GET /api/incidents/stats
 }
 ```
 
-### 3.2 資産管理API
+### 3.2 資産管理API（完全実装済み）
 
 #### 3.2.1 資産一覧取得
 ```http
 GET /api/assets?page=1&limit=20&status=Active&category=Server
 ```
 
-**クエリパラメータ**:
-| パラメータ | 型 | 説明 |
-|-----------|---|------|
-| page, limit | integer | ページネーション |
-| status | enum | Active,Inactive,Maintenance,Retired,Lost,Stolen,Disposed |
-| category | string | カテゴリフィルタ |
-| location | string | 設置場所フィルタ |
-| assigned_to | string | 担当者フィルタ |
-| search | string | 名前,資産タグ,製造元,モデル検索 |
+**実装済みクエリパラメータ**:
+| パラメータ | 型 | 説明 | 実装状況 |
+|-----------|---|------|---------|
+| page, limit | integer | ページネーション | ✅ 実装済み |
+| status | enum | Active,Inactive,Maintenance,Retired,Lost,Stolen,Disposed | ✅ 実装済み |
+| category | string | カテゴリフィルタ | ✅ 実装済み |
+| location | string | 設置場所フィルタ（LIKE検索） | ✅ 実装済み |
+| assigned_to | string | 担当者フィルタ | ✅ 実装済み |
+| search | string | 名前,資産タグ,説明,製造元,モデル検索 | ✅ 実装済み |
+
+#### 3.2.2 資産タグ自動生成（新機能）
+```http
+GET /api/assets/generate-tag?type=Server
+```
+
+**実装済み自動生成ルール**:
+| 資産種別 | プレフィックス | 例 |
+|---------|-------------|-----|
+| Server | SRV | SRV-001, SRV-002... |
+| Desktop | DSK | DSK-001, DSK-002... |
+| Laptop | LAP | LAP-001, LAP-002... |
+| Network Equipment | NET | NET-001, NET-002... |
+| Storage | STG | STG-001, STG-002... |
+| その他 | AST | AST-001, AST-002... |
+
+**レスポンス**:
+```json
+{
+  "assetTag": "SRV-001"
+}
+```
+
+#### 3.2.3 資産統計情報（新機能）
+```http
+GET /api/assets/stats
+```
+
+**実装済みレスポンス**:
+```json
+{
+  "overall": {
+    "total_assets": 245,
+    "total_cost": 5420000.00,
+    "avg_cost": 22122.45
+  },
+  "byCategory": [
+    {
+      "category": "Server",
+      "status": "Active",
+      "count": 12,
+      "total_cost": 2400000.00
+    }
+  ],
+  "byStatus": [
+    {
+      "status": "Active",
+      "count": 198
+    }
+  ],
+  "warranty": [
+    {
+      "warranty_status": "Expired",
+      "count": 15
+    },
+    {
+      "warranty_status": "Expiring Soon",
+      "count": 8
+    }
+  ]
+}
+```
 
 #### 3.2.2 資産作成
 ```http
@@ -265,32 +335,108 @@ PUT    /api/service-requests/:id     # 更新
 DELETE /api/service-requests/:id     # 削除
 ```
 
-### 3.4 その他のITSMモジュールAPI
+### 3.3 コンプライアンス管理API（完全実装済み）
 
-#### 利用可能なエンドポイント
+#### 3.3.1 統制管理
 ```http
-# 変更管理
+GET /api/compliance/controls    # 統制一覧取得
+POST /api/compliance/controls   # 統制作成
+PUT /api/compliance/controls/:id # 統制更新
+DELETE /api/compliance/controls/:id # 統制削除
+```
+
+**統制作成リクエスト例**:
+```json
+{
+  "controlId": "AC-001",
+  "name": "アクセス制御ポリシー",
+  "description": "システムアクセスに関する統制",
+  "standard": "ISO27001/27002",
+  "category": "アクセス制御",
+  "responsibleTeam": "IT部門",
+  "status": "実装済み",
+  "lastAuditDate": "2024-01-15",
+  "nextAuditDate": "2024-07-15",
+  "evidenceLinks": ["doc1.pdf", "screenshot.png"],
+  "notes": "定期監査完了",
+  "riskLevel": "Medium",
+  "capStatus": "完了"
+}
+```
+
+#### 3.3.2 監査管理
+```http
+GET /api/compliance/audits    # 監査一覧取得
+```
+
+**レスポンス例**:
+```json
+[
+  {
+    "id": "1",
+    "auditName": "年次ISO27001監査",
+    "standard": "ISO27001/27002",
+    "type": "External",
+    "scheduledStartDate": "2024-03-01",
+    "scheduledEndDate": "2024-03-15",
+    "status": "Planned",
+    "leadAuditor": "監査法人ABC",
+    "findingsCount": 0,
+    "openFindingsCount": 0
+  }
+]
+```
+
+#### 3.3.3 リスク管理
+```http
+GET /api/compliance/risks    # リスク一覧取得
+```
+
+**レスポンス例**:
+```json
+[
+  {
+    "id": "1",
+    "riskDescription": "データ漏洩リスク",
+    "relatedControlId": "AC-001",
+    "relatedStandard": "ISO27001/27002",
+    "likelihood": "Medium",
+    "impact": "High",
+    "overallRisk": "High",
+    "mitigationPlan": "暗号化強化、アクセス制御見直し",
+    "responsibleTeam": "セキュリティ部門",
+    "status": "Mitigating",
+    "dueDate": "2024-06-30"
+  }
+]
+```
+
+### 3.4 その他のITSMモジュールAPI（基本実装済み）
+
+#### データベーススキーマ準備完了
+```http
+# 変更管理 (基本テーブル実装済み)
 GET|POST|PUT|DELETE /api/changes
 
-# リリース管理  
+# リリース管理 (基本テーブル実装済み)
 GET|POST|PUT|DELETE /api/releases
 
-# 問題管理
+# 問題管理 (基本テーブル実装済み)
 GET|POST|PUT|DELETE /api/problems
 
-# ナレッジ管理
+# ナレッジ管理 (基本テーブル実装済み)
 GET|POST|PUT|DELETE /api/knowledge
 
-# SLA管理
+# SLA管理 (基本テーブル実装済み)
 GET|POST|PUT|DELETE /api/slas
 
-# キャパシティ管理
+# キャパシティ管理 (基本テーブル実装済み)
 GET|POST|PUT|DELETE /api/capacity
 
-# 可用性管理
+# 可用性管理 (基本テーブル実装済み)
 GET|POST|PUT|DELETE /api/availability
 
-# 監査ログ
+# 監査ログ (基本テーブル実装済み)
 GET /api/audit-logs
 ```
 
@@ -377,37 +523,84 @@ GET /api/audit-logs
 }
 ```
 
-## 6. セキュリティ仕様
+## 6. セキュリティ仕様（実装済み）
 
-### 6.1 CORS設定
+### 6.1 CORS設定（実装済み）
 ```javascript
-// 許可オリジン
+// 実装済み許可オリジン
 origins: [
   "http://localhost:3001",
-  "http://127.0.0.1:3001",
+  "http://127.0.0.1:3001", 
   "http://192.168.3.92:3001",
   "http://10.212.134.20:3001"
 ]
 
-// 許可メソッド
+// 実装済み許可メソッド
 methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 
-// 許可ヘッダー
-headers: ["Content-Type", "Authorization"]
+// 実装済み許可ヘッダー
+allowedHeaders: ["Content-Type", "Authorization"]
+
+// 追加設定
+credentials: true
 ```
 
-### 6.2 レート制限
+### 6.2 レート制限（実装済み）
 - **時間窓**: 15分
 - **最大リクエスト数**: 100件/IP
 - **適用範囲**: `/api/*` エンドポイント
+- **実装**: express-rate-limit 7.5.0
 
-### 6.3 セキュリティヘッダー
-```http
+### 6.3 セキュリティヘッダー（実装済み）
+```javascript
+// Helmet 8.1.0 による実装済みヘッダー
+app.use(helmet());
+
+// 自動適用されるヘッダー
 Content-Security-Policy: default-src 'self'
-X-Frame-Options: DENY
+X-Frame-Options: DENY  
 X-Content-Type-Options: nosniff
 Referrer-Policy: strict-origin-when-cross-origin
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Permitted-Cross-Domain-Policies: none
 ```
+
+### 6.4 入力検証（実装済み）
+
+#### 6.4.1 インシデント検証
+```javascript
+// validateIncidentData() 実装済み
+{
+  title: { required: true, maxLength: 200 },
+  description: { required: true, maxLength: 2000 },
+  reported_by: { required: true },
+  status: { enum: ["Open", "In Progress", "Resolved", "Closed", "Pending"] },
+  priority: { enum: ["Low", "Medium", "High", "Critical"] },
+  impact: { enum: ["Low", "Medium", "High"] },
+  urgency: { enum: ["Low", "Medium", "High"] }
+}
+```
+
+#### 6.4.2 資産検証
+```javascript
+// validateAssetData() 実装済み
+{
+  asset_tag: { required: true, unique: true, maxLength: 50 },
+  name: { required: true, maxLength: 200 },
+  status: { enum: ["Active", "Inactive", "Maintenance", "Retired", "Lost", "Stolen", "Disposed"] },
+  ip_address: { pattern: "^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$" },
+  mac_address: { pattern: "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$" },
+  purchase_cost: { type: "number", min: 0 },
+  date_fields: { pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
+}
+```
+
+### 6.5 データベースセキュリティ（実装済み）
+- **SQLインジェクション防止**: パラメータ化クエリ徹底使用
+- **制約チェック**: CHECK制約によるデータ整合性
+- **トリガー**: 自動バリデーション・タイムスタンプ更新
+- **インデックス**: 効率的な検索のための最適化
 
 ## 7. パフォーマンス仕様
 
@@ -426,34 +619,55 @@ Referrer-Policy: strict-origin-when-cross-origin
 | 削除 | < 100ms |
 | 複雑検索 | < 500ms |
 
-## 8. 監視・ヘルスチェック
+## 8. 監視・ヘルスチェック（実装済み）
 
-### 8.1 ヘルスチェックエンドポイント
+### 8.1 ヘルスチェックエンドポイント（実装済み）
 ```http
 GET /api/health
 ```
 
-**レスポンス**:
+**実装済みレスポンス**:
 ```json
 {
-  "status": "OK",
+  "status": "✅ OK",
   "timestamp": "2024-01-01T10:00:00Z",
-  "version": "1.0.0",
-  "database": {
-    "type": "SQLite",
-    "status": "Connected",
-    "response_time": "5ms"
-  },
-  "uptime": "24:15:30",
-  "memory_usage": "256MB",
-  "active_connections": 15
+  "version": "1.0.0-quick",
+  "database": "🔧 Mock",
+  "server": "Express Quick Server",
+  "uptime": 3600.5
 }
 ```
 
-### 8.2 メトリクス
+### 8.2 追加監視エンドポイント（実装済み）
 ```http
-GET /api/metrics      # プロメテウス形式メトリクス
-GET /ping             # シンプルpingエンドポイント
+GET /ping             # シンプルpingエンドポイント → "pong"
+GET /                 # API情報・エンドポイント一覧
+GET /api/test         # 詳細システム情報
+```
+
+**API情報エンドポイントレスポンス**:
+```json
+{
+  "message": "✅ ITSM API Server is running successfully!",
+  "status": "OK",
+  "timestamp": "2024-01-01T10:00:00Z",
+  "version": "1.0.0-quick",
+  "server": "Express Quick Server",
+  "platform": "linux",
+  "nodeVersion": "v22.16.0",
+  "networkInfo": {
+    "eth0": "192.168.1.100"
+  },
+  "endpoints": [
+    "GET / - This endpoint",
+    "GET /api/health - Health check",
+    "POST /api/auth/login - Mock login",
+    "GET /api/test - Test endpoint",
+    "GET /api/incidents - Incidents API",
+    "GET /api/assets - Assets API",
+    "GET /api/compliance - Compliance API"
+  ]
+}
 ```
 
 ## 9. APIバージョニング
