@@ -2,10 +2,11 @@
   "name": "itsm-backend",
   "version": "1.0.0",
   "description": "ITSM準拠IT運用システムプラットフォーム バックエンドAPI",
-  "main": "start-server.js",
+  "main": "secure-server.js",
   "scripts": {
-    "start": "PORT=8082 node start-server.js",
-    "dev": "PORT=8082 node start-server.js"
+    "start": "PORT=8082 node secure-server.js",
+    "dev": "PORT=8082 node secure-server.js",
+    "start:legacy": "PORT=8082 node start-server.js"
   },
   "keywords": [
     "itsm",

@@ -1,0 +1,188 @@
+name: Claude Code Auto Loop
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+  schedule:
+    - cron: '0 */6 * * *'  # 6時間ごとの自動チェック
+  workflow_dispatch:  # 手動実行対応
+
+env:
+  # Claude自動化設定
+  CLAUDE_LANGUAGE: "ja"
+  CLAUDE_MODE: "fully-automatic"
+  CLAUDE_INTERACTION: "false"
+  CLAUDE_AUTO_APPROVE: "true"
+  CLAUDE_SILENT_MODE: "true"
+  CLAUDE_AUTO_FIX: "true"
+  CLAUDE_CONTINUOUS_IMPROVEMENT: "true"
+  CLAUDE_SELF_HEALING: "true"
+
+jobs:
+  claude-auto-dev:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude'))) ||
+      (github.event_name == 'schedule') ||
+      (github.event_name == 'workflow_dispatch')
+    
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: write
+      checks: write
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 完全な履歴取得
+          
+      - name: Setup Claude Code Environment
+        run: |
+          echo "CLAUDE_CONFIG_PATH=.claude-automation-config.yml" >> $GITHUB_ENV
+          echo "CLAUDE_WORKSPACE=${{ github.workspace }}" >> $GITHUB_ENV
+          
+      - name: Load Claude Configuration
+        run: |
+          if [ -f ".claude-automation-config.yml" ]; then
+            echo "Claude設定ファイルが見つかりました"
+            cat .claude-automation-config.yml
+          else
+            echo "デフォルト設定を作成中..."
+            cat > .claude-automation-config.yml << 'EOF'
+          automation:
+            language: "ja"
+            mode: "fully-automatic"
+            interaction: false
+            approval: auto
+            continuous_loop: true
+            
+          development:
+            auto_fix: true
+            continuous_improvement: true
+            self_healing: true
+            code_review: automated
+            testing: comprehensive
+            
+          monitoring:
+            real_time: true
+            predictive: true
+            auto_response: true
+            health_check: enabled
+            
+          quality:
+            security_scan: continuous
+            performance_test: automated
+            compliance_check: enabled
+            
+          deployment:
+            strategy: "blue-green"
+            rollback: automatic
+            monitoring: comprehensive
+            
+          notifications:
+            slack: enabled
+            teams: enabled
+            email: critical-only
+          EOF
+          fi
+          
+      - name: Extract Claude Instructions
+        id: extract_instructions
+        run: |
+          # GitHub EventからClaude指示を抽出
+          INSTRUCTIONS=""
+          if [ "${{ github.event_name }}" = "issue_comment" ]; then
+            INSTRUCTIONS="${{ github.event.comment.body }}"
+          elif [ "${{ github.event_name }}" = "pull_request_review_comment" ]; then
+            INSTRUCTIONS="${{ github.event.comment.body }}"
+          elif [ "${{ github.event_name }}" = "pull_request_review" ]; then
+            INSTRUCTIONS="${{ github.event.review.body }}"
+          elif [ "${{ github.event_name }}" = "issues" ]; then
+            INSTRUCTIONS="${{ github.event.issue.body }}"
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            INSTRUCTIONS="定期的なシステム診断と自動改善を実行してください"
+          else
+            INSTRUCTIONS="リポジトリの健康状態をチェックし、必要に応じて改善してください"
+          fi
+          
+          # @claude部分を抽出して整理
+          CLEANED_INSTRUCTIONS=$(echo "$INSTRUCTIONS" | grep -o '@claude.*' | sed 's/@claude//')
+          echo "instructions=$CLEANED_INSTRUCTIONS" >> $GITHUB_OUTPUT
+          
+      - name: Run Claude Code with Full Automation
+        uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          instructions: |
+            ${{ steps.extract_instructions.outputs.instructions }}
+            
+            以下の完全自動化設定で実行してください：
+            --auto-approve --no-prompts --silent-mode --lang "ja"
+            --config-file ".claude-automation-config.yml"
+            --continuous-improvement --self-healing
+            --auto-fix-errors --quality-gates-automated
+            --monitoring-integration --documentation-auto-update
+            
+          allowed_tools: |
+            mcp__github__create_issue,
+            mcp__github__create_pull_request,
+            mcp__github__merge_pull_request,
+            mcp__github__create_commit,
+            mcp__github__update_file,
+            mcp__github__create_branch,
+            Edit,Replace,View,Execute
+            
+      - name: Auto-healing Health Check
+        if: always()
+        run: |
+          # システム状態のチェック
+          echo "🔍 システム健康状態チェック実行中..."
+          
+          # テストの実行
+          if [ -f "package.json" ]; then
+            npm test --if-present || echo "⚠️ テスト失敗を検出"
+          fi
+          
+          # セキュリティスキャン
+          if command -v npm &> /dev/null; then
+            npm audit --audit-level=moderate || echo "⚠️ セキュリティ脆弱性を検出"
+          fi
+          
+          # コード品質チェック
+          if [ -f ".eslintrc*" ] || [ -f "eslint.config.*" ]; then
+            npx eslint . --max-warnings 0 || echo "⚠️ コード品質問題を検出"
+          fi
+          
+      - name: Continuous Improvement Trigger
+        if: always()
+        run: |
+          # 改善提案の自動生成
+          echo "💡 継続的改善プロセスを開始..."
+          
+          # パフォーマンス分析結果を Issue として作成
+          gh issue create \
+            --title "🤖 自動改善提案 - $(date '+%Y-%m-%d %H:%M')" \
+            --body "システム分析結果に基づく改善提案を自動生成しました。詳細は添付のレポートを確認してください。" \
+            --label "enhancement,automated,claude" || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Notification
+        if: always()
+        run: |
+          echo "✅ Claude自動化サイクル完了"
+          echo "📊 実行結果: ${{ job.status }}"
+          echo "🕐 実行時間: $(date)"

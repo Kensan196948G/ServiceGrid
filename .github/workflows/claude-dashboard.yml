@@ -1,0 +1,15 @@
+name: Claude Automation Dashboard
+on:
+  workflow_run:
+    workflows: ["Claude Code Auto Loop"]
+    types: [completed]
+    
+jobs:
+  update-dashboard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update Operations Dashboard
+        run: |
+          # 運用ダッシュボードの更新
+          echo "📊 Claude自動化メトリクス更新中..."
+          # Grafana/Prometheus連携、Slack通知等

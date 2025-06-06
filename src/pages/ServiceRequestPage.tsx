@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
 import { ServiceRequest, ItemStatus, UserRole } from '../types';
-import { getServiceRequests, addServiceRequest, updateServiceRequest, deleteServiceRequest } from '../services/mockItsmService';
+import * as serviceRequestApi from '../services/serviceRequestApiService';
 import { Button, Table, Modal, Input, Textarea, Select, Spinner, Card, Notification, NotificationType } from '../components/CommonUI';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../hooks/useToast';
 import { itemStatusToJapanese } from '../localization';
 
 const ServiceRequestPage: React.FC = () => {
@@ -11,8 +12,8 @@ const ServiceRequestPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRequest, setEditingRequest] = useState<Partial<ServiceRequest> | null>(null);
-  const [notification, setNotification] = useState<{ message: string; type: NotificationType } | null>(null);
   const { user } = useAuth();
+  const { addToast } = useToast();
 
   const serviceTypes = ['アカウント作成', 'ソフトウェアインストール', 'ハードウェアリクエスト', 'アクセスリクエスト', '一般問い合わせ'];
 
@@ -36,15 +37,15 @@ const ServiceRequestPage: React.FC = () => {
   const fetchRequests = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await getServiceRequests();
+      const data = await serviceRequestApi.getServiceRequests();
       setRequests(data);
     } catch (error) {
       console.error("Failed to fetch service requests:", error);
-      setNotification({ message: 'サービスリクエストの読み込みに失敗しました。', type: NotificationType.ERROR });
+      addToast('サービスリクエストの読み込みに失敗しました。', 'error');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [addToast]);
 
   useEffect(() => {
     fetchRequests();
@@ -136,29 +137,29 @@ const ServiceRequestPage: React.FC = () => {
 
     try {
       if (editingRequest.id) {
-        await updateServiceRequest(editingRequest.id, { ...editingRequest, requestedBy: editingRequest.requestedBy || user.username } as ServiceRequest);
-        setNotification({ message: 'サービスリクエストが正常に更新されました。', type: NotificationType.SUCCESS });
+        await serviceRequestApi.updateServiceRequest(editingRequest.id, { ...editingRequest, requestedBy: editingRequest.requestedBy || user.username } as ServiceRequest);
+        addToast('サービスリクエストが正常に更新されました。', 'success');
       } else {
-        await addServiceRequest({ ...editingRequest, requestedBy: user.username } as Omit<ServiceRequest, 'id' | 'createdAt' | 'updatedAt'>);
-        setNotification({ message: 'サービスリクエストが正常に作成されました。', type: NotificationType.SUCCESS });
+        await serviceRequestApi.createServiceRequest({ ...editingRequest, requestedBy: user.username } as Omit<ServiceRequest, 'id' | 'createdAt' | 'updatedAt'>);
+        addToast('サービスリクエストが正常に作成されました。', 'success');
       }
       fetchRequests();
       handleCloseModal();
     } catch (error) {
       console.error("Failed to save service request:", error);
-      setNotification({ message: 'サービスリクエストの保存に失敗しました。', type: NotificationType.ERROR });
+      addToast('サービスリクエストの保存に失敗しました。', 'error');
     }
   };
   
   const handleDelete = async (id: string) => {
     if (window.confirm('このサービスリクエストを削除してもよろしいですか？')) {
       try {
-        await deleteServiceRequest(id);
-        setNotification({ message: 'サービスリクエストが正常に削除されました。', type: NotificationType.SUCCESS });
+        await serviceRequestApi.deleteServiceRequest(id);
+        addToast('サービスリクエストが正常に削除されました。', 'success');
         fetchRequests();
       } catch (error) {
         console.error("Failed to delete service request:", error);
-        setNotification({ message: 'サービスリクエストの削除に失敗しました。', type: NotificationType.ERROR });
+        addToast('サービスリクエストの削除に失敗しました。', 'error');
       }
     }
   };
@@ -187,7 +188,6 @@ const ServiceRequestPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
       <div className="flex justify-between items-center">
         <h2 className="text-3xl font-semibold text-slate-800">サービスリクエスト管理</h2>
         <Button onClick={() => handleOpenModal()}>サービスリクエスト作成</Button>

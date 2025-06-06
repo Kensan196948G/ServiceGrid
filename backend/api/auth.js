@@ -13,6 +13,7 @@ const db = new sqlite3.Database(dbPath);
 const login = async (req, res) => {
   try {
     const { username, password } = req.body;
+    console.log('🔍 Login attempt:', { username, hasPassword: !!password });
 
     // 入力検証
     if (!username || !password) {
@@ -23,12 +24,13 @@ const login = async (req, res) => {
     }
 
     // ユーザー検索
+    console.log('🔍 Searching for user in database...');
     db.get(
       'SELECT * FROM users WHERE username = ?',
       [username],
       async (err, user) => {
         if (err) {
-          console.error('Database error:', err);
+          console.error('❌ Database error:', err);
           return res.status(500).json({
             error: 'データベースエラーが発生しました',
             code: 'DATABASE_ERROR'
@@ -36,11 +38,14 @@ const login = async (req, res) => {
         }
 
         if (!user) {
+          console.log('❌ User not found:', username);
           return res.status(401).json({
             error: '認証に失敗しました',
             code: 'INVALID_CREDENTIALS'
           });
         }
+
+        console.log('✅ User found:', { username: user.username, role: user.role });
 
         // アカウントロック確認
         if (user.account_locked && new Date() < new Date(user.account_locked_until)) {

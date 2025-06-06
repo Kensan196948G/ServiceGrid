@@ -1,16 +1,10 @@
 
 import React, { useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
 import { ChangeRequest, ItemStatus, Priority, UserRole } from '../types';
-import { 
-    getChangeRequests, 
-    addChangeRequest, 
-    updateChangeRequest, 
-    deleteChangeRequest,
-    approveChangeRequest as approveChangeRequestAPI,
-    rejectChangeRequest as rejectChangeRequestAPI
-} from '../services/mockItsmService';
+import * as changeApi from '../services/changeApiService';
 import { Button, Table, Modal, Input, Textarea, Select, Spinner, Card, Notification, NotificationType } from '../components/CommonUI';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../hooks/useToast';
 import { itemStatusToJapanese, priorityToJapanese, impactUrgencyRiskToJapanese } from '../localization';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -19,8 +13,8 @@ const ChangeManagementPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRequest, setEditingRequest] = useState<Partial<ChangeRequest> | null>(null);
-  const [notification, setNotification] = useState<{ message: string; type: NotificationType } | null>(null);
   const { user } = useAuth();
+  const { addToast } = useToast();
 
   const priorities: Priority[] = ['Low', 'Medium', 'High', 'Critical'];
   const impacts: Array<ChangeRequest['impact']> = ['Low', 'Medium', 'High'];
@@ -55,15 +49,15 @@ const ChangeManagementPage: React.FC = () => {
   const fetchChangeRequests = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await getChangeRequests();
+      const data = await changeApi.getChanges();
       setAllChangeRequests(data.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     } catch (error) {
       console.error("変更リクエストの読み込みに失敗:", error);
-      setNotification({ message: '変更リクエストの読み込みに失敗しました。', type: NotificationType.ERROR });
+      addToast('変更リクエストの読み込みに失敗しました。', 'error');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [addToast]);
 
   useEffect(() => {
     fetchChangeRequests();
@@ -201,33 +195,33 @@ const ChangeManagementPage: React.FC = () => {
 
 
       if (editingRequest.id) {
-        await updateChangeRequest(editingRequest.id, requestToSave);
-        setNotification({ message: '変更リクエストが正常に更新されました。', type: NotificationType.SUCCESS });
+        await changeApi.updateChange(editingRequest.id, requestToSave);
+        addToast('変更リクエストが正常に更新されました。', 'success');
       } else {
         const newRequestData = {
             ...requestToSave,
             requester: requestToSave.requester || user.username 
         } as Omit<ChangeRequest, 'id'|'createdAt'|'updatedAt'>;
-        await addChangeRequest(newRequestData);
-        setNotification({ message: '変更リクエストが正常に作成されました。', type: NotificationType.SUCCESS });
+        await changeApi.createChange(newRequestData);
+        addToast('変更リクエストが正常に作成されました。', 'success');
       }
       fetchChangeRequests();
       handleCloseModal();
     } catch (error) {
       console.error("変更リクエストの保存に失敗:", error);
-      setNotification({ message: '変更リクエストの保存に失敗しました。', type: NotificationType.ERROR });
+      addToast('変更リクエストの保存に失敗しました。', 'error');
     }
   };
   
   const handleDelete = async (id: string) => {
     if (window.confirm('この変更リクエストを削除してもよろしいですか？')) {
       try {
-        await deleteChangeRequest(id);
-        setNotification({ message: '変更リクエストが正常に削除されました。', type: NotificationType.SUCCESS });
+        await changeApi.deleteChange(id);
+        addToast('変更リクエストが正常に削除されました。', 'success');
         fetchChangeRequests();
       } catch (error) {
         console.error("Failed to delete change request:", error);
-        setNotification({ message: '変更リクエストの削除に失敗しました。', type: NotificationType.ERROR });
+        addToast('変更リクエストの削除に失敗しました。', 'error');
       }
     }
   };
@@ -235,11 +229,11 @@ const ChangeManagementPage: React.FC = () => {
   const handleApprove = async (id: string) => {
     if (!user) return;
     try {
-      await approveChangeRequestAPI(id, user.username);
-      setNotification({ message: '変更リクエストが承認されました。', type: NotificationType.SUCCESS });
+      await changeApi.approveChange(id, user.username);
+      addToast('変更リクエストが承認されました。', 'success');
       fetchChangeRequests();
     } catch (error: any) {
-      setNotification({ message: `承認処理に失敗: ${error.message}`, type: NotificationType.ERROR });
+      addToast(`承認処理に失敗: ${error.message}`, 'error');
     }
   };
 
@@ -251,11 +245,11 @@ const ChangeManagementPage: React.FC = () => {
       return; // User cancelled
     }
     try {
-      await rejectChangeRequestAPI(id, user.username, reason || "理由未記入");
-      setNotification({ message: '変更リクエストが却下されました。', type: NotificationType.SUCCESS });
+      await changeApi.rejectChange(id, user.username, reason || "理由未記入");
+      addToast('変更リクエストが却下されました。', 'success');
       fetchChangeRequests();
     } catch (error: any) {
-      setNotification({ message: `却下処理に失敗: ${error.message}`, type: NotificationType.ERROR });
+      addToast(`却下処理に失敗: ${error.message}`, 'error');
     }
   };
 
@@ -296,7 +290,6 @@ const ChangeManagementPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
       <div className="flex justify-between items-center">
         <h2 className="text-3xl font-semibold text-slate-800">変更管理</h2>
         <Button onClick={() => handleOpenModal()}>新規リクエスト作成</Button>

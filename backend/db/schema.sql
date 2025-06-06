@@ -1,18 +1,38 @@
 -- ITSM準拠IT運用システムプラットフォーム データベーススキーマ
 -- SQLite用初期化スクリプト
 
--- 資産管理テーブル
+-- 資産管理テーブル (拡張版 - assets-schema.sqlと統合)
 CREATE TABLE assets (
-    asset_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    asset_no TEXT NOT NULL,
-    name TEXT,
-    type TEXT,
-    user TEXT,
-    location TEXT,
-    status TEXT,
-    warranty_end DATE,
-    created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_date DATETIME DEFAULT CURRENT_TIMESTAMP
+  asset_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  asset_tag VARCHAR(50) UNIQUE NOT NULL,
+  name VARCHAR(200) NOT NULL,
+  description TEXT,
+  category VARCHAR(100) NOT NULL DEFAULT 'Hardware',
+  type VARCHAR(100),
+  manufacturer VARCHAR(100),
+  model VARCHAR(100),
+  serial_number VARCHAR(100),
+  location VARCHAR(200),
+  department VARCHAR(100),
+  owner VARCHAR(100),
+  assigned_to VARCHAR(100),
+  status VARCHAR(50) NOT NULL DEFAULT 'Active',
+  purchase_date DATE,
+  purchase_cost DECIMAL(12,2),
+  warranty_expiry DATE,
+  last_maintenance DATE,
+  next_maintenance DATE,
+  ip_address VARCHAR(45),
+  mac_address VARCHAR(17),
+  operating_system VARCHAR(100),
+  software_licenses TEXT, -- JSON array
+  configuration TEXT, -- JSON object
+  notes TEXT,
+  tags TEXT, -- JSON array
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_by VARCHAR(100),
+  updated_by VARCHAR(100)
 );
 
 -- インシデント管理テーブル
@@ -221,12 +241,27 @@ CREATE TABLE compliance_risks (
 );
 
 -- インデックス作成
+-- ユーザー関連
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_email ON users(email);
+
+-- 資産管理関連
+CREATE INDEX idx_assets_tag ON assets(asset_tag);
+CREATE INDEX idx_assets_category ON assets(category);
+CREATE INDEX idx_assets_status ON assets(status);
+CREATE INDEX idx_assets_location ON assets(location);
+CREATE INDEX idx_assets_assigned_to ON assets(assigned_to);
+CREATE INDEX idx_assets_created_at ON assets(created_at);
+
+-- インシデント管理関連
 CREATE INDEX idx_incidents_status ON incidents(status);
 CREATE INDEX idx_incidents_priority ON incidents(priority);
 CREATE INDEX idx_incidents_created_date ON incidents(created_date);
+
+-- サービス要求関連
 CREATE INDEX idx_service_requests_status ON service_requests(status);
+
+-- ログ関連
 CREATE INDEX idx_logs_event_time ON logs(event_time);
 CREATE INDEX idx_logs_user ON logs(user);
 
@@ -238,3 +273,30 @@ CREATE INDEX idx_compliance_audits_standard ON compliance_audits(standard);
 CREATE INDEX idx_compliance_audits_status ON compliance_audits(status);
 CREATE INDEX idx_compliance_risks_overall_risk ON compliance_risks(overall_risk);
 CREATE INDEX idx_compliance_risks_status ON compliance_risks(status);
+
+-- 資産管理テーブル用トリガー
+-- 更新日時自動更新トリガー
+CREATE TRIGGER update_assets_timestamp 
+  AFTER UPDATE ON assets
+  BEGIN
+    UPDATE assets SET updated_at = CURRENT_TIMESTAMP WHERE asset_id = NEW.asset_id;
+  END;
+
+-- バリデーション制約
+CREATE TRIGGER validate_asset_status
+  BEFORE INSERT ON assets
+  BEGIN
+    SELECT CASE
+      WHEN NEW.status NOT IN ('Active', 'Inactive', 'Maintenance', 'Retired', 'Lost', 'Stolen', 'Disposed')
+      THEN RAISE(ABORT, 'Invalid asset status')
+    END;
+  END;
+
+CREATE TRIGGER validate_asset_status_update
+  BEFORE UPDATE ON assets
+  BEGIN
+    SELECT CASE
+      WHEN NEW.status NOT IN ('Active', 'Inactive', 'Maintenance', 'Retired', 'Lost', 'Stolen', 'Disposed')
+      THEN RAISE(ABORT, 'Invalid asset status')
+    END;
+  END;

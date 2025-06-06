@@ -4,6 +4,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import { MainLayout } from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
+import ToastContainer from './components/ToastContainer';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import IncidentPage from './pages/IncidentPage';
@@ -69,6 +70,7 @@ const App: React.FC = () => {
             }
           />
         </Routes>
+        <ToastContainer />
       </HashRouter>
     </ErrorBoundary>
   );

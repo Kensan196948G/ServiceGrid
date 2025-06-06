@@ -87,14 +87,14 @@ async function initDatabase() {
         ],
         columns: 'title, description, status, priority, assignee, reported_date'
       },
-      // サンプル資産
+      // サンプル資産（新しいスキーマに対応）
       {
         table: 'assets',
         data: [
-          ['SRV001', 'Webサーバー', 'Server', 'IT部', 'データセンターA', 'Active', '2025-12-31'],
-          ['PC001', '管理者用PC', 'Hardware', 'admin', 'オフィス1F', 'Active', '2024-12-31']
+          ['SRV-001', 'Webサーバー', 'プロダクション用Webサーバー', 'Server', 'Physical Server', 'Dell', 'PowerEdge R740', 'DL1234567890', 'データセンター A-1', 'IT部門', 'admin', 'admin', 'Active', '2023-01-15', 850000.00, '2026-01-15', '192.168.1.10', '00:1B:21:12:34:56', 'Ubuntu Server 22.04 LTS', '["Apache", "MySQL", "PHP"]', '{"cpu": "Intel Xeon", "ram": "32GB", "storage": "1TB SSD"}', '重要なプロダクションサーバー', '["production", "web", "critical"]', 'admin'],
+          ['WS-001', '開発用ワークステーション', '開発者用デスクトップPC', 'Workstation', 'Desktop PC', 'HP', 'EliteDesk 800', 'HP9876543210', 'オフィス 3F-15', '開発部門', 'developer01', 'developer01', 'Active', '2023-03-20', 120000.00, '2026-03-20', '192.168.1.101', '00:1B:21:98:76:54', 'Windows 11 Pro', '["Visual Studio", "Docker", "Git"]', '{"cpu": "Intel i7", "ram": "16GB", "storage": "512GB SSD"}', '開発環境設定済み', '["development", "workstation"]', 'admin']
         ],
-        columns: 'asset_no, name, type, user, location, status, warranty_end'
+        columns: 'asset_tag, name, description, category, type, manufacturer, model, serial_number, location, department, owner, assigned_to, status, purchase_date, purchase_cost, warranty_expiry, ip_address, mac_address, operating_system, software_licenses, configuration, notes, tags, created_by'
       }
     ];
 

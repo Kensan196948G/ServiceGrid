@@ -1,32 +1,34 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { UserRole } from '../types';
 import { Button, Input, Card } from '../components/CommonUI';
-import { APP_NAME } from '../constants';
 
 const LoginPage: React.FC = () => {
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState(''); // Password not actually checked in this mock
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [role, setRole] = useState<UserRole>(UserRole.USER);
-  const [error, setError] = useState('');
-  const { login } = useAuth();
+  const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { login, error: authError, isLoading } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username) { // Basic validation
-      setError('ユーザー名は必須です。');
+    
+    if (!username || !password) {
       return;
     }
-    // In a real app, you'd authenticate against a backend.
-    // Here, we just log in with the chosen role.
-    // Password "admin" for admin, anything else for user is a common mock pattern.
-    const selectedRole = password === 'adminpass' ? UserRole.ADMIN : UserRole.USER;
-    login(username, selectedRole); 
-    setError('');
-    navigate('/');
+    
+    setIsSubmitting(true);
+    
+    try {
+      const success = await login(username, password);
+      if (success) {
+        navigate('/');
+      }
+    } catch (error) {
+      console.error('Login failed:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -61,8 +63,9 @@ const LoginPage: React.FC = () => {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="例: taro.yamada"
+              placeholder="ユーザー名を入力"
               required
+              disabled={isSubmitting || isLoading}
               aria-required="true"
               className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
             />
@@ -72,8 +75,9 @@ const LoginPage: React.FC = () => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="パスワードを入力してください"
+              placeholder="パスワードを入力"
               required
+              disabled={isSubmitting || isLoading}
               aria-required="true"
               className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
             />
@@ -85,20 +89,20 @@ const LoginPage: React.FC = () => {
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"/>
               </svg>
               <div className="text-xs text-blue-800">
-                <p className="font-medium mb-1">テストログイン情報:</p>
-                <p>ユーザー: 任意の名前 + 任意のパスワード</p>
-                <p>管理者: 任意の名前 + <code className="bg-blue-100 px-1 rounded text-xs">adminpass</code></p>
+                <p className="font-medium mb-1">テストアカウント:</p>
+                <p>管理者: <code className="bg-blue-100 px-1 rounded text-xs">admin</code> / <code className="bg-blue-100 px-1 rounded text-xs">admin123</code></p>
+                <p>オペレータ: <code className="bg-blue-100 px-1 rounded text-xs">operator</code> / <code className="bg-blue-100 px-1 rounded text-xs">operator123</code></p>
               </div>
             </div>
           </div>
           
-          {error && (
+          {authError && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3">
               <div className="flex items-center space-x-2">
                 <svg className="w-4 h-4 text-red-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
                 </svg>
-                <p className="text-sm text-red-800" role="alert">{error}</p>
+                <p className="text-sm text-red-800" role="alert">{authError}</p>
               </div>
             </div>
           )}
@@ -107,12 +111,22 @@ const LoginPage: React.FC = () => {
             type="submit" 
             variant="primary" 
             size="lg" 
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 transform hover:scale-[1.02] shadow-lg"
+            disabled={!username || !password || isSubmitting || isLoading}
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 transform hover:scale-[1.02] shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
           >
-            <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z" clipRule="evenodd"/>
-            </svg>
-            ログイン
+            {isSubmitting || isLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                ログイン中...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z" clipRule="evenodd"/>
+                </svg>
+                ログイン
+              </>
+            )}
           </Button>
         </form>
       </Card>

@@ -150,7 +150,7 @@ function getIncidents(req, res) {
         // JSON文字列をパース
         const processedIncidents = incidents.map(incident => ({
           ...incident,
-          relatedAssets: incident.relatedAssets ? JSON.parse(incident.relatedAssets) : [],
+          relatedAssets: incident.related_assets ? JSON.parse(incident.related_assets) : [],
           tags: incident.tags ? JSON.parse(incident.tags) : []
         }));
         
@@ -229,7 +229,7 @@ function getIncidentById(req, res) {
       // JSON文字列をパース
       const processedIncident = {
         ...incident,
-        relatedAssets: incident.relatedAssets ? JSON.parse(incident.relatedAssets) : [],
+        relatedAssets: incident.related_assets ? JSON.parse(incident.related_assets) : [],
         tags: incident.tags ? JSON.parse(incident.tags) : []
       };
       
