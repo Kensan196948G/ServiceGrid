@@ -259,69 +259,122 @@ app.post('/api/incidents', authenticateToken, (req, res) => {
   );
 });
 
-// 資産管理API
-app.get('/api/assets', authenticateToken, (req, res) => {
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 20;
-  const offset = (page - 1) * limit;
-  
-  const countQuery = 'SELECT COUNT(*) as total FROM assets';
-  const dataQuery = 'SELECT * FROM assets ORDER BY created_date DESC LIMIT ? OFFSET ?';
-  
-  db.get(countQuery, (err, countResult) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
-    
-    db.all(dataQuery, [limit, offset], (err, assets) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
-      }
-      
-      res.json({
-        data: assets,
-        pagination: {
-          page,
-          limit,
-          total: countResult.total,
-          totalPages: Math.ceil(countResult.total / limit)
-        }
-      });
-    });
-  });
-});
+// API モジュールのインポート
+const assetsAPI = require('./api/assets');
+const incidentsAPI = require('./api/incidents');
+const authAPI = require('./api/auth');
+const serviceRequestsAPI = require('./api/service-requests');
+const knowledgeAPI = require('./api/knowledge');
+const changesAPI = require('./api/changes-enhanced');
+const problemsAPI = require('./api/problems');
+const slasAPI = require('./api/slas');
+const capacityAPI = require('./api/capacity');
+const availabilityAPI = require('./api/availability');
+const auditLogsAPI = require('./api/audit-logs');
+const reportsAPI = require('./api/reports');
 
-app.post('/api/assets', authenticateToken, (req, res) => {
-  const { asset_no, name, type, user, location, status } = req.body;
-  
-  if (!asset_no || !name) {
-    return res.status(400).json({ error: 'Asset number and name are required' });
-  }
-  
-  db.run(
-    'INSERT INTO assets (asset_no, name, type, user, location, status) VALUES (?, ?, ?, ?, ?, ?)',
-    [asset_no, name, type, user, location, status || 'Active'],
-    function(err) {
-      if (err) {
-        if (err.code === 'SQLITE_CONSTRAINT') {
-          return res.status(409).json({ error: 'Asset number already exists' });
-        }
-        return res.status(500).json({ error: 'Failed to create asset' });
-      }
-      
-      // 監査ログ
-      db.run(
-        'INSERT INTO logs (event_type, event_time, user, detail) VALUES (?, CURRENT_TIMESTAMP, ?, ?)',
-        ['ASSET_CREATE', req.user.username, `Created asset: ${asset_no} - ${name}`]
-      );
-      
-      res.status(201).json({ 
-        id: this.lastID,
-        message: 'Asset created successfully' 
-      });
-    }
-  );
-});
+// 資産管理API
+app.get('/api/assets', authenticateToken, assetsAPI.getAssets);
+app.get('/api/assets/stats', authenticateToken, assetsAPI.getAssetStats);
+app.get('/api/assets/generate-tag', authenticateToken, assetsAPI.generateAssetTag);
+app.get('/api/assets/:id', authenticateToken, assetsAPI.getAssetById);
+app.post('/api/assets', authenticateToken, assetsAPI.createAsset);
+app.put('/api/assets/:id', authenticateToken, assetsAPI.updateAsset);
+app.delete('/api/assets/:id', authenticateToken, assetsAPI.deleteAsset);
+
+// インシデント管理API（拡張版に置き換え）
+app.get('/api/incidents', authenticateToken, incidentsAPI.getIncidents);
+app.get('/api/incidents/stats', authenticateToken, incidentsAPI.getIncidentStats);
+app.get('/api/incidents/:id', authenticateToken, incidentsAPI.getIncidentById);
+app.post('/api/incidents', authenticateToken, incidentsAPI.createIncident);
+app.put('/api/incidents/:id', authenticateToken, incidentsAPI.updateIncident);
+app.delete('/api/incidents/:id', authenticateToken, incidentsAPI.deleteIncident);
+
+// サービス要求管理API
+app.get('/api/service-requests', authenticateToken, serviceRequestsAPI.getServiceRequests);
+app.get('/api/service-requests/stats', authenticateToken, serviceRequestsAPI.getServiceRequestStats);
+app.get('/api/service-requests/:id', authenticateToken, serviceRequestsAPI.getServiceRequestById);
+app.post('/api/service-requests', authenticateToken, serviceRequestsAPI.createServiceRequest);
+app.put('/api/service-requests/:id', authenticateToken, serviceRequestsAPI.updateServiceRequest);
+app.put('/api/service-requests/:id/approve', authenticateToken, serviceRequestsAPI.approveServiceRequest);
+app.put('/api/service-requests/:id/fulfill', authenticateToken, serviceRequestsAPI.fulfillServiceRequest);
+app.delete('/api/service-requests/:id', authenticateToken, serviceRequestsAPI.deleteServiceRequest);
+
+// ナレッジ管理API
+app.get('/api/knowledge', authenticateToken, knowledgeAPI.getKnowledge);
+app.get('/api/knowledge/stats', authenticateToken, knowledgeAPI.getKnowledgeStats);
+app.get('/api/knowledge/:id', authenticateToken, knowledgeAPI.getKnowledgeById);
+app.post('/api/knowledge', authenticateToken, knowledgeAPI.createKnowledge);
+app.put('/api/knowledge/:id', authenticateToken, knowledgeAPI.updateKnowledge);
+app.put('/api/knowledge/:id/approve', authenticateToken, knowledgeAPI.approveKnowledge);
+app.put('/api/knowledge/:id/rate', authenticateToken, knowledgeAPI.rateKnowledge);
+app.delete('/api/knowledge/:id', authenticateToken, knowledgeAPI.deleteKnowledge);
+
+// 変更管理API
+app.get('/api/changes', authenticateToken, changesAPI.getChanges);
+app.get('/api/changes/stats', authenticateToken, changesAPI.getChangeStats);
+app.get('/api/changes/:id', authenticateToken, changesAPI.getChangeById);
+app.post('/api/changes', authenticateToken, changesAPI.createChange);
+app.put('/api/changes/:id', authenticateToken, changesAPI.updateChange);
+app.put('/api/changes/:id/approve', authenticateToken, changesAPI.approveChange);
+app.put('/api/changes/:id/start-implementation', authenticateToken, changesAPI.startImplementation);
+app.put('/api/changes/:id/complete-implementation', authenticateToken, changesAPI.completeImplementation);
+app.delete('/api/changes/:id', authenticateToken, changesAPI.deleteChange);
+
+// 問題管理API
+app.get('/api/problems', authenticateToken, problemsAPI.getProblems);
+app.get('/api/problems/stats', authenticateToken, problemsAPI.getProblemStats);
+app.get('/api/problems/:id', authenticateToken, problemsAPI.getProblemById);
+app.post('/api/problems', authenticateToken, problemsAPI.createProblem);
+app.put('/api/problems/:id', authenticateToken, problemsAPI.updateProblem);
+app.put('/api/problems/:id/start-rca', authenticateToken, problemsAPI.startRootCauseAnalysis);
+app.put('/api/problems/:id/mark-known-error', authenticateToken, problemsAPI.markAsKnownError);
+app.put('/api/problems/:id/resolve', authenticateToken, problemsAPI.resolveProblem);
+app.put('/api/problems/:id/link-incident', authenticateToken, problemsAPI.linkIncident);
+app.delete('/api/problems/:id', authenticateToken, problemsAPI.deleteProblem);
+
+// SLA管理API
+app.get('/api/slas', authenticateToken, slasAPI.getSLAs);
+app.get('/api/slas/stats', authenticateToken, slasAPI.getSLAStats);
+app.get('/api/slas/alerts', authenticateToken, slasAPI.generateSLAAlerts);
+app.get('/api/slas/:id', authenticateToken, slasAPI.getSLAById);
+app.post('/api/slas', authenticateToken, slasAPI.createSLA);
+app.put('/api/slas/:id', authenticateToken, slasAPI.updateSLA);
+app.put('/api/slas/bulk-update', authenticateToken, slasAPI.bulkUpdateSLAs);
+app.delete('/api/slas/:id', authenticateToken, slasAPI.deleteSLA);
+
+// キャパシティ管理API
+app.get('/api/capacity', authenticateToken, capacityAPI.getCapacities);
+app.get('/api/capacity/stats', authenticateToken, capacityAPI.getCapacityStats);
+app.get('/api/capacity/alerts', authenticateToken, capacityAPI.generateCapacityAlerts);
+app.get('/api/capacity/:id', authenticateToken, capacityAPI.getCapacityById);
+app.post('/api/capacity', authenticateToken, capacityAPI.createCapacity);
+app.put('/api/capacity/:id', authenticateToken, capacityAPI.updateCapacity);
+app.delete('/api/capacity/:id', authenticateToken, capacityAPI.deleteCapacity);
+
+// 可用性管理API
+app.get('/api/availability', authenticateToken, availabilityAPI.getAvailabilities);
+app.get('/api/availability/stats', authenticateToken, availabilityAPI.getAvailabilityStats);
+app.get('/api/availability/alerts', authenticateToken, availabilityAPI.generateAvailabilityAlerts);
+app.get('/api/availability/:id', authenticateToken, availabilityAPI.getAvailabilityById);
+app.post('/api/availability', authenticateToken, availabilityAPI.createAvailability);
+app.put('/api/availability/:id', authenticateToken, availabilityAPI.updateAvailability);
+app.delete('/api/availability/:id', authenticateToken, availabilityAPI.deleteAvailability);
+
+// 監査ログ管理API
+app.get('/api/audit-logs', authenticateToken, auditLogsAPI.getAuditLogs);
+app.get('/api/audit-logs/stats', authenticateToken, auditLogsAPI.getAuditLogStats);
+app.get('/api/audit-logs/security', authenticateToken, auditLogsAPI.getSecurityAuditLogs);
+app.get('/api/audit-logs/compliance-report', authenticateToken, auditLogsAPI.generateComplianceReport);
+app.get('/api/audit-logs/export', authenticateToken, auditLogsAPI.exportAuditLogs);
+app.get('/api/audit-logs/:id', authenticateToken, auditLogsAPI.getAuditLogById);
+app.delete('/api/audit-logs/archive', authenticateToken, auditLogsAPI.archiveOldLogs);
+
+// レポート機能API
+app.get('/api/reports/executive-dashboard', authenticateToken, reportsAPI.getExecutiveDashboard);
+app.get('/api/reports/performance', authenticateToken, reportsAPI.getPerformanceReport);
+app.get('/api/reports/monthly-operational', authenticateToken, reportsAPI.getMonthlyOperationalReport);
+app.post('/api/reports/custom', authenticateToken, reportsAPI.generateCustomReport);
 
 // エラーハンドリング
 app.use(errorHandler);

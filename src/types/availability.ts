@@ -10,6 +10,7 @@ export enum CurrentServiceStatus {
   DEGRADED = 'Degraded',
   PARTIAL_OUTAGE = 'Partial Outage',
   MAJOR_OUTAGE = 'Major Outage',
+  OUTAGE = 'Outage',
   MAINTENANCE = 'Maintenance',
   UNKNOWN = 'Unknown'
 }
@@ -40,4 +41,11 @@ export interface AvailabilityRecord {
   relatedSlaId?: string; 
   lastRefreshed: string; 
   notes?: string;
+}
+
+export interface AvailabilityQuickActionFormData {
+  action: 'maintenance' | 'incident' | 'report' | 'alert';
+  serviceId?: string;
+  duration?: number;
+  description?: string;
 }
