@@ -1,0 +1,43 @@
+{
+  "name": "itsm準拠it運用システムプラットフォーム",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit",
+    "serve": "vite preview --port 4173",
+    "test": "echo 'テスト環境は設定中です。現在は開発に集中します。'",
+    "test:watch": "echo 'テスト環境は設定中です。'",
+    "test:coverage": "echo 'テスト環境は設定中です。'",
+    "test:ci": "echo 'テスト環境は設定中です。'",
+    "start:all": "./start-all.sh",
+    "stop:all": "./stop-all.sh",
+    "backend": "cd backend && npm start",
+    "frontend": "npm run dev"
+  },
+  "dependencies": {
+    "react-router-dom": "^7.6.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "recharts": "^2.15.3",
+    "@google/genai": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.7.2",
+    "vite": "^6.2.0",
+    "@testing-library/react": "^14.3.1",
+    "@testing-library/jest-dom": "^6.4.6",
+    "@testing-library/user-event": "^14.5.2",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "ts-jest": "^29.1.4",
+    "identity-obj-proxy": "^3.0.0"
+  }
+}
