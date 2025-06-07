@@ -26,6 +26,8 @@
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
     "sqlite3": "^5.1.7"
   },
   "engines": {
@@ -34,7 +36,9 @@
   "devDependencies": {
     "@types/jsdom": "^21.1.7",
     "@types/supertest": "^6.0.3",
+    "@vitejs/plugin-react": "^4.5.1",
     "jsdom": "^26.1.0",
-    "supertest": "^7.1.1"
+    "supertest": "^7.1.1",
+    "vite": "^6.3.5"
   }
 }
