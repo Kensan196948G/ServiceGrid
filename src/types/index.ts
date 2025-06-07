@@ -5,6 +5,7 @@ export * from './user';
 // Domain-specific types
 export * from './incident';
 export * from './asset';
+export * from './service-request';
 export * from './knowledge';
 export * from './dashboard';
 export * from './security';

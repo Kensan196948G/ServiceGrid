@@ -1,6 +1,12 @@
 
 import React, { useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
-import { ServiceRequest, ItemStatus, UserRole } from '../types';
+import { 
+  ServiceRequest, 
+  ServiceRequestFilter, 
+  ServiceRequestResponse,
+  ServiceRequestStats,
+  UserRole 
+} from '../types';
 import * as serviceRequestApi from '../services/serviceRequestApiService';
 import { Button, Table, Modal, Input, Textarea, Select, Spinner, Card, Notification, NotificationType } from '../components/CommonUI';
 import { useAuth } from '../contexts/AuthContext';
@@ -42,8 +48,15 @@ const ServiceRequestPage: React.FC = () => {
   const fetchRequests = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await serviceRequestApi.getServiceRequests();
-      setRequests(data);
+      const filters: ServiceRequestFilter = {
+        status: statusFilter || undefined,
+        category: serviceTypeFilter || undefined,
+        page: currentPage,
+        limit: itemsPerPage,
+        date_from: dateFilter || undefined
+      };
+      const response = await serviceRequestApi.getServiceRequests(filters);
+      setRequests(response.data);
     } catch (error) {
       console.error("Failed to fetch service requests:", error);
       addToast('サービスリクエストの読み込みに失敗しました。', 'error');
