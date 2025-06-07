@@ -1,0 +1,98 @@
+{
+  "summary": {
+    "total_tests": 10,
+    "passed": 3,
+    "failed": 7,
+    "success_rate": "30%",
+    "execution_time": "2025-06-07T12:25:00.364Z"
+  },
+  "test_categories": {
+    "basic_operations": 5,
+    "advanced_features": 2,
+    "security": 0,
+    "data_integrity": 3
+  },
+  "results": [
+    {
+      "test": "管理者認証",
+      "success": true,
+      "details": "JWT トークン取得成功",
+      "data": null,
+      "timestamp": "2025-06-07T12:24:59.816Z"
+    },
+    {
+      "test": "SLA一覧取得",
+      "success": true,
+      "details": "5件のSLAを取得",
+      "data": {
+        "count": 5,
+        "sample": {
+          "service": "Integration Test Service",
+          "metric": "API Availability",
+          "status": "Met"
+        }
+      },
+      "timestamp": "2025-06-07T12:25:00.126Z"
+    },
+    {
+      "test": "SLA統計取得",
+      "success": true,
+      "details": "統計データ取得成功",
+      "data": {
+        "total": 5,
+        "achievement_rate": 93.8,
+        "breached": 1
+      },
+      "timestamp": "2025-06-07T12:25:00.152Z"
+    },
+    {
+      "test": "SLA作成",
+      "success": false,
+      "details": "作成エラー: undefined undefined",
+      "data": null,
+      "timestamp": "2025-06-07T12:25:00.309Z"
+    },
+    {
+      "test": "SLAアラート生成",
+      "success": false,
+      "details": "アラート生成エラー: undefined",
+      "data": null,
+      "timestamp": "2025-06-07T12:25:00.313Z"
+    },
+    {
+      "test": "バルクSLA更新",
+      "success": false,
+      "details": "バルク更新エラー: undefined",
+      "data": null,
+      "timestamp": "2025-06-07T12:25:00.323Z"
+    },
+    {
+      "test": "オペレータログイン",
+      "success": false,
+      "details": "オペレータログインに失敗",
+      "data": null,
+      "timestamp": "2025-06-07T12:25:00.333Z"
+    },
+    {
+      "test": "データ検証テスト 1",
+      "success": false,
+      "details": "予期しないエラー: undefined",
+      "data": null,
+      "timestamp": "2025-06-07T12:25:00.343Z"
+    },
+    {
+      "test": "データ検証テスト 2",
+      "success": false,
+      "details": "予期しないエラー: undefined",
+      "data": null,
+      "timestamp": "2025-06-07T12:25:00.354Z"
+    },
+    {
+      "test": "データ検証テスト 3",
+      "success": false,
+      "details": "予期しないエラー: undefined",
+      "data": null,
+      "timestamp": "2025-06-07T12:25:00.363Z"
+    }
+  ]
+}

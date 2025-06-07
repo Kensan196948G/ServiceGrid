@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
-import { Problem, ItemStatus, Priority, UserRole } from '../types';
-import { getProblems, addProblem, updateProblem, deleteProblem, getIncidents } from '../services/mockItsmService';
+import { Problem, ProblemStatus, Priority, UserRole } from '../types';
+import { getProblems, createProblem, updateProblem, deleteProblem } from '../services/problemApiService';
+import { getIncidents } from '../services/mockItsmService'; // Still using mock for incidents until implemented
 import { Button, Table, Modal, Input, Textarea, Select, Spinner, Card, Notification, NotificationType } from '../components/CommonUI';
 import { useAuth } from '../contexts/AuthContext';
 import { itemStatusToJapanese, priorityToJapanese, booleanToJapanese } from '../localization';
@@ -17,7 +18,7 @@ const ProblemManagementPage: React.FC = () => {
   const [notification, setNotification] = useState<{ message: string; type: NotificationType } | null>(null);
   const { user } = useAuth();
 
-  const problemStatusesOptions = [ItemStatus.NEW, ItemStatus.ANALYSIS, ItemStatus.SOLUTION_PROPOSED, ItemStatus.PENDING, ItemStatus.RESOLVED, ItemStatus.CLOSED];
+  const problemStatusesOptions: ProblemStatus[] = ['Logged', 'In Progress', 'Known Error', 'Resolved', 'Closed'];
   const prioritiesOptions: Priority[] = ['Low', 'Medium', 'High', 'Critical'];
   
   // ITサービス・ITシステム対象オプション（資産の種類 + ITサービス）
@@ -54,11 +55,11 @@ const ProblemManagementPage: React.FC = () => {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [problemsData, incidentsData] = await Promise.all([
+      const [problemsResponse, incidentsData] = await Promise.all([
         getProblems(),
         getIncidents()
       ]);
-      setAllProblems(problemsData.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      setAllProblems(problemsResponse.data.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
       setAvailableIncidents(incidentsData);
     } catch (error) {
       console.error("データの読み込みに失敗:", error);
@@ -149,7 +150,7 @@ const ProblemManagementPage: React.FC = () => {
     } : { 
       title: '', 
       description: '', 
-      status: ItemStatus.NEW, 
+      status: 'Logged' as ProblemStatus, 
       priority: 'Medium',
       relatedIncidents: [],
       knownError: false,
@@ -213,7 +214,7 @@ const ProblemManagementPage: React.FC = () => {
             systemTargets: (problemToSave as any).systemTargets || [],
             jvnNumbers: (problemToSave as any).jvnNumbers || []
         } as Omit<Problem, 'id'|'createdAt'|'updatedAt'>;
-        await addProblem(newProblemData);
+        await createProblem(newProblemData);
         setNotification({ message: '問題が正常に登録されました。', type: NotificationType.SUCCESS });
       }
       fetchData();
@@ -449,7 +450,7 @@ const ProblemManagementPage: React.FC = () => {
             
             <Textarea label="説明" name="description" value={editingProblem.description || ''} onChange={handleInputChange} required rows={3}/>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Select label="ステータス" name="status" value={editingProblem.status || ItemStatus.NEW} onChange={handleInputChange} options={problemStatusesOptions.map(s => ({value: s, label: itemStatusToJapanese(s)}))} required/>
+                <Select label="ステータス" name="status" value={editingProblem.status || 'Logged'} onChange={handleInputChange} options={problemStatusesOptions.map(s => ({value: s, label: itemStatusToJapanese(s)}))} required/>
                 <Select label="優先度" name="priority" value={editingProblem.priority || 'Medium'} onChange={handleInputChange} options={prioritiesOptions.map(p => ({value: p, label: priorityToJapanese(p)}))} required/>
             </div>
             <div>

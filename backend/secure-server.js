@@ -13,6 +13,7 @@ const assetsApi = require('./api/assets');
 const serviceRequestsApi = require('./api/service-requests');
 const changesApi = require('./api/changes');
 const knowledgeApi = require('./api/knowledge');
+const slasApi = require('./api/slas');
 
 const app = express();
 const PORT = process.env.PORT || 8082;
@@ -146,7 +147,8 @@ app.get('/', (req, res) => {
         'GET /api/assets - Assets API (JWT required)',
         'GET /api/service-requests - Service Requests API (JWT required)',
         'GET /api/changes - Change Management API (JWT required)',
-        'GET /api/knowledge - Knowledge Base API (JWT required)'
+        'GET /api/knowledge - Knowledge Base API (JWT required)',
+        'GET /api/slas - SLA Management API (JWT required)'
       ]
     }
   });
@@ -241,6 +243,16 @@ app.get('/api/knowledge/:id', authenticateToken, knowledgeApi.getKnowledgeById);
 app.post('/api/knowledge', authenticateToken, knowledgeApi.createKnowledge);
 app.put('/api/knowledge/:id', authenticateToken, knowledgeApi.updateKnowledge);
 app.delete('/api/knowledge/:id', authenticateToken, knowledgeApi.deleteKnowledge);
+
+// SLA管理API
+app.get('/api/slas', authenticateToken, slasApi.getSLAs);
+app.get('/api/slas/stats', authenticateToken, slasApi.getSLAStats);
+app.get('/api/slas/alerts', authenticateToken, requireRole(['administrator', 'operator']), slasApi.generateSLAAlerts);
+app.get('/api/slas/:id', authenticateToken, slasApi.getSLAById);
+app.post('/api/slas', authenticateToken, requireRole(['administrator', 'operator']), slasApi.createSLA);
+app.put('/api/slas/:id', authenticateToken, requireRole(['administrator', 'operator']), slasApi.updateSLA);
+app.post('/api/slas/bulk-update', authenticateToken, requireRole(['administrator', 'operator']), slasApi.bulkUpdateSLAs);
+app.delete('/api/slas/:id', authenticateToken, requireRole(['administrator']), slasApi.deleteSLA);
 
 // ================================================
 // エラーハンドリング

@@ -17,9 +17,8 @@ export interface Release {
   updatedAt: string;
 }
 
-import { apiCall } from './apiUtils';
+import { apiGet, apiPost, apiPut, apiDelete } from './apiUtils';
 
-const API_BASE = process.env.VITE_API_BASE_URL || 'http://localhost:8082';
 
 export interface ReleaseResponse {
   data: Release[];
@@ -56,8 +55,8 @@ export const getReleases = async (params?: {
   if (params?.status) query.append('status', params.status);
   if (params?.responsible) query.append('responsible', params.responsible);
 
-  const url = `${API_BASE}/api/releases${query.toString() ? '?' + query.toString() : ''}`;
-  const response = await apiCall<ReleaseResponse>('GET', url);
+  const url = `/api/releases${query.toString() ? '?' + query.toString() : ''}`;
+  const response = await apiGet<ReleaseResponse>(url);
   return response.data;
 };
 
@@ -65,21 +64,21 @@ export const getReleases = async (params?: {
  * Get release statistics
  */
 export const getReleaseStats = async (): Promise<ReleaseStatsResponse> => {
-  return await apiCall<ReleaseStatsResponse>('GET', `${API_BASE}/api/releases/stats`);
+  return await apiGet<ReleaseStatsResponse>('/api/releases/stats');
 };
 
 /**
  * Get a specific release by ID
  */
 export const getReleaseById = async (releaseId: string): Promise<Release> => {
-  return await apiCall<Release>('GET', `${API_BASE}/api/releases/${releaseId}`);
+  return await apiGet<Release>(`/api/releases/${releaseId}`);
 };
 
 /**
  * Create a new release
  */
 export const createRelease = async (releaseData: Omit<Release, 'id' | 'createdAt' | 'updatedAt'>): Promise<Release> => {
-  const response = await apiCall<{ releaseId: string; data: Release }>('POST', `${API_BASE}/api/releases`, releaseData);
+  const response = await apiPost<{ releaseId: string; data: Release }>('/api/releases', releaseData);
   return response.data;
 };
 
@@ -87,12 +86,12 @@ export const createRelease = async (releaseData: Omit<Release, 'id' | 'createdAt
  * Update a release
  */
 export const updateRelease = async (releaseId: string, releaseData: Partial<Release>): Promise<Release> => {
-  return await apiCall<Release>('PUT', `${API_BASE}/api/releases/${releaseId}`, releaseData);
+  return await apiPut<Release>(`/api/releases/${releaseId}`, releaseData);
 };
 
 /**
  * Delete a release
  */
 export const deleteRelease = async (releaseId: string): Promise<void> => {
-  await apiCall<void>('DELETE', `${API_BASE}/api/releases/${releaseId}`);
+  await apiDelete<void>(`/api/releases/${releaseId}`);
 };

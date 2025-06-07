@@ -15,7 +15,19 @@ export const userRoleToJapanese = (role: UserRole): string => {
   }
 };
 
-export const itemStatusToJapanese = (status: ItemStatus): string => {
+export const itemStatusToJapanese = (status: ItemStatus | string): string => {
+  // Handle Problem-specific statuses first
+  if (typeof status === 'string') {
+    switch (status) {
+      case 'Logged': return '登録済み';
+      case 'In Progress': return '進行中';
+      case 'Known Error': return '既知のエラー';
+      case 'Resolved': return '解決済み';
+      case 'Closed': return 'クローズ';
+      default: break; // Fall through to ItemStatus handling
+    }
+  }
+  
   switch (status) {
     case ItemStatus.OPEN: return 'オープン';
     case ItemStatus.IN_PROGRESS: return '対応中';
@@ -41,7 +53,7 @@ export const itemStatusToJapanese = (status: ItemStatus): string => {
     case ItemStatus.NON_COMPLIANT: return '非準拠';
     case ItemStatus.IN_REVIEW: return 'レビュー中';
     case ItemStatus.NOT_APPLICABLE: return '非該当';
-    default: return status;
+    default: return typeof status === 'string' ? status : status;
   }
 };
 

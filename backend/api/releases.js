@@ -250,8 +250,8 @@ const createRelease = (req, res) => {
     // 監査ログ
     const now = new Date().toISOString();
     db.run(
-      'INSERT INTO logs (event_type, event_time, user, detail) VALUES (?, ?, ?, ?)',
-      ['RELEASE_CREATE', now, req.user?.username || 'system', `Created release: ${frontendData.title}`]
+      'INSERT INTO logs (event_type, event_time, username, action, details) VALUES (?, ?, ?, ?, ?)',
+      ['Data Modification', now, req.user?.username || 'system', 'Create Release', `Created release: ${frontendData.title}`]
     );
     
     // 作成されたリリースを返す
@@ -383,8 +383,8 @@ const updateRelease = (req, res) => {
       // 監査ログ
       const now = new Date().toISOString();
       db.run(
-        'INSERT INTO logs (event_type, event_time, user, detail) VALUES (?, ?, ?, ?)',
-        ['RELEASE_UPDATE', now, req.user?.username || 'system', `Updated release ID: ${id}`]
+        'INSERT INTO logs (event_type, event_time, username, action, details) VALUES (?, ?, ?, ?, ?)',
+        ['Data Modification', now, req.user?.username || 'system', 'Update Release', `Updated release ID: ${id}`]
       );
       
       // 更新後のデータを返す
@@ -452,8 +452,8 @@ const deleteRelease = (req, res) => {
           // 監査ログ
           const now = new Date().toISOString();
           db.run(
-            'INSERT INTO logs (event_type, event_time, user, detail) VALUES (?, ?, ?, ?)',
-            ['RELEASE_DELETE', now, req.user?.username || 'system', `Deleted release: ${row.title}`]
+            'INSERT INTO logs (event_type, event_time, username, action, details) VALUES (?, ?, ?, ?, ?)',
+            ['Data Modification', now, req.user?.username || 'system', 'Delete Release', `Deleted release: ${row.title}`]
           );
           
           res.json({ 

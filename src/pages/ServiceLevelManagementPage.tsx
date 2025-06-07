@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
 import { ServiceLevelAgreement, UserRole } from '../types';
-import { getSLAs, addSla, updateSla, deleteSla, addAuditLog } from '../services/mockItsmService';
+import { getSLAs, createSLA, updateSLA, deleteSLA } from '../services/slaApiService';
+import { addAuditLog } from '../services/mockItsmService';
 import { Table, Spinner, Card, Notification, NotificationType, Button, Modal, Input, Select, Textarea } from '../components/CommonUI';
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from '../components/ChartPlaceholder';
 import { slaStatusToJapanese, slaPerformanceStatusToJapanese } from '../localization';
@@ -94,10 +95,10 @@ const ServiceLevelManagementPage: React.FC = () => {
     try {
       const currentUserInfo = { userId: user.id, username: user.username };
       if (editingSla.id) {
-        await updateSla(editingSla.id, editingSla as ServiceLevelAgreement, currentUserInfo);
+        await updateSLA(editingSla.id, editingSla as ServiceLevelAgreement);
         setNotification({ message: 'SLA定義が正常に更新されました。', type: NotificationType.SUCCESS });
       } else {
-        await addSla(editingSla as Omit<ServiceLevelAgreement, 'id'>, currentUserInfo);
+        await createSLA(editingSla as Omit<ServiceLevelAgreement, 'id'>);
         setNotification({ message: 'SLA定義が正常に作成されました。', type: NotificationType.SUCCESS });
       }
       fetchSLAs();
@@ -112,7 +113,7 @@ const ServiceLevelManagementPage: React.FC = () => {
      if (!user) return;
     if (window.confirm('このSLA定義を削除してもよろしいですか？')) {
       try {
-        await deleteSla(id, { userId: user.id, username: user.username });
+        await deleteSLA(id);
         setNotification({ message: 'SLA定義が正常に削除されました。', type: NotificationType.SUCCESS });
         fetchSLAs();
       } catch (error) {

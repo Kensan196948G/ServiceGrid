@@ -382,7 +382,6 @@ export function useFormValidation(initialData: Record<string, any>, validationRu
   };
 }
 
-// React import for the hook (this will need to be imported separately in actual use)
 import React from 'react';
 
 // Export commonly used validation rule sets

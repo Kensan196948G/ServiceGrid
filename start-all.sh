@@ -23,7 +23,7 @@ sleep 3
 
 # フロントエンドサーバー起動
 echo "🎨 フロントエンドサーバーを起動中..."
-npm run dev &
+npx --yes vite@latest --port 3001 --host &
 FRONTEND_PID=$!
 
 # プロセスIDを記録

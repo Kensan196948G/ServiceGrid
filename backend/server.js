@@ -158,8 +158,8 @@ app.post('/api/auth/login', async (req, res) => {
 
         // 監査ログ
         db.run(
-          'INSERT INTO logs (event_type, event_time, user, detail) VALUES (?, CURRENT_TIMESTAMP, ?, ?)',
-          ['LOGIN', user.username, `User ${user.username} logged in successfully`]
+          'INSERT INTO logs (event_type, event_time, username, action, details) VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?)',
+          ['Authentication', user.username, 'User Login', `User ${user.username} logged in successfully`]
         );
 
         res.json({
@@ -247,8 +247,8 @@ app.post('/api/incidents', authenticateToken, (req, res) => {
       
       // 監査ログ
       db.run(
-        'INSERT INTO logs (event_type, event_time, user, detail) VALUES (?, CURRENT_TIMESTAMP, ?, ?)',
-        ['INCIDENT_CREATE', req.user.username, `Created incident: ${title}`]
+        'INSERT INTO logs (event_type, event_time, username, action, details) VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?)',
+        ['Data Modification', req.user.username, 'Create Incident', `Created incident: ${title}`]
       );
       
       res.status(201).json({ 
