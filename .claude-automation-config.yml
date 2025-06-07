@@ -4,7 +4,7 @@ automation:
   interaction: false
   approval: auto
   continuous_loop: true
-  healing_interval: "6h"
+  healing_interval: "1h"
   
 development:
   auto_fix: true
@@ -49,7 +49,7 @@ notifications:
     webhook: ${{ secrets.TEAMS_WEBHOOK }}
   email:
     enabled: true
-    recipients: ["ops-team@company.com"]
+    recipients: ["kensan1969@gmail.com"]
     level: "critical-only"
     
 error_handling:

@@ -75,7 +75,7 @@ async function apiRequest<T>(
 
 // 認証ヘッダー取得
 function getAuthHeaders(): Record<string, string> {
-  const token = sessionStorage.getItem('auth_token');
+  const token = sessionStorage.getItem('token');
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
@@ -90,7 +90,7 @@ export async function login(credentials: LoginCredentials): Promise<LoginRespons
 
   // トークンをセッションストレージに保存
   if (response.success && response.token) {
-    sessionStorage.setItem('auth_token', response.token);
+    sessionStorage.setItem('token', response.token);
     sessionStorage.setItem('user_data', JSON.stringify(response.user));
   }
 
@@ -111,7 +111,7 @@ export async function logout(): Promise<void> {
     // APIエラーでもローカルデータはクリア
   } finally {
     // ローカルデータクリア
-    sessionStorage.removeItem('auth_token');
+    sessionStorage.removeItem('token');
     sessionStorage.removeItem('user_data');
   }
 }
@@ -178,7 +178,7 @@ export function getCurrentUserRole(): UserRole | null {
  * 認証状態確認
  */
 export function isAuthenticated(): boolean {
-  const token = sessionStorage.getItem('auth_token');
+  const token = sessionStorage.getItem('token');
   const userData = sessionStorage.getItem('user_data');
   return !!(token && userData);
 }
@@ -187,7 +187,7 @@ export function isAuthenticated(): boolean {
  * トークン取得
  */
 export function getAuthToken(): string | null {
-  return sessionStorage.getItem('auth_token');
+  return sessionStorage.getItem('token');
 }
 
 /**

@@ -1,6 +1,6 @@
 module.exports = {
-  testEnvironment: 'jsdom',
-  setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
+  testEnvironment: 'node',
+  setupFilesAfterEnv: [],
   testMatch: [
     '**/__tests__/**/*.{js,ts,tsx}',
     '**/*.(test|spec).{js,ts,tsx}'

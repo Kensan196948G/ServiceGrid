@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from '../components/RouterPlaceholder';
 import { Card, Spinner, Button, Notification, NotificationType } from '../components/CommonUI';
 import { 
   getIncidents, 
@@ -34,7 +34,7 @@ import {
   priorityToJapanese
 } from '../localization';
 import { useAuth } from '../contexts/AuthContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from '../components/ChartPlaceholder';
 
 
 // Icons for cards (simple text/emoji for now)

@@ -14,6 +14,11 @@ const ServiceRequestPage: React.FC = () => {
   const [editingRequest, setEditingRequest] = useState<Partial<ServiceRequest> | null>(null);
   const { user } = useAuth();
   const { addToast } = useToast();
+  
+  // Approval workflow state
+  const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+  const [approvingRequest, setApprovingRequest] = useState<ServiceRequest | null>(null);
+  const [approvalComments, setApprovalComments] = useState('');
 
   const serviceTypes = ['アカウント作成', 'ソフトウェアインストール', 'ハードウェアリクエスト', 'アクセスリクエスト', '一般問い合わせ'];
 
@@ -164,6 +169,112 @@ const ServiceRequestPage: React.FC = () => {
     }
   };
 
+  // Approval workflow handlers
+  const handleOpenApprovalModal = (request: ServiceRequest) => {
+    setApprovingRequest(request);
+    setApprovalComments('');
+    setIsApprovalModalOpen(true);
+  };
+
+  const handleCloseApprovalModal = () => {
+    setIsApprovalModalOpen(false);
+    setApprovingRequest(null);
+    setApprovalComments('');
+  };
+
+  const handleApprove = async () => {
+    if (!approvingRequest || !user) return;
+
+    try {
+      const updatedRequest = {
+        ...approvingRequest,
+        status: ItemStatus.APPROVED,
+        approvedBy: user.username,
+        approvedAt: new Date().toISOString(),
+        approvalComments: approvalComments.trim() || '承認されました'
+      };
+
+      await serviceRequestApi.updateServiceRequest(approvingRequest.id, updatedRequest);
+      addToast(`サービスリクエスト「${approvingRequest.title}」を承認しました。`, 'success');
+      fetchRequests();
+      handleCloseApprovalModal();
+    } catch (error) {
+      console.error("Failed to approve service request:", error);
+      addToast('承認処理に失敗しました。', 'error');
+    }
+  };
+
+  const handleReject = async () => {
+    if (!approvingRequest || !user) return;
+
+    if (!approvalComments.trim()) {
+      addToast('却下理由を入力してください。', 'error');
+      return;
+    }
+
+    try {
+      const updatedRequest = {
+        ...approvingRequest,
+        status: ItemStatus.REJECTED,
+        rejectedBy: user.username,
+        rejectedAt: new Date().toISOString(),
+        rejectionReason: approvalComments.trim()
+      };
+
+      await serviceRequestApi.updateServiceRequest(approvingRequest.id, updatedRequest);
+      addToast(`サービスリクエスト「${approvingRequest.title}」を却下しました。`, 'success');
+      fetchRequests();
+      handleCloseApprovalModal();
+    } catch (error) {
+      console.error("Failed to reject service request:", error);
+      addToast('却下処理に失敗しました。', 'error');
+    }
+  };
+
+  const handleStartWork = async (request: ServiceRequest) => {
+    if (!user) return;
+
+    try {
+      const updatedRequest = {
+        ...request,
+        status: ItemStatus.IN_PROGRESS,
+        assignedTo: user.username,
+        startedAt: new Date().toISOString()
+      };
+
+      await serviceRequestApi.updateServiceRequest(request.id, updatedRequest);
+      addToast(`サービスリクエスト「${request.title}」の作業を開始しました。`, 'success');
+      fetchRequests();
+    } catch (error) {
+      console.error("Failed to start work on service request:", error);
+      addToast('作業開始処理に失敗しました。', 'error');
+    }
+  };
+
+  const handleComplete = async (request: ServiceRequest) => {
+    if (!user) return;
+
+    const resolution = prompt('完了コメントを入力してください（任意）:');
+    if (resolution === null) return; // Cancelled
+
+    try {
+      const updatedRequest = {
+        ...request,
+        status: ItemStatus.RESOLVED,
+        resolvedBy: user.username,
+        resolvedAt: new Date().toISOString(),
+        resolution: resolution.trim() || '完了しました'
+      };
+
+      await serviceRequestApi.updateServiceRequest(request.id, updatedRequest);
+      addToast(`サービスリクエスト「${request.title}」を完了しました。`, 'success');
+      fetchRequests();
+    } catch (error) {
+      console.error("Failed to complete service request:", error);
+      addToast('完了処理に失敗しました。', 'error');
+    }
+  };
+
   const columns: Array<{ Header: string; accessor: keyof ServiceRequest | ((row: ServiceRequest) => ReactNode) }> = [
     { Header: 'ID', accessor: (row: ServiceRequest) => <span className="font-mono text-xs">{row.id.slice(0,8)}...</span> },
     { Header: 'タイトル', accessor: 'title' },
@@ -179,9 +290,35 @@ const ServiceRequestPage: React.FC = () => {
     { Header: '要求者', accessor: 'requestedBy' },
     { Header: '作成日時', accessor: (row: ServiceRequest) => new Date(row.createdAt).toLocaleDateString() },
     { Header: '操作', accessor: (row: ServiceRequest) => (
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-1 flex-wrap">
         <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleOpenModal(row);}}>編集</Button>
-         {user?.role === UserRole.ADMIN && <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleDelete(row.id);}}>削除</Button>}
+        
+        {/* Approval workflow buttons */}
+        {(user?.role === UserRole.ADMIN || user?.role === UserRole.OPERATOR) && (
+          <>
+            {(row.status === ItemStatus.NEW || row.status === ItemStatus.OPEN) && (
+              <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); handleOpenApprovalModal(row);}}>
+                承認/却下
+              </Button>
+            )}
+            
+            {row.status === ItemStatus.APPROVED && (
+              <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handleStartWork(row);}}>
+                作業開始
+              </Button>
+            )}
+            
+            {row.status === ItemStatus.IN_PROGRESS && row.assignedTo === user?.username && (
+              <Button size="sm" variant="success" onClick={(e) => { e.stopPropagation(); handleComplete(row);}}>
+                完了
+              </Button>
+            )}
+          </>
+        )}
+        
+        {user?.role === UserRole.ADMIN && (
+          <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleDelete(row.id);}}>削除</Button>
+        )}
       </div>
     )},
   ];
@@ -260,6 +397,83 @@ const ServiceRequestPage: React.FC = () => {
               <Button type="submit" variant="primary">リクエスト保存</Button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Approval/Rejection Modal */}
+      {isApprovalModalOpen && approvingRequest && (
+        <Modal 
+          isOpen={isApprovalModalOpen} 
+          onClose={handleCloseApprovalModal} 
+          title={`承認/却下 - ${approvingRequest.title}`}
+          size="md"
+        >
+          <div className="space-y-4">
+            {/* Request Details */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-semibold text-gray-800 mb-2">リクエスト詳細</h4>
+              <div className="space-y-2 text-sm">
+                <div><span className="font-medium">タイトル:</span> {approvingRequest.title}</div>
+                <div><span className="font-medium">説明:</span> {approvingRequest.description}</div>
+                <div><span className="font-medium">サービス種別:</span> {approvingRequest.serviceType}</div>
+                <div><span className="font-medium">要求者:</span> {approvingRequest.requestedBy}</div>
+                <div><span className="font-medium">作成日:</span> {new Date(approvingRequest.createdAt).toLocaleString('ja-JP')}</div>
+                <div>
+                  <span className="font-medium">現在のステータス:</span> 
+                  <span className={`ml-2 px-2 py-1 text-xs font-semibold rounded-full ${
+                    approvingRequest.status === ItemStatus.NEW || approvingRequest.status === ItemStatus.OPEN 
+                      ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {itemStatusToJapanese(approvingRequest.status)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Approval Comments */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                コメント
+              </label>
+              <Textarea
+                value={approvalComments}
+                onChange={(e) => setApprovalComments(e.target.value)}
+                placeholder="承認/却下の理由やコメントを入力してください..."
+                rows={4}
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                ※却下の場合はコメントが必須です
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-between space-x-3 pt-4">
+              <div className="flex space-x-2">
+                <Button
+                  type="button"
+                  variant="success"
+                  onClick={handleApprove}
+                  className="flex items-center space-x-1"
+                >
+                  <span>✓</span>
+                  <span>承認</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={handleReject}
+                  className="flex items-center space-x-1"
+                >
+                  <span>✗</span>
+                  <span>却下</span>
+                </Button>
+              </div>
+              <Button type="button" variant="secondary" onClick={handleCloseApprovalModal}>
+                キャンセル
+              </Button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>

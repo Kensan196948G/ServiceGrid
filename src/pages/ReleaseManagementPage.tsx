@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
 import { Release, ItemStatus, UserRole, ReleaseType } from '../types';
-import { getReleases, addRelease, updateRelease, deleteRelease as deleteReleaseAPI } from '../services/mockItsmService';
+import { getReleases, createRelease, updateRelease, deleteRelease as deleteReleaseAPI } from '../services/releaseApiService';
 import { Button, Table, Modal, Input, Textarea, Select, Spinner, Card, Notification, NotificationType } from '../components/CommonUI';
 import { useAuth } from '../contexts/AuthContext';
 import { itemStatusToJapanese, releaseTypeToJapanese, releaseTypeToIcon, assetTypeToJapanese } from '../localization'; 
@@ -239,7 +239,7 @@ const ReleaseManagementPage: React.FC = () => {
         await updateRelease(editingRelease.id, releaseToSave);
         setNotification({ message: 'リリース計画が正常に更新されました。', type: NotificationType.SUCCESS });
       } else {
-        await addRelease(releaseToSave as Omit<Release, 'id'|'createdAt'|'updatedAt'>);
+        await createRelease(releaseToSave as Omit<Release, 'id'|'createdAt'|'updatedAt'>);
         setNotification({ message: 'リリース計画が正常に作成されました。', type: NotificationType.SUCCESS });
       }
       fetchReleases();

@@ -6,6 +6,8 @@ const os = require('os');
 const incidentsApi = require('./api/incidents');
 const assetsApi = require('./api/assets');
 const complianceApi = require('./api/compliance');
+const changesApi = require('./api/changes-enhanced');
+const authMiddleware = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 8082;
@@ -51,7 +53,8 @@ app.get('/', (req, res) => {
       'GET /api/test - Test endpoint',
       'GET /api/incidents - Incidents API',
       'GET /api/assets - Assets API',
-      'GET /api/compliance - Compliance API'
+      'GET /api/compliance - Compliance API',
+      'GET /api/changes - Change Management API'
     ]
   });
 });
@@ -161,6 +164,33 @@ app.delete('/api/assets/:id', assetsApi.deleteAsset);
 // コンプライアンス管理API
 app.use('/api/compliance', complianceApi);
 
+// Mock user middleware for development
+const mockAuthMiddleware = (req, res, next) => {
+  // For development, use mock user info
+  const token = req.headers['authorization'];
+  if (token && token.includes('mock-jwt-token')) {
+    // Extract user info from mock token or use default
+    req.user = {
+      user_id: 1,
+      username: 'admin',
+      role: 'administrator',
+      email: 'admin@company.com'
+    };
+  }
+  next();
+};
+
+// 変更管理API
+app.get('/api/changes', changesApi.getChanges);
+app.get('/api/changes/stats', changesApi.getChangeStats);
+app.get('/api/changes/:id', changesApi.getChangeById);
+app.post('/api/changes', mockAuthMiddleware, changesApi.createChange);
+app.put('/api/changes/:id', mockAuthMiddleware, changesApi.updateChange);
+app.delete('/api/changes/:id', mockAuthMiddleware, changesApi.deleteChange);
+app.post('/api/changes/:id/approve', mockAuthMiddleware, changesApi.approveChange);
+app.post('/api/changes/:id/start-implementation', mockAuthMiddleware, changesApi.startImplementation);
+app.post('/api/changes/:id/complete-implementation', mockAuthMiddleware, changesApi.completeImplementation);
+
 // エラーハンドリング
 app.use((err, req, res, next) => {
   console.error('Server Error:', err);
@@ -201,7 +231,14 @@ app.use((req, res) => {
       'PUT /api/compliance/controls/:id',
       'DELETE /api/compliance/controls/:id',
       'GET /api/compliance/audits',
-      'GET /api/compliance/risks'
+      'GET /api/compliance/risks',
+      'GET /api/changes',
+      'GET /api/changes/stats',
+      'GET /api/changes/:id',
+      'POST /api/changes',
+      'PUT /api/changes/:id',
+      'DELETE /api/changes/:id',
+      'POST /api/changes/:id/approve'
     ]
   });
 });

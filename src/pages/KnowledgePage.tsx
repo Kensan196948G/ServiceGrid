@@ -16,10 +16,12 @@ import {
 } from '../types';
 import { 
   getKnowledgeArticles, 
-  addKnowledgeArticle, 
+  createKnowledgeArticle, 
   updateKnowledgeArticle, 
-  deleteKnowledgeArticle as deleteKnowledgeArticleAPI 
-} from '../services/mockItsmService';
+  deleteKnowledgeArticle,
+  approveKnowledgeArticle,
+  rateKnowledgeArticle
+} from '../services/knowledgeApiService';
 import { Button, Modal, Input, Textarea, Spinner, Card, Notification, NotificationType, Select, Table } from '../components/CommonUI';
 import { useAuth } from '../contexts/AuthContext';
 import { knowledgeArticleStatusToJapanese, confidentialityLevelToJapanese } from '../localization';
@@ -46,6 +48,44 @@ const KnowledgePage: React.FC = () => {
   const [notification, setNotification] = useState<{ message: string; type: NotificationType } | null>(null);
   const { user } = useAuth();
 
+  // Convert API response to frontend format
+  const convertApiArticleToFrontend = (apiArticle: any): KnowledgeArticle => {
+    return {
+      id: apiArticle.id || '',
+      title: apiArticle.title || '',
+      content: apiArticle.content || '',
+      category: apiArticle.category || '',
+      tags: Array.isArray(apiArticle.tags) ? apiArticle.tags : [],
+      createdAt: apiArticle.created_date || new Date().toISOString(),
+      updatedAt: apiArticle.updated_date || new Date().toISOString(),
+      authorUserId: apiArticle.author?.id || '',
+      authorUsername: apiArticle.author?.name || '',
+      lastUpdatedByUserId: apiArticle.author?.id || '',
+      lastUpdatedByUsername: apiArticle.author?.name || '',
+      status: apiArticle.status || KnowledgeArticleStatus.DRAFT,
+      approverUserId: apiArticle.approver?.id,
+      approverUsername: apiArticle.approver?.name,
+      approvalDate: apiArticle.approval_date,
+      viewCount: apiArticle.view_count || 0,
+      averageRating: apiArticle.rating?.average || 0,
+      ratings: [],
+      comments: [],
+      attachments: Array.isArray(apiArticle.attachments) ? apiArticle.attachments : [],
+      currentVersion: 1,
+      versionHistory: [],
+      // Default values for fields not in API
+      confidentialityLevel: ConfidentialityLevel.INTERNAL,
+      viewPermissions: [],
+      editPermissions: [],
+      targetAudience: [],
+      relatedIncidents: [],
+      relatedProblems: [],
+      relatedChanges: [],
+      referenceUrls: [],
+      relatedArticles: []
+    };
+  };
+
   const categories = useMemo(() => ['一般IT', 'Microsoft 365', 'ネットワーク問題', 'ソフトウェアガイド', 'ハードウェアトラブルシューティング', 'セキュリティベストプラクティス', '業務アプリケーション', 'その他'],[]);
   const articleStatusOptions = useMemo(() => [
     { value: '', label: 'すべてのステータス' },
@@ -57,19 +97,29 @@ const KnowledgePage: React.FC = () => {
   const fetchArticles = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await getKnowledgeArticles();
-      setAllArticles(data.sort((a,b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
+      const response = await getKnowledgeArticles({
+        search: searchTerm || undefined,
+        category: categoryFilter || undefined,
+        page: 1,
+        limit: 1000 // Get all articles for now, can implement proper pagination later
+      });
+      const articles = response.data.map(convertApiArticleToFrontend);
+      setAllArticles(articles.sort((a,b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
     } catch (error) {
       console.error("Failed to fetch articles:", error);
       setNotification({ message: 'ナレッジベース記事の読み込みに失敗しました。', type: NotificationType.ERROR });
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [searchTerm, categoryFilter]);
 
+  // Debounce search and category filter changes to avoid too many API calls
   useEffect(() => {
-    fetchArticles();
-  }, [fetchArticles]);
+    const timeoutId = setTimeout(() => {
+      fetchArticles();
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, categoryFilter, fetchArticles]);
 
   const handleOpenModal = (article?: KnowledgeArticle) => {
     const defaultArticleData: Partial<KnowledgeArticle> = {
@@ -173,13 +223,19 @@ const KnowledgePage: React.FC = () => {
       };
 
       if (editingArticle.id) { 
-        const updateData: Partial<Omit<KnowledgeArticle, 'id' | 'createdAt' | 'authorUserId' | 'authorUsername'>> = {
-          ...articleToSave,
-        };
-        await updateKnowledgeArticle(editingArticle.id, updateData, {userId: user.id, username: user.username}, editingArticle.versionHistory?.slice(-1)[0]?.summary || "内容更新");
+        await updateKnowledgeArticle(editingArticle.id, {
+          title: articleToSave.title,
+          content: articleToSave.content,
+          category: articleToSave.category
+        });
         setNotification({ message: '記事が正常に更新されました。', type: NotificationType.SUCCESS });
       } else { 
-        await addKnowledgeArticle(articleToSave as Omit<KnowledgeArticle, 'id' | 'createdAt' | 'updatedAt' | 'currentVersion' | 'versionHistory' | 'authorUserId' | 'authorUsername'>, {userId: user.id, username: user.username});
+        await createKnowledgeArticle({
+          title: articleToSave.title,
+          content: articleToSave.content,
+          category: articleToSave.category,
+          author_id: user.id
+        });
         setNotification({ message: '記事が正常に作成されました。', type: NotificationType.SUCCESS });
       }
       fetchArticles();
@@ -195,7 +251,7 @@ const KnowledgePage: React.FC = () => {
     if (!user) return;
     if (window.confirm('この記事を削除してもよろしいですか？この操作は元に戻せません。')) {
       try {
-        await deleteKnowledgeArticleAPI(id, {userId: user.id, username: user.username});
+        await deleteKnowledgeArticle(id);
         setNotification({ message: '記事が正常に削除されました。', type: NotificationType.SUCCESS });
         fetchArticles();
         setSelectedArticle(null); 
@@ -206,14 +262,46 @@ const KnowledgePage: React.FC = () => {
     }
   };
 
+  const handleApproveArticle = async (id: string, approved: boolean) => {
+    if (!user) return;
+    const action = approved ? '承認' : '却下';
+    if (window.confirm(`この記事を${action}しますか？`)) {
+      try {
+        const updatedArticle = await approveKnowledgeArticle(id, approved);
+        const frontendArticle = convertApiArticleToFrontend(updatedArticle);
+        setSelectedArticle(frontendArticle);
+        setNotification({ message: `記事が正常に${action}されました。`, type: NotificationType.SUCCESS });
+        fetchArticles();
+      } catch (error) {
+        console.error(`Failed to ${action.toLowerCase()} article:`, error);
+        setNotification({ message: `記事の${action}に失敗しました。`, type: NotificationType.ERROR });
+      }
+    }
+  };
+
+  const handleRateArticle = async (id: string, rating: number) => {
+    if (!user) return;
+    try {
+      const ratingResult = await rateKnowledgeArticle(id, rating);
+      setNotification({ message: '記事を評価しました。', type: NotificationType.SUCCESS });
+      // Update the selected article rating if it's the same article
+      if (selectedArticle && selectedArticle.id === id) {
+        setSelectedArticle({
+          ...selectedArticle,
+          averageRating: ratingResult.average,
+          ratings: [...(selectedArticle.ratings || []), { userId: user.id, value: rating as 1 | 2 | 3 | 4 | 5 }]
+        });
+      }
+      fetchArticles();
+    } catch (error) {
+      console.error("Failed to rate article:", error);
+      setNotification({ message: '記事の評価に失敗しました。', type: NotificationType.ERROR });
+    }
+  };
+
   const filteredArticles = useMemo(() => {
     return allArticles.filter(article => {
-      const searchMatch = searchTerm.toLowerCase() ? 
-        article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        article.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        article.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-        : true;
-      const categoryMatch = categoryFilter ? article.category === categoryFilter : true;
+      // Only filter by status and date range locally since search and category are handled by API
       const statusMatch = statusFilter ? article.status === statusFilter : true;
       
       let dateMatch = true;
@@ -225,9 +313,9 @@ const KnowledgePage: React.FC = () => {
       } else if (dateEndFilter) {
         dateMatch = new Date(article.updatedAt) <= new Date(dateEndFilter);
       }
-      return searchMatch && categoryMatch && statusMatch && dateMatch;
+      return statusMatch && dateMatch;
     });
-  }, [allArticles, searchTerm, categoryFilter, statusFilter, dateStartFilter, dateEndFilter]);
+  }, [allArticles, statusFilter, dateStartFilter, dateEndFilter]);
 
   const paginatedArticles = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -383,9 +471,42 @@ const KnowledgePage: React.FC = () => {
           </DetailSection>
           
           {user?.role === UserRole.ADMIN && (
-            <div className="mt-6 flex space-x-2">
-              <Button onClick={() => handleOpenModal(article)} variant="primary">この記事を編集</Button>
-              <Button onClick={() => handleDeleteArticle(article.id)} variant="danger">この記事を削除</Button>
+            <div className="mt-6 space-y-4">
+              <div className="flex space-x-2">
+                <Button onClick={() => handleOpenModal(article)} variant="primary">この記事を編集</Button>
+                <Button onClick={() => handleDeleteArticle(article.id)} variant="danger">この記事を削除</Button>
+              </div>
+              
+              {/* Approval actions for articles pending review */}
+              {article.status === KnowledgeArticleStatus.REVIEW_PENDING && (
+                <div className="flex space-x-2">
+                  <Button onClick={() => handleApproveArticle(article.id, true)} variant="primary" size="sm">
+                    ✓ 承認
+                  </Button>
+                  <Button onClick={() => handleApproveArticle(article.id, false)} variant="danger" size="sm">
+                    ✗ 却下
+                  </Button>
+                </div>
+              )}
+              
+              {/* Rating system for published articles */}
+              {article.status === KnowledgeArticleStatus.PUBLISHED && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-slate-700">この記事を評価:</p>
+                  <div className="flex space-x-1">
+                    {[1, 2, 3, 4, 5].map(rating => (
+                      <button
+                        key={rating}
+                        onClick={() => handleRateArticle(article.id, rating)}
+                        className="px-2 py-1 text-sm border rounded hover:bg-blue-50 focus:ring-2 focus:ring-blue-500"
+                        title={`${rating}点で評価`}
+                      >
+                        ⭐ {rating}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

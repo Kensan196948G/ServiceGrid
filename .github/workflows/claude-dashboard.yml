@@ -1,15 +1,24 @@
-name: Claude Automation Dashboard
+name: Claude Dashboard Manual Action
+
 on:
-  workflow_run:
-    workflows: ["Claude Code Auto Loop"]
-    types: [completed]
-    
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'Claudeへの日本語指示（例：最新運用レポートをダッシュボード形式で生成）'
+        required: true
+      file:
+        description: 'ダッシュボード生成対象ファイル（例: ITSM準拠IT運用システムプラットフォーム 詳細仕様書.txt）'
+        required: true
+
 jobs:
-  update-dashboard:
+  dashboard:
     runs-on: ubuntu-latest
     steps:
-      - name: Update Operations Dashboard
-        run: |
-          # 運用ダッシュボードの更新
-          echo "📊 Claude自動化メトリクス更新中..."
-          # Grafana/Prometheus連携、Slack通知等
+      - name: 🚀 Repository Checkout
+        uses: actions/checkout@v4
+
+      - name: 📊 Claude Dashboard Action
+        uses: anthropic/claude-dashboard-action@v1
+        with:
+          prompt: ${{ github.event.inputs.prompt }}
+          file: ${{ github.event.inputs.file }}

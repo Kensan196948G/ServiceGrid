@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, ReactNode, useMemo } from 'rea
 import { ServiceLevelAgreement, UserRole } from '../types';
 import { getSLAs, addSla, updateSla, deleteSla, addAuditLog } from '../services/mockItsmService';
 import { Table, Spinner, Card, Notification, NotificationType, Button, Modal, Input, Select, Textarea } from '../components/CommonUI';
-import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from '../components/ChartPlaceholder';
 import { slaStatusToJapanese, slaPerformanceStatusToJapanese } from '../localization';
 import { useAuth } from '../contexts/AuthContext';
 

@@ -90,3 +90,39 @@ export interface KnowledgeArticle {
   versionHistory?: KnowledgeArticleVersion[];
   currentVersion: number;
 }
+
+// Additional types for API service
+export interface KnowledgeFilter {
+  page?: number;
+  limit?: number;
+  category?: string;
+  created_by?: string;
+  search?: string;
+}
+
+export interface CreateKnowledgeArticle {
+  title: string;
+  content: string;
+  category: string;
+  author_id?: string;
+  author?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
+export interface UpdateKnowledgeArticle {
+  title?: string;
+  content?: string;
+  category?: string;
+}
+
+export interface KnowledgeStats {
+  total: number;
+  by_category: { [key: string]: number };
+  by_status: { [key: string]: number };
+  top_authors: Array<{ name: string; count: number }>;
+  recent_activity: Array<{ date: string; action: string; article_title: string }>;
+  popular_articles: Array<{ id: string; title: string; view_count: number }>;
+}

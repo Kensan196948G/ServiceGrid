@@ -1,7 +1,6 @@
 // 資産管理APIとの連携サービス
 import { Asset, ItemStatus } from '../types';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8082';
+import { apiGet, apiPost, apiPut, apiDelete, ApiError } from './apiUtils';
 
 // API レスポンス型定義
 interface ApiResponse<T> {
@@ -24,55 +23,6 @@ interface AssetFilters {
   search?: string;
 }
 
-// HTTPエラーハンドリング
-class ApiError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
-
-// 認証ヘッダー取得
-function getAuthHeaders(): Record<string, string> {
-  const token = sessionStorage.getItem('auth_token');
-  return token ? { 'Authorization': `Bearer ${token}` } : {};
-}
-
-// API リクエストヘルパー
-async function apiRequest<T>(
-  endpoint: string, 
-  options: RequestInit = {}
-): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
-  
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeaders(),
-        ...options.headers,
-      },
-      ...options,
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new ApiError(response.status, data.error || 'API request failed');
-    }
-
-    return data;
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    
-    // ネットワークエラーなど
-    console.error('API Request Error:', error);
-    throw new ApiError(0, 'Network error or server unavailable');
-  }
-}
-
 // 資産一覧取得
 export async function getAssets(
   page: number = 1, 
@@ -87,7 +37,7 @@ export async function getAssets(
     )
   });
 
-  const response = await apiRequest<ApiResponse<Asset[]>>(
+  const response = await apiGet<ApiResponse<Asset[]>>(
     `/api/assets?${queryParams}`
   );
 
@@ -138,7 +88,7 @@ export async function getAssets(
 
 // 資産詳細取得
 export async function getAssetById(id: string): Promise<Asset> {
-  const response = await apiRequest<any>(`/api/assets/${id}`);
+  const response = await apiGet<any>(`/api/assets/${id}`);
   
   // APIレスポンスをフロントエンド型に変換
   const asset = response.data || response;
@@ -207,10 +157,7 @@ export async function createAsset(assetData: Partial<Asset>): Promise<Asset> {
     created_by: assetData.createdBy
   };
 
-  const response = await apiRequest<ApiResponse<Asset>>('/api/assets', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  const response = await apiPost<ApiResponse<Asset>>('/api/assets', payload);
 
   // 作成された資産データを返す
   const asset = response.data || response;
@@ -279,10 +226,7 @@ export async function updateAsset(id: string, updates: Partial<Asset>): Promise<
     updated_by: updates.updatedBy
   };
 
-  const response = await apiRequest<ApiResponse<Asset>>(`/api/assets/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  });
+  const response = await apiPut<ApiResponse<Asset>>(`/api/assets/${id}`, payload);
 
   const asset = response.data || response;
   return {
@@ -321,20 +265,18 @@ export async function updateAsset(id: string, updates: Partial<Asset>): Promise<
 
 // 資産削除
 export async function deleteAsset(id: string): Promise<void> {
-  await apiRequest(`/api/assets/${id}`, {
-    method: 'DELETE',
-  });
+  await apiDelete(`/api/assets/${id}`);
 }
 
 // 資産統計取得
 export async function getAssetStats(): Promise<any> {
-  const response = await apiRequest<any>('/api/assets/stats');
+  const response = await apiGet<any>('/api/assets/stats');
   return response;
 }
 
 // 資産タグ生成
 export async function generateAssetTag(type: string): Promise<string> {
-  const response = await apiRequest<{ assetTag: string }>(`/api/assets/generate-tag?type=${encodeURIComponent(type)}`);
+  const response = await apiGet<{ assetTag: string }>(`/api/assets/generate-tag?type=${encodeURIComponent(type)}`);
   return response.assetTag;
 }
 

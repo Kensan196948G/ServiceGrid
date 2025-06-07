@@ -175,11 +175,14 @@ const createKnowledge = (req, res) => {
   const today = new Date().toISOString().split('T')[0];
   
   const query = `
-    INSERT INTO knowledge (title, content, category, created_by, created_date, updated_date)
-    VALUES (?, ?, ?, ?, ?, datetime('now'))
+    INSERT INTO knowledge (article_number, title, content, category, author_user_id, created_date, updated_date)
+    VALUES (?, ?, ?, ?, (SELECT user_id FROM users WHERE username = ? LIMIT 1), ?, datetime('now'))
   `;
   
-  db.run(query, [title, content, category, author, today], function(err) {
+  // Generate article number
+  const articleNumber = `KB-${Date.now().toString().slice(-6)}`;
+  
+  db.run(query, [articleNumber, title, content, category, author, today], function(err) {
     if (err) {
       console.error('Database error:', err);
       return res.status(500).json({ error: 'データベースエラーが発生しました' });
@@ -443,6 +446,142 @@ const searchKnowledge = (req, res) => {
   });
 };
 
+/**
+ * ナレッジ承認
+ */
+const approveKnowledge = (req, res) => {
+  const { id } = req.params;
+  const { approved, comments } = req.body;
+  
+  // 管理者権限チェック
+  if (!req.user || req.user.role !== 'administrator') {
+    return res.status(403).json({ error: 'ナレッジの承認は管理者のみ可能です' });
+  }
+  
+  // 既存データの確認
+  db.get(
+    'SELECT * FROM knowledge WHERE knowledge_id = ?',
+    [id],
+    (err, existingKnowledge) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'データベースエラーが発生しました' });
+      }
+      
+      if (!existingKnowledge) {
+        return res.status(404).json({ error: 'ナレッジが見つかりません' });
+      }
+      
+      const status = approved ? 'Published' : 'Archived';
+      const approval_status = approved ? 'Approved' : 'Rejected';
+      const now = new Date().toISOString();
+      
+      const query = `
+        UPDATE knowledge 
+        SET status = ?, approval_status = ?, approved_by_user_id = (SELECT user_id FROM users WHERE username = ? LIMIT 1), updated_date = ?
+        WHERE knowledge_id = ?
+      `;
+      
+      db.run(query, [status, approval_status, req.user.username, now, id], function(err) {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'データベースエラーが発生しました' });
+        }
+        
+        // 監査ログ
+        db.run(
+          'INSERT INTO logs (event_type, event_time, user, detail) VALUES (?, ?, ?, ?)',
+          ['KNOWLEDGE_APPROVE', now, req.user.username, `${approved ? 'Approved' : 'Rejected'} knowledge article ID: ${id}${comments ? ' - ' + comments : ''}`]
+        );
+        
+        // 更新後のデータを返す
+        db.get(
+          'SELECT * FROM knowledge WHERE knowledge_id = ?',
+          [id],
+          (err, row) => {
+            if (err) {
+              console.error('Database error:', err);
+              return res.status(500).json({ error: 'データベースエラーが発生しました' });
+            }
+            
+            res.json({
+              success: true,
+              message: `ナレッジが正常に${approved ? '承認' : '却下'}されました`,
+              data: row
+            });
+          }
+        );
+      });
+    }
+  );
+};
+
+/**
+ * ナレッジ評価
+ */
+const rateKnowledge = (req, res) => {
+  const { id } = req.params;
+  const { rating, comment } = req.body;
+  
+  // 評価値検証
+  if (!rating || rating < 1 || rating > 5) {
+    return res.status(400).json({ error: '評価は1-5の範囲で入力してください' });
+  }
+  
+  // 既存データの確認
+  db.get(
+    'SELECT * FROM knowledge WHERE knowledge_id = ?',
+    [id],
+    (err, existingKnowledge) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'データベースエラーが発生しました' });
+      }
+      
+      if (!existingKnowledge) {
+        return res.status(404).json({ error: 'ナレッジが見つかりません' });
+      }
+      
+      const now = new Date().toISOString();
+      
+      // 評価記録の保存（拡張スキーマ使用）
+      const currentTotal = existingKnowledge.rating_total || 0;
+      const ratingCount = existingKnowledge.rating_count || 0;
+      const newTotal = currentTotal + rating;
+      const newCount = ratingCount + 1;
+      
+      const query = `
+        UPDATE knowledge 
+        SET rating_total = ?, rating_count = ?, updated_date = ?
+        WHERE knowledge_id = ?
+      `;
+      
+      db.run(query, [newTotal, newCount, now, id], function(err) {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'データベースエラーが発生しました' });
+        }
+        
+        // 監査ログ
+        db.run(
+          'INSERT INTO logs (event_type, event_time, user, detail) VALUES (?, ?, ?, ?)',
+          ['KNOWLEDGE_RATE', now, req.user?.username || 'anonymous', `Rated knowledge article ID: ${id} with ${rating} stars${comment ? ' - ' + comment : ''}`]
+        );
+        
+        res.json({
+          success: true,
+          message: 'ナレッジの評価が正常に記録されました',
+          rating: {
+            average: parseFloat((newTotal / newCount).toFixed(2)),
+            count: newCount,
+            user_rating: rating
+          }
+        });
+      });
+    }
+  );
+};
+
 module.exports = {
   getKnowledge,
   getKnowledgeStats,
@@ -450,5 +589,7 @@ module.exports = {
   createKnowledge,
   updateKnowledge,
   deleteKnowledge,
-  searchKnowledge
+  searchKnowledge,
+  approveKnowledge,
+  rateKnowledge
 };

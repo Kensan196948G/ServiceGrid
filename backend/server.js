@@ -266,6 +266,7 @@ const authAPI = require('./api/auth');
 const serviceRequestsAPI = require('./api/service-requests');
 const knowledgeAPI = require('./api/knowledge');
 const changesAPI = require('./api/changes-enhanced');
+const releasesAPI = require('./api/releases');
 const problemsAPI = require('./api/problems');
 const slasAPI = require('./api/slas');
 const capacityAPI = require('./api/capacity');
@@ -276,7 +277,7 @@ const reportsAPI = require('./api/reports');
 // 資産管理API
 app.get('/api/assets', authenticateToken, assetsAPI.getAssets);
 app.get('/api/assets/stats', authenticateToken, assetsAPI.getAssetStats);
-app.get('/api/assets/generate-tag', authenticateToken, assetsAPI.generateAssetTag);
+app.get('/api/assets/generate-tag', authenticateToken, assetsAPI.generateAssetTagEndpoint);
 app.get('/api/assets/:id', authenticateToken, assetsAPI.getAssetById);
 app.post('/api/assets', authenticateToken, assetsAPI.createAsset);
 app.put('/api/assets/:id', authenticateToken, assetsAPI.updateAsset);
@@ -303,6 +304,7 @@ app.delete('/api/service-requests/:id', authenticateToken, serviceRequestsAPI.de
 // ナレッジ管理API
 app.get('/api/knowledge', authenticateToken, knowledgeAPI.getKnowledge);
 app.get('/api/knowledge/stats', authenticateToken, knowledgeAPI.getKnowledgeStats);
+app.get('/api/knowledge/search', authenticateToken, knowledgeAPI.searchKnowledge);
 app.get('/api/knowledge/:id', authenticateToken, knowledgeAPI.getKnowledgeById);
 app.post('/api/knowledge', authenticateToken, knowledgeAPI.createKnowledge);
 app.put('/api/knowledge/:id', authenticateToken, knowledgeAPI.updateKnowledge);
@@ -320,6 +322,14 @@ app.put('/api/changes/:id/approve', authenticateToken, changesAPI.approveChange)
 app.put('/api/changes/:id/start-implementation', authenticateToken, changesAPI.startImplementation);
 app.put('/api/changes/:id/complete-implementation', authenticateToken, changesAPI.completeImplementation);
 app.delete('/api/changes/:id', authenticateToken, changesAPI.deleteChange);
+
+// リリース管理API
+app.get('/api/releases', authenticateToken, releasesAPI.getReleases);
+app.get('/api/releases/stats', authenticateToken, releasesAPI.getReleaseStats);
+app.get('/api/releases/:id', authenticateToken, releasesAPI.getReleaseById);
+app.post('/api/releases', authenticateToken, releasesAPI.createRelease);
+app.put('/api/releases/:id', authenticateToken, releasesAPI.updateRelease);
+app.delete('/api/releases/:id', authenticateToken, releasesAPI.deleteRelease);
 
 // 問題管理API
 app.get('/api/problems', authenticateToken, problemsAPI.getProblems);

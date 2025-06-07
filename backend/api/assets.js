@@ -1,6 +1,21 @@
 // 資産管理API実装
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const {
+  ITSMError,
+  ERROR_TYPES,
+  HTTP_STATUS,
+  createValidationError,
+  createDatabaseError,
+  createNotFoundError,
+  apiResponse,
+  apiError,
+  asyncHandler,
+  executeDbOperation,
+  validateRequiredFields,
+  sanitizeInput,
+  checkRateLimit
+} = require('../utils/errorHandler');
 
 const DB_PATH = path.join(__dirname, '..', 'db', 'itsm.sqlite');
 
@@ -86,56 +101,115 @@ function generateNextAssetTag(type, callback) {
 }
 
 // バリデーション関数
+// 強化されたバリデーション関数
 function validateAssetData(data, isUpdate = false) {
-  const errors = [];
-  
-  if (!isUpdate || data.asset_tag !== undefined) {
-    if (!data.asset_tag || data.asset_tag.trim().length === 0) {
-      errors.push('資産タグは必須です');
-    } else if (data.asset_tag.length > 50) {
-      errors.push('資産タグは50文字以内で入力してください');
+  try {
+    // データの正規化
+    const sanitizedData = sanitizeInput(data);
+    
+    // 必須フィールドの検証（新規作成時のみ）
+    if (!isUpdate) {
+      validateRequiredFields(sanitizedData, ['name', 'type', 'asset_tag']);
     }
-  }
-  
-  if (!isUpdate || data.name !== undefined) {
-    if (!data.name || data.name.trim().length === 0) {
-      errors.push('資産名は必須です');
-    } else if (data.name.length > 200) {
-      errors.push('資産名は200文字以内で入力してください');
+    
+    const errors = [];
+    
+    // 資産名の検証
+    if (sanitizedData.name !== undefined) {
+      if (typeof sanitizedData.name !== 'string') {
+        errors.push('資産名は文字列で入力してください');
+      } else if (sanitizedData.name.trim().length === 0 && !isUpdate) {
+        errors.push('資産名は必須です');
+      } else if (sanitizedData.name.length > 200) {
+        errors.push('資産名は200文字以内で入力してください');
+      }
     }
-  }
-  
-  if (data.status && !['Active', 'Inactive', 'Maintenance', 'Retired', 'Lost', 'Stolen', 'Disposed'].includes(data.status)) {
-    errors.push('無効なステータスです');
-  }
-  
-  if (data.category && data.category.length > 100) {
-    errors.push('カテゴリは100文字以内で入力してください');
-  }
-  
-  if (data.purchase_cost && (isNaN(data.purchase_cost) || data.purchase_cost < 0)) {
-    errors.push('購入費用は正の数値を入力してください');
-  }
-  
-  // 日付形式チェック
-  const dateFields = ['purchase_date', 'warranty_expiry', 'last_maintenance', 'next_maintenance'];
-  dateFields.forEach(field => {
-    if (data[field] && data[field] !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(data[field])) {
-      errors.push(`${field}は YYYY-MM-DD 形式で入力してください`);
+    
+    // 資産タイプの検証
+    if (sanitizedData.type !== undefined) {
+      const validTypes = ['Server', 'Desktop', 'Laptop', 'Tablet', 'Phone', 'Network Equipment', 'Storage', 'Printer', 'Monitor', 'Peripheral', 'Software', 'License', 'Virtual Machine', 'Cloud Service', 'Other'];
+      if (!validTypes.includes(sanitizedData.type)) {
+        errors.push(`無効な資産タイプです。有効な値: ${validTypes.join(', ')}`);
+      }
     }
-  });
-  
-  // IPアドレス形式チェック（簡易）
-  if (data.ip_address && data.ip_address !== '' && !/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(data.ip_address)) {
-    errors.push('IPアドレスの形式が正しくありません');
+    
+    // 資産タグの検証
+    if (sanitizedData.asset_tag !== undefined) {
+      if (typeof sanitizedData.asset_tag !== 'string') {
+        errors.push('資産タグは文字列で入力してください');
+      } else if (sanitizedData.asset_tag.trim().length === 0 && !isUpdate) {
+        errors.push('資産タグは必須です');
+      } else if (sanitizedData.asset_tag.length > 50) {
+        errors.push('資産タグは50文字以内で入力してください');
+      }
+    }
+    
+    // ステータスの検証
+    if (sanitizedData.status !== undefined) {
+      const validStatuses = ['Active', 'Inactive', 'Maintenance', 'Retired', 'Lost', 'Stolen', 'Disposed'];
+      if (!validStatuses.includes(sanitizedData.status)) {
+        errors.push(`無効なステータスです。有効な値: ${validStatuses.join(', ')}`);
+      }
+    }
+    
+    // 費用の検証
+    if (sanitizedData.purchase_cost !== undefined && sanitizedData.purchase_cost !== null && sanitizedData.purchase_cost !== '') {
+      const cost = parseFloat(sanitizedData.purchase_cost);
+      if (isNaN(cost)) {
+        errors.push('購入費用は数値で入力してください');
+      } else if (cost < 0) {
+        errors.push('購入費用は0以上の値で入力してください');
+      }
+    }
+    
+    // 日付の検証
+    const dateFields = ['purchase_date', 'warranty_expiry', 'last_maintenance', 'next_maintenance'];
+    dateFields.forEach(field => {
+      if (sanitizedData[field] !== undefined && sanitizedData[field] !== null && sanitizedData[field] !== '') {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(sanitizedData[field])) {
+          errors.push(`${field}は YYYY-MM-DD 形式で入力してください`);
+        } else {
+          const date = new Date(sanitizedData[field]);
+          if (isNaN(date.getTime())) {
+            errors.push(`${field}は有効な日付で入力してください`);
+          }
+        }
+      }
+    });
+    
+    // IPアドレス形式の検証
+    if (sanitizedData.ip_address && sanitizedData.ip_address.trim() !== '') {
+      const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+      if (!ipRegex.test(sanitizedData.ip_address)) {
+        errors.push('IPアドレスは正しい形式（例：192.168.1.1）で入力してください');
+      } else {
+        const octets = sanitizedData.ip_address.split('.');
+        if (octets.some(octet => parseInt(octet) > 255)) {
+          errors.push('IPアドレスの各オクテットは0-255の範囲で入力してください');
+        }
+      }
+    }
+    
+    // MACアドレス形式の検証
+    if (sanitizedData.mac_address && sanitizedData.mac_address.trim() !== '') {
+      const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
+      if (!macRegex.test(sanitizedData.mac_address)) {
+        errors.push('MACアドレスは正しい形式（例：AA:BB:CC:DD:EE:FF）で入力してください');
+      }
+    }
+    
+    if (errors.length > 0) {
+      throw createValidationError('入力データに問題があります', { validationErrors: errors });
+    }
+    
+    return sanitizedData;
+    
+  } catch (error) {
+    if (error instanceof ITSMError) {
+      throw error;
+    }
+    throw createValidationError(`データ検証中にエラーが発生しました: ${error.message}`);
   }
-  
-  // MACアドレス形式チェック（簡易）
-  if (data.mac_address && data.mac_address !== '' && !/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(data.mac_address)) {
-    errors.push('MACアドレスの形式が正しくありません');
-  }
-  
-  return errors;
 }
 
 // 資産一覧取得

@@ -305,3 +305,220 @@ export const complianceRiskStatusToJapanese = (status: ComplianceRiskStatus): st
     default: return status;
   }
 };
+
+// Common UI messages and error messages
+export const UI_MESSAGES = {
+  // Common buttons
+  save: '保存',
+  cancel: 'キャンセル',
+  edit: '編集',
+  delete: '削除',
+  create: '作成',
+  search: '検索',
+  filter: 'フィルター',
+  export: 'エクスポート',
+  import: 'インポート',
+  approve: '承認',
+  reject: '却下',
+  close: '閉じる',
+  submit: '送信',
+  reset: 'リセット',
+  
+  // Loading and status messages
+  loading: '読み込み中...',
+  saving: '保存中...',
+  processing: '処理中...',
+  noData: 'データがありません',
+  noResults: '検索結果がありません',
+  
+  // Success messages
+  saveSuccess: '正常に保存されました',
+  deleteSuccess: '正常に削除されました',
+  createSuccess: '正常に作成されました',
+  updateSuccess: '正常に更新されました',
+  importSuccess: '正常にインポートされました',
+  exportSuccess: '正常にエクスポートされました',
+  approveSuccess: '正常に承認されました',
+  rejectSuccess: '正常に却下されました',
+  
+  // Error messages
+  saveError: '保存に失敗しました',
+  deleteError: '削除に失敗しました',
+  createError: '作成に失敗しました',
+  updateError: '更新に失敗しました',
+  loadError: '読み込みに失敗しました',
+  importError: 'インポートに失敗しました',
+  exportError: 'エクスポートに失敗しました',
+  validationError: '入力内容にエラーがあります',
+  networkError: 'ネットワークエラーが発生しました',
+  serverError: 'サーバーエラーが発生しました',
+  permissionError: 'アクセス権限がありません',
+  authenticationError: '認証が必要です',
+  notFoundError: 'データが見つかりません',
+  
+  // Confirmation messages
+  deleteConfirm: 'この項目を削除してもよろしいですか？この操作は元に戻せません。',
+  unsavedChangesConfirm: '保存されていない変更があります。破棄してもよろしいですか？',
+  logoutConfirm: 'ログアウトしてもよろしいですか？',
+  
+  // Form validation messages
+  required: 'この項目は必須です',
+  invalidEmail: '正しいメールアドレスを入力してください',
+  invalidUrl: '正しいURLを入力してください',
+  invalidDate: '正しい日付を入力してください',
+  invalidNumber: '数値を入力してください',
+  minLength: (min: number) => `${min}文字以上で入力してください`,
+  maxLength: (max: number) => `${max}文字以内で入力してください`,
+  invalidFormat: '正しい形式で入力してください',
+  
+  // File upload messages
+  selectFile: 'ファイルを選択してください',
+  uploadSuccess: 'ファイルのアップロードが完了しました',
+  uploadError: 'ファイルのアップロードに失敗しました',
+  invalidFileType: 'サポートされていないファイル形式です',
+  fileTooLarge: 'ファイルサイズが大きすぎます',
+  
+  // Pagination
+  page: 'ページ',
+  of: '/',
+  itemsPerPage: '表示件数',
+  showing: '表示中',
+  to: '〜',
+  items: '件',
+  
+  // Table headers and sorting
+  sortAscending: '昇順でソート',
+  sortDescending: '降順でソート',
+  noSorting: 'ソートなし',
+  
+  // Filters
+  allItems: 'すべて',
+  clearFilters: 'フィルタークリア',
+  applyFilters: 'フィルター適用',
+  
+  // Date and time
+  today: '今日',
+  yesterday: '昨日',
+  lastWeek: '先週',
+  lastMonth: '先月',
+  thisYear: '今年',
+  
+  // Asset specific
+  assetTag: '資産タグ',
+  assetName: '資産名',
+  assetType: '資産種類',
+  assetStatus: '資産ステータス',
+  generateTag: 'タグ自動生成',
+  
+  // Service Request specific
+  serviceRequest: 'サービスリクエスト',
+  requestor: '申請者',
+  approver: '承認者',
+  workflowStatus: 'ワークフロー状況',
+  approvalComments: '承認コメント',
+  rejectionReason: '却下理由',
+  startWork: '作業開始',
+  completeWork: '作業完了',
+  
+  // Incident specific
+  incident: 'インシデント',
+  priority: '優先度',
+  severity: '重要度',
+  category: 'カテゴリ',
+  assignee: '担当者',
+  reporter: '報告者',
+  resolution: '解決策',
+  
+  // Dashboard specific
+  dashboard: 'ダッシュボード',
+  overview: '概要',
+  statistics: '統計',
+  recentActivity: '最近の活動',
+  alerts: 'アラート',
+  healthStatus: 'ヘルス状況',
+  
+  // Navigation
+  home: 'ホーム',
+  settings: '設定',
+  profile: 'プロフィール',
+  logout: 'ログアウト',
+  administration: '管理',
+  
+  // System messages
+  systemMaintenance: 'システムメンテナンス中です',
+  systemError: 'システムエラーが発生しました',
+  sessionExpired: 'セッションが期限切れです。再度ログインしてください',
+  connectionLost: '接続が失われました。ネットワークを確認してください'
+};
+
+// Error code to message mapping
+export const ERROR_CODES = {
+  E001: 'データベース接続エラー',
+  E002: '認証エラー',
+  E003: 'アクセス権限エラー',
+  E004: 'データ検証エラー',
+  E005: 'ファイル処理エラー',
+  E006: 'ネットワークエラー',
+  E007: 'システム内部エラー',
+  E008: 'タイムアウトエラー',
+  E009: 'データ重複エラー',
+  E010: 'リソース不足エラー'
+};
+
+// Helper function to format error messages
+export const formatErrorMessage = (error: any): string => {
+  if (typeof error === 'string') {
+    return error;
+  }
+  
+  if (error?.response?.data?.message) {
+    return error.response.data.message;
+  }
+  
+  if (error?.message) {
+    return error.message;
+  }
+  
+  if (error?.code && ERROR_CODES[error.code as keyof typeof ERROR_CODES]) {
+    return ERROR_CODES[error.code as keyof typeof ERROR_CODES];
+  }
+  
+  return UI_MESSAGES.systemError;
+};
+
+// Date formatting functions
+export const formatDateTime = (date: string | Date): string => {
+  try {
+    const d = new Date(date);
+    return d.toLocaleString('ja-JP', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return '不明';
+  }
+};
+
+export const formatDate = (date: string | Date): string => {
+  try {
+    const d = new Date(date);
+    return d.toLocaleDateString('ja-JP');
+  } catch {
+    return '不明';
+  }
+};
+
+export const formatTime = (date: string | Date): string => {
+  try {
+    const d = new Date(date);
+    return d.toLocaleTimeString('ja-JP', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return '不明';
+  }
+};

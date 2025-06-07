@@ -6,6 +6,7 @@ import { testApiConnection, testIncidentsApi } from '../services/testApiConnecti
 import { Button, Table, Modal, Input, Textarea, Select, Spinner, Card, Notification, NotificationType } from '../components/CommonUI';
 import { useAuth } from '../contexts/AuthContext';
 import { itemStatusToJapanese, priorityToJapanese } from '../localization';
+import { validateForm, INCIDENT_VALIDATION_RULES, ValidationError } from '../utils/formValidation';
 
 const IncidentPage: React.FC = () => {
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -14,6 +15,10 @@ const IncidentPage: React.FC = () => {
   const [editingIncident, setEditingIncident] = useState<Partial<Incident> | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: NotificationType } | null>(null);
   const { user } = useAuth();
+  
+  // Form validation state
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
 
   const priorities: Array<Incident['priority']> = ['Low', 'Medium', 'High', 'Critical'];
   const categories = ['ハードウェア', 'ソフトウェア', 'ネットワーク', 'アカウント', 'その他'];

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from './components/RouterPlaceholder';
 import { useAuth } from './contexts/AuthContext';
 import { MainLayout } from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';

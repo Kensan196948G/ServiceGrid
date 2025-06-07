@@ -127,7 +127,19 @@ const AuditLogPage: React.FC = () => {
     { Header: '詳細', accessor: (row: AuditLog) => <span title={row.details}>{row.details.substring(0, 100)}{row.details.length > 100 ? '...' : ''}</span> },
   ];
 
-  // Commented out unused logSourceStatusColumns to fix TypeScript warnings
+  const logSourceStatusColumns: Array<{ Header: string; accessor: keyof LogSourceStatus | ((row: LogSourceStatus) => ReactNode) }> = [
+    { Header: 'ソース', accessor: 'source' },
+    { Header: 'ステータス', accessor: (row: LogSourceStatus) => (
+      <span className={`px-2 py-1 rounded text-xs font-medium ${
+        row.status === 'Active' ? 'bg-green-100 text-green-800' : 
+        row.status === 'Error' ? 'bg-red-100 text-red-800' : 
+        'bg-yellow-100 text-yellow-800'
+      }`}>
+        {row.status === 'Active' ? '稼働中' : row.status === 'Error' ? 'エラー' : 'メンテナンス'}
+      </span>
+    )},
+    { Header: '最終更新', accessor: (row: LogSourceStatus) => new Date(row.lastUpdated).toLocaleString() },
+  ];
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-full"><Spinner size="lg" /></div>;

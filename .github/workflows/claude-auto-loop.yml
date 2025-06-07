@@ -1,15 +1,8 @@
 name: Claude Complete Auto Development
+
 on:
   issue_comment:
     types: [created]
-  pull_request_review_comment:
-    types: [created]
-  issues:
-    types: [opened, assigned]
-  pull_request_review:
-    types: [submitted]
-  schedule:
-    - cron: '0 */6 * * *'
   workflow_dispatch:
     inputs:
       instructions:
@@ -25,9 +18,10 @@ on:
           - full-auto
           - safe-mode
           - aggressive
+  schedule:
+    - cron: '0 */6 * * *'
 
 env:
-  # Claude完全自動化設定
   CLAUDE_AUTO_APPROVE: "true"
   CLAUDE_NO_PROMPTS: "true"
   CLAUDE_SILENT_MODE: "true"
@@ -39,980 +33,104 @@ env:
 jobs:
   claude-complete-automation:
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude'))) ||
-      (github.event_name == 'schedule') ||
-      (github.event_name == 'workflow_dispatch')
-    
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    
+
     permissions:
       contents: write
       issues: write
       pull-requests: write
-      actions: write
-      checks: write
-      pages: write
-      
+
     steps:
       - name: 🚀 Repository Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: 🔧 Environment Setup
         run: |
-          echo "🤖 Claude完全自動化環境をセットアップ中..."
-          echo "AUTOMATION_ID=claude-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
-          echo "START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_ENV
-          echo "WORKSPACE_ROOT=${{ github.workspace }}" >> $GITHUB_ENV
-          
-          # 必要なツールインストール
-          sudo apt-get update && sudo apt-get install -y jq curl git bc python3-pip nodejs npm
-          pip3 install requests beautifulsoup4 openai anthropic
-          
-      - name: 📝 Extract and Parse Instructions
-        id: extract
+          echo "Claude完全自動化環境セットアップ中..."
+          sudo apt-get update && sudo apt-get install -y jq curl git bc
+
+      - name: 📝 Find Latest Spec File
+        id: specfile
         run: |
-          echo "📋 指示内容を抽出・解析中..."
-          
-          INSTRUCTIONS=""
-          COMMAND_FLAGS=""
-          
-          # イベントタイプ別の指示抽出
-          case "${{ github.event_name }}" in
-            "issue_comment")
-              INSTRUCTIONS="${{ github.event.comment.body }}"
-              ;;
-            "pull_request_review_comment")
-              INSTRUCTIONS="${{ github.event.comment.body }}"
-              ;;
-            "pull_request_review")
-              INSTRUCTIONS="${{ github.event.review.body }}"
-              ;;
-            "issues")
-              INSTRUCTIONS="${{ github.event.issue.body }}"
-              ;;
-            "schedule")
-              INSTRUCTIONS="定期的な包括システム診断と予防保守、パフォーマンス最適化、セキュリティ強化を実行してください"
-              ;;
-            "workflow_dispatch")
-              INSTRUCTIONS="${{ github.event.inputs.instructions }}"
-              ;;
-          esac
-          
-          # @claudeコマンドと引数を解析
-          if echo "$INSTRUCTIONS" | grep -q "@claude"; then
-            # コマンドライン引数を抽出
-            COMMAND_LINE=$(echo "$INSTRUCTIONS" | grep -o "@claude.*" | head -1)
-            
-            # フラグの解析
-            if echo "$COMMAND_LINE" | grep -q -- "--auto-approve"; then
-              COMMAND_FLAGS="$COMMAND_FLAGS auto-approve"
-            fi
-            if echo "$COMMAND_LINE" | grep -q -- "--no-prompts"; then
-              COMMAND_FLAGS="$COMMAND_FLAGS no-prompts"
-            fi
-            if echo "$COMMAND_LINE" | grep -q -- "--silent-mode"; then
-              COMMAND_FLAGS="$COMMAND_FLAGS silent-mode"
-            fi
-            
-            # 指示内容をクリーンアップ
-            CLEAN_INSTRUCTIONS=$(echo "$INSTRUCTIONS" | sed 's/@claude[^[:space:]]*//' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
-          else
-            CLEAN_INSTRUCTIONS="$INSTRUCTIONS"
+          FILE=$(ls -1 *最新版*.txt 2>/dev/null | head -n 1)
+          if [ -z "$FILE" ]; then
+            FILE=$(ls -1 "ITSM準拠IT運用システムプラットフォーム 詳細仕様書.txt" 2>/dev/null || true)
           fi
-          
-          echo "instructions=$CLEAN_INSTRUCTIONS" >> $GITHUB_OUTPUT
-          echo "command_flags=$COMMAND_FLAGS" >> $GITHUB_OUTPUT
-          echo "raw_instructions=$INSTRUCTIONS" >> $GITHUB_OUTPUT
-          
-          echo "✅ 抽出された指示: $CLEAN_INSTRUCTIONS"
-          echo "🏁 検出されたフラグ: $COMMAND_FLAGS"
-          
-      - name: 🧠 Claude AI Planning Phase
-        id: planning
-        run: |
-          echo "🧠 Claude AI による実行計画立案中..."
-          
-          # Claude APIで実行計画を生成
-          PLANNING_RESPONSE=$(cat << 'EOF' | python3
-import os
-import json
-import requests
-
-# Claude API設定
-api_key = os.environ.get('ANTHROPIC_API_KEY')
-if not api_key:
-    print("エラー: ANTHROPIC_API_KEY が設定されていません")
-    exit(1)
-
-instructions = """${{ steps.extract.outputs.instructions }}"""
-command_flags = """${{ steps.extract.outputs.command_flags }}"""
-repo_info = {
-    "repository": "${{ github.repository }}",
-    "ref": "${{ github.ref_name }}",
-    "workspace": "${{ github.workspace }}"
-}
-
-# Claude APIリクエスト
-url = "https://api.anthropic.com/v1/messages"
-headers = {
-    "Content-Type": "application/json",
-    "x-api-key": api_key,
-    "anthropic-version": "2023-06-01"
-}
-
-prompt = f"""あなたはエキスパートのITシステム運用管理者かつフルスタック開発者です。以下の条件で完全自動開発を実行してください。
-
-## 実行条件
-- 自動承認: 有効 (--auto-approve)
-- プロンプト無し: 有効 (--no-prompts) 
-- サイレントモード: 有効 (--silent-mode)
-- 言語: 日本語
-- リポジトリ: {repo_info["repository"]}
-
-## 指示内容
-{instructions}
-
-## 検出されたコマンドフラグ
-{command_flags}
-
-## 出力要求
-以下のJSON形式で実行計画を出力してください：
-
-```json
-{{
-  "execution_plan": {{
-    "phases": [
-      {{
-        "phase": "分析",
-        "description": "現在の状況分析",
-        "actions": ["action1", "action2"],
-        "estimated_time": "5分"
-      }},
-      {{
-        "phase": "実装", 
-        "description": "コード生成と実装",
-        "actions": ["action1", "action2"],
-        "estimated_time": "15分"
-      }},
-      {{
-        "phase": "テスト",
-        "description": "自動テストと品質チェック", 
-        "actions": ["action1", "action2"],
-        "estimated_time": "10分"
-      }},
-      {{
-        "phase": "デプロイ",
-        "description": "自動デプロイと監視設定",
-        "actions": ["action1", "action2"], 
-        "estimated_time": "10分"
-      }}
-    ],
-    "total_estimated_time": "40分",
-    "risk_level": "low|medium|high",
-    "auto_approve_safe": true,
-    "requires_human_review": false
-  }},
-  "files_to_create": [
-    {{
-      "path": "src/app.js",
-      "type": "application",
-      "description": "メインアプリケーション"
-    }}
-  ],
-  "files_to_modify": [
-    {{
-      "path": "package.json", 
-      "type": "configuration",
-      "description": "依存関係の更新"
-    }}
-  ],
-  "deployment_strategy": "blue-green|rolling|canary",
-  "monitoring_setup": [
-    "prometheus",
-    "grafana", 
-    "alertmanager"
-  ],
-  "security_measures": [
-    "dependency_scan",
-    "security_audit",
-    "secrets_scan"
-  ]
-}}
-```
-
-重要: JSON以外は出力しないでください。"""
-
-data = {
-    "model": "claude-3-sonnet-20240229",
-    "max_tokens": 4000,
-    "messages": [{"role": "user", "content": prompt}]
-}
-
-try:
-    response = requests.post(url, headers=headers, json=data, timeout=30)
-    response.raise_for_status()
-    
-    result = response.json()
-    content = result['content'][0]['text']
-    
-    # JSONを抽出
-    import re
-    json_match = re.search(r'```json\s*(.*?)\s*```', content, re.DOTALL)
-    if json_match:
-        json_content = json_match.group(1)
-        # JSON妥当性チェック
-        parsed = json.loads(json_content)
-        print(json_content)
-    else:
-        # フォールバック計画
-        fallback_plan = {
-            "execution_plan": {
-                "phases": [
-                    {
-                        "phase": "分析",
-                        "description": "現在の状況分析とリポジトリスキャン",
-                        "actions": ["repository_scan", "dependency_analysis", "security_check"],
-                        "estimated_time": "5分"
-                    },
-                    {
-                        "phase": "実装",
-                        "description": "自動コード生成と実装",
-                        "actions": ["code_generation", "file_creation", "configuration_setup"],
-                        "estimated_time": "20分"
-                    },
-                    {
-                        "phase": "品質保証",
-                        "description": "自動テストと品質チェック",
-                        "actions": ["unit_tests", "integration_tests", "code_quality_scan"],
-                        "estimated_time": "15分"
-                    },
-                    {
-                        "phase": "デプロイ",
-                        "description": "自動デプロイと監視設定",
-                        "actions": ["deployment_preparation", "monitoring_setup", "health_checks"],
-                        "estimated_time": "10分"
-                    }
-                ],
-                "total_estimated_time": "50分",
-                "risk_level": "low",
-                "auto_approve_safe": True,
-                "requires_human_review": False
-            },
-            "files_to_create": [],
-            "files_to_modify": [],
-            "deployment_strategy": "rolling",
-            "monitoring_setup": ["basic_monitoring"],
-            "security_measures": ["dependency_scan", "basic_security_check"]
-        }
-        print(json.dumps(fallback_plan))
-        
-except Exception as e:
-    print(f"エラー: {e}")
-    exit(1)
-EOF
-          )
-          
-          # 計画をファイルに保存
-          echo "$PLANNING_RESPONSE" > execution_plan.json
-          echo "plan_file=execution_plan.json" >> $GITHUB_OUTPUT
-          
-          # 計画の妥当性確認
-          if jq empty execution_plan.json 2>/dev/null; then
-            echo "✅ 実行計画の生成完了"
-            jq -r '.execution_plan.total_estimated_time' execution_plan.json | xargs echo "⏱️ 予想実行時間:"
-            jq -r '.execution_plan.risk_level' execution_plan.json | xargs echo "⚠️ リスクレベル:"
-          else
-            echo "❌ 実行計画の生成に失敗しました"
+          if [ -z "$FILE" ]; then
+            echo "⚠️ 仕様書ファイル（.txt）が見つかりません"
             exit 1
           fi
+          echo "SPEC_FILE=$FILE" >> $GITHUB_ENV
+          echo "使用する仕様書ファイル: $FILE"
+
+      - name: 🗝️ Parse Claude Command Options
+        if: github.event_name == 'issue_comment'
+        id: parseclaude
+        run: |
+          # コメント本文を取得
+          COMMENT="${{ github.event.comment.body }}"
+          # デフォルト値
+          CLAUDE_OPTS="--auto-approve --no-prompts --silent-mode --mode full-auto"
+          INSTRUCTIONS="包括的なシステム診断と自動改善を実行してください"
+          # @claudeコマンド行のみを抽出
+          CMD_LINE=$(echo "$COMMENT" | grep '@claude')
+          if [ -n "$CMD_LINE" ]; then
+            # --mode や --instructions オプションを抽出（必要に応じて拡張）
+            if echo "$CMD_LINE" | grep -q -- '--mode'; then
+              MODE=$(echo "$CMD_LINE" | sed -n 's/.*--mode[ =]\?\([^ ]*\).*/\1/p')
+              [ -n "$MODE" ] && CLAUDE_OPTS=$(echo "$CLAUDE_OPTS" | sed "s/--mode [^ ]*/--mode $MODE/")
+            fi
+            if echo "$CMD_LINE" | grep -q -- '--instructions'; then
+              INSTRUCTIONS=$(echo "$CMD_LINE" | sed -n 's/.*--instructions[ =]\?\([^ ]*\).*/\1/p')
+            fi
+          fi
+          echo "CLAUDE_OPTS=$CLAUDE_OPTS" >> $GITHUB_ENV
+          echo "INSTRUCTIONS=$INSTRUCTIONS" >> $GITHUB_ENV
+          echo "パース結果: $CLAUDE_OPTS / $INSTRUCTIONS"
+
+      - name: 🤖 Claude Auto Loop Execution
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          
-      - name: 🔍 Phase 1 - Repository Analysis
-        id: analysis
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: |
-          echo "🔍 Phase 1: リポジトリ分析開始..."
-          
-          # 現在の状況を詳細分析
-          ANALYSIS_REPORT="analysis_report.json"
-          
-          cat > analyze_repo.py << 'EOF'
-import os
-import json
-import subprocess
-import glob
-from pathlib import Path
-
-def run_command(cmd):
-    try:
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        return result.stdout.strip()
-    except:
-        return ""
-
-def analyze_repository():
-    analysis = {
-        "timestamp": run_command("date -u +%Y-%m-%dT%H:%M:%SZ"),
-        "repository_info": {
-            "total_files": len(list(Path(".").rglob("*"))),
-            "git_branches": run_command("git branch -r | wc -l"),
-            "recent_commits": run_command("git log --since='30 days ago' --oneline | wc -l"),
-            "contributors": run_command("git log --since='1 year ago' --format='%an' | sort -u | wc -l")
-        },
-        "project_structure": {
-            "has_package_json": os.path.exists("package.json"),
-            "has_requirements_txt": os.path.exists("requirements.txt"),
-            "has_dockerfile": os.path.exists("Dockerfile"),
-            "has_github_actions": os.path.exists(".github/workflows"),
-            "has_tests": bool(glob.glob("**/test*", recursive=True)) or bool(glob.glob("**/*test*", recursive=True))
-        },
-        "technology_stack": [],
-        "security_status": {
-            "has_gitignore": os.path.exists(".gitignore"),
-            "potential_secrets": False
-        },
-        "performance_metrics": {
-            "file_sizes": {},
-            "complexity_estimate": "low"
-        },
-        "recommendations": []
-    }
-    
-    # 技術スタック検出
-    if analysis["project_structure"]["has_package_json"]:
-        analysis["technology_stack"].append("Node.js")
-    if analysis["project_structure"]["has_requirements_txt"]:
-        analysis["technology_stack"].append("Python")
-    if os.path.exists("pom.xml") or os.path.exists("build.gradle"):
-        analysis["technology_stack"].append("Java")
-    if os.path.exists("go.mod"):
-        analysis["technology_stack"].append("Go")
-    if os.path.exists("Cargo.toml"):
-        analysis["technology_stack"].append("Rust")
-    
-    # 推奨事項生成
-    if not analysis["project_structure"]["has_github_actions"]:
-        analysis["recommendations"].append("GitHub Actions CI/CDの設定")
-    if not analysis["project_structure"]["has_tests"]:
-        analysis["recommendations"].append("自動テストの実装")
-    if not analysis["project_structure"]["has_dockerfile"]:
-        analysis["recommendations"].append("Docker化の実装")
-    
-    return analysis
-
-# 分析実行
-result = analyze_repository()
-print(json.dumps(result, indent=2, ensure_ascii=False))
-EOF
-          
-          python3 analyze_repo.py > $ANALYSIS_REPORT
-          
-          echo "analysis_file=$ANALYSIS_REPORT" >> $GITHUB_OUTPUT
-          echo "✅ リポジトリ分析完了"
-          
-          # 分析結果の要約表示
-          jq -r '.technology_stack[]' $ANALYSIS_REPORT | xargs echo "🛠️ 検出技術:"
-          jq -r '.recommendations[]' $ANALYSIS_REPORT | while read rec; do echo "💡 推奨: $rec"; done
-          
-      - name: ⚡ Phase 2 - Automated Implementation
-        id: implementation
-        run: |
-          echo "⚡ Phase 2: 自動実装開始..."
-          
-          # Claude APIで具体的な実装を生成
-          python3 << 'EOF'
-import os
-import json
-import requests
-import re
-
-# 分析結果を読み込み
-with open('analysis_report.json', 'r') as f:
-    analysis = json.load(f)
-
-with open('execution_plan.json', 'r') as f:
-    plan = json.load(f)
-
-# Claude APIで実装コードを生成
-api_key = os.environ.get('ANTHROPIC_API_KEY')
-url = "https://api.anthropic.com/v1/messages"
-headers = {
-    "Content-Type": "application/json",
-    "x-api-key": api_key,
-    "anthropic-version": "2023-06-01"
-}
-
-instructions = """${{ steps.extract.outputs.instructions }}"""
-
-prompt = f"""ITシステム運用管理者として、以下の分析結果に基づいて完全自動実装を行ってください。
-
-## 分析結果
-{json.dumps(analysis, indent=2, ensure_ascii=False)}
-
-## ユーザー指示
-{instructions}
-
-## 実装要求
-- 自動承認モード (--auto-approve)
-- プロンプト無し (--no-prompts)
-- サイレントモード (--silent-mode)
-- 日本語対応
-
-## 出力形式
-各ファイルを以下の形式で出力してください：
-
-=== FILE: [ファイルパス] ===
-[ファイルの内容]
-=== END FILE ===
-
-## 必須実装項目
-1. プロジェクト構造の最適化
-2. CI/CDパイプラインの強化
-3. セキュリティ対策の実装
-4. 監視・ログ設定
-5. 自動テストの充実
-6. ドキュメント自動生成
-7. パフォーマンス最適化
-
-完全に動作する、本番環境対応のコードを生成してください。"""
-
-data = {
-    "model": "claude-3-sonnet-20240229",
-    "max_tokens": 4000,
-    "messages": [{"role": "user", "content": prompt}]
-}
-
-try:
-    response = requests.post(url, headers=headers, json=data, timeout=60)
-    response.raise_for_status()
-    
-    result = response.json()
-    content = result['content'][0]['text']
-    
-    # ファイル内容を抽出してファイルを作成
-    file_pattern = r'=== FILE: (.*?) ===\n(.*?)\n=== END FILE ==='
-    files = re.findall(file_pattern, content, re.DOTALL)
-    
-    created_files = []
-    for file_path, file_content in files:
-        file_path = file_path.strip()
-        
-        # ディレクトリ作成
-        os.makedirs(os.path.dirname(file_path) if os.path.dirname(file_path) else '.', exist_ok=True)
-        
-        # ファイル作成
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(file_content.strip())
-        
-        created_files.append(file_path)
-        print(f"✅ 作成: {file_path}")
-    
-    # 作成されたファイルリストを保存
-    with open('created_files.txt', 'w') as f:
-        for file in created_files:
-            f.write(file + '\n')
-    
-    print(f"📊 合計 {len(created_files)} ファイルを自動生成しました")
-    
-except Exception as e:
-    print(f"❌ 実装エラー: {e}")
-    # フォールバック実装
-    print("🔄 フォールバック実装を実行中...")
-    
-    # 基本的なCI/CD設定を作成
-    fallback_files = {
-        '.github/workflows/ci.yml': '''name: CI/CD Pipeline
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run Tests
-        run: echo "自動テスト実行"
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-      - name: Deploy
-        run: echo "自動デプロイ実行"
-''',
-        'README.md': '''# 🤖 Claude自動開発プロジェクト
-
-このプロジェクトはClaude AIによって自動生成・運用されています。
-
-## 特徴
-- 完全自動化開発
-- 継続的インテグレーション
-- 自動デプロイメント
-- セキュリティ強化
-
-## 使用方法
-```bash
-@claude [実行したい内容を日本語で記述]
-```
-''',
-        'package.json': '''{
-  "name": "claude-auto-project",
-  "version": "1.0.0",
-  "description": "Claude AI自動生成プロジェクト",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \\"自動テスト実行\\" && exit 0",
-    "start": "node index.js",
-    "dev": "nodemon index.js"
-  },
-  "keywords": ["claude", "ai", "automation"],
-  "license": "MIT"
-}'''
-    }
-    
-    created_files = []
-    for file_path, content in fallback_files.items():
-        os.makedirs(os.path.dirname(file_path) if os.path.dirname(file_path) else '.', exist_ok=True)
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(content)
-        created_files.append(file_path)
-        print(f"✅ フォールバック作成: {file_path}")
-    
-    with open('created_files.txt', 'w') as f:
-        for file in created_files:
-            f.write(file + '\n')
-EOF
-          
-          echo "✅ 自動実装完了"
-          
-      - name: 🧪 Phase 3 - Automated Testing & Quality Assurance
-        id: testing
-        run: |
-          echo "🧪 Phase 3: 自動テスト・品質保証開始..."
-          
-          # Node.js プロジェクトのテスト
-          if [ -f "package.json" ]; then
-            echo "📦 Node.js 自動テスト実行中..."
-            
-            # 依存関係インストール
-            npm install --silent || echo "⚠️ npm install 警告あり"
-            
-            # ESLint設定
-            if ! [ -f ".eslintrc.js" ] && ! [ -f ".eslintrc.json" ]; then
-              cat > .eslintrc.json << 'EOF'
-{
-  "env": {
-    "node": true,
-    "es2021": true
-  },
-  "extends": ["eslint:recommended"],
-  "parserOptions": {
-    "ecmaVersion": "latest",
-    "sourceType": "module"
-  },
-  "rules": {
-    "no-unused-vars": "warn",
-    "no-console": "off"
-  }
-}
-EOF
+          echo "🚀 Claude自動開発・修復ループ開始"
+          ITER=1
+          while [ $ITER -le $CLAUDE_MAX_ITERATIONS ]; do
+            echo "----------------------"
+            echo "🌀 ループ $ITER 回目"
+            echo "----------------------"
+            # コマンド/オプションを自動適用
+            npx claude-cli \
+              --file "$SPEC_FILE" \
+              $CLAUDE_OPTS \
+              --instructions "$INSTRUCTIONS" \
+              --lang "ja"
+            STATUS=$?
+            if [ $STATUS -eq 0 ]; then
+              echo "✅ Claude開発ループ $ITER 完了"
+            else
+              echo "⚠️ Claudeエラー: ループ $ITER 失敗、次に進みます"
             fi
-            
-            # 自動フォーマット・リント
-            npx prettier --write . --ignore-unknown 2>/dev/null || echo "⚠️ prettier 適用完了"
-            npx eslint . --fix --max-warnings 10 2>/dev/null || echo "⚠️ eslint 完了"
-            
-            # テスト実行
-            npm test 2>/dev/null || echo "✅ テスト完了（警告含む）"
-            
-            # セキュリティ監査
-            npm audit --audit-level=moderate || echo "⚠️ セキュリティ監査完了"
-          fi
-          
-          # Python プロジェクトのテスト
-          if [ -f "requirements.txt" ]; then
-            echo "🐍 Python 自動テスト実行中..."
-            
-            pip install -r requirements.txt --quiet || echo "⚠️ pip install 警告あり"
-            
-            # Black フォーマット
-            python3 -m black . 2>/dev/null || echo "⚠️ Black フォーマット完了"
-            
-            # flake8 リント
-            python3 -m flake8 . --max-line-length=88 --extend-ignore=E203,W503 || echo "⚠️ flake8 完了"
-            
-            # pytest実行（存在する場合）
-            python3 -m pytest -v 2>/dev/null || echo "✅ pytest 完了"
-          fi
-          
-          # セキュリティスキャン
-          echo "🔐 セキュリティスキャン実行中..."
-          
-          # シークレット検出
-          SECRET_PATTERNS="(password|secret|key|token|api_key).*[=:].*['\"][^'\"]{8,}['\"]"
-          if git log --all --grep="$SECRET_PATTERNS" --oneline | head -5; then
-            echo "⚠️ 潜在的なシークレットパターンを検出"
-          fi
-          
-          # Dockerfile セキュリティチェック
-          if [ -f "Dockerfile" ]; then
-            echo "🐳 Docker セキュリティチェック..."
-            
-            # 基本的なDockerfileセキュリティチェック
-            if grep -q "FROM.*:latest" Dockerfile; then
-              echo "⚠️ latest タグの使用を検出（セキュリティリスク）"
-            fi
-            
-            if ! grep -q "USER " Dockerfile; then
-              echo "💡 推奨: 非rootユーザーの設定を検討"
-            fi
-          fi
-          
-          echo "✅ 品質保証完了"
-          
-      - name: 🚀 Phase 4 - Automated Deployment & Monitoring
-        id: deployment
-        run: |
-          echo "🚀 Phase 4: 自動デプロイ・監視設定開始..."
-          
-          # デプロイメント準備
-          echo "📋 デプロイメント戦略: $(jq -r '.deployment_strategy' execution_plan.json 2>/dev/null || echo 'rolling')"
-          
-          # ヘルスチェックエンドポイント作成
-          if [ -f "package.json" ] && ! [ -f "health.js" ]; then
-            cat > health.js << 'EOF'
-// 🤖 Claude自動生成 - ヘルスチェックエンドポイント
-const http = require('http');
-const fs = require('fs');
+            ITER=$((ITER+1))
+          done
+          echo "🎉 Claude自動開発ループ完了"
 
-const healthCheck = {
-  status: 'healthy',
-  timestamp: new Date().toISOString(),
-  version: process.env.npm_package_version || '1.0.0',
-  uptime: process.uptime(),
-  environment: process.env.NODE_ENV || 'development'
-};
-
-// 簡易ヘルスチェックサーバー
-const server = http.createServer((req, res) => {
-  if (req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(healthCheck, null, 2));
-  } else {
-    res.writeHead(404);
-    res.end('Not Found');
-  }
-});
-
-const port = process.env.HEALTH_PORT || 3001;
-server.listen(port, () => {
-  console.log(`ヘルスチェックサーバー起動: http://localhost:${port}/health`);
-});
-
-module.exports = { healthCheck };
-EOF
-            echo "✅ ヘルスチェックエンドポイント作成"
-          fi
-          
-          # Prometheus監視設定
-          if ! [ -f "prometheus.yml" ]; then
-            cat > prometheus.yml << 'EOF'
-# 🤖 Claude自動生成 - Prometheus設定
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
-
-rule_files:
-  - "alert.rules.yml"
-
-scrape_configs:
-  - job_name: 'application'
-    static_configs:
-      - targets: ['localhost:3000']
-    metrics_path: '/metrics'
-    scrape_interval: 5s
-
-  - job_name: 'health-check'
-    static_configs:
-      - targets: ['localhost:3001']
-    metrics_path: '/health'
-    scrape_interval: 10s
-
-alerting:
-  alertmanagers:
-    - static_configs:
-        - targets:
-          - alertmanager:9093
-EOF
-            echo "✅ Prometheus監視設定作成"
-          fi
-          
-          # Docker Compose for monitoring stack
-          if ! [ -f "docker-compose.monitoring.yml" ]; then
-            cat > docker-compose.monitoring.yml << 'EOF'
-# 🤖 Claude自動生成 - 監視スタック
-version: '3.8'
-
-services:
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    volumes:
-      - grafana-storage:/var/lib/grafana
-
-volumes:
-  grafana-storage:
-EOF
-            echo "✅ 監視スタック設定作成"
-          fi
-          
-          # 自動バックアップスクリプト
-          cat > backup.sh << 'EOF'
-#!/bin/bash
-# 🤖 Claude自動生成 - 自動バックアップスクリプト
-
-BACKUP_DATE=$(date +%Y%m%d-%H%M%S)
-BACKUP_DIR="backups/$BACKUP_DATE"
-
-echo "🗄️ バックアップ開始: $BACKUP_DATE"
-
-# ディレクトリ作成
-mkdir -p "$BACKUP_DIR"
-
-# Git履歴をバックアップ
-git bundle create "$BACKUP_DIR/repository.bundle" --all
-
-# 設定ファイルをバックアップ
-cp -r .github "$BACKUP_DIR/" 2>/dev/null || true
-cp *.yml "$BACKUP_DIR/" 2>/dev/null || true
-cp *.json "$BACKUP_DIR/" 2>/dev/null || true
-
-# 圧縮
-tar -czf "backup-$BACKUP_DATE.tar.gz" "$BACKUP_DIR"
-
-echo "✅ バックアップ完了: backup-$BACKUP_DATE.tar.gz"
-
-# 古いバックアップの削除（30日以上）
-find backups/ -name "backup-*.tar.gz" -mtime +30 -delete 2>/dev/null || true
-EOF
-          chmod +x backup.sh
-          echo "✅ 自動バックアップスクリプト作成"
-          
-          echo "✅ デプロイ・監視設定完了"
-          
-      - name: 📊 Generate Automation Report
-        id: report
+      - name: 📊 Report Results
         if: always()
         run: |
-          echo "📊 自動化実行レポート生成中..."
-          
-          REPORT_FILE="claude-automation-report-$(date +%Y%m%d-%H%M%S).md"
-          CREATED_FILES=$(cat created_files.txt 2>/dev/null | wc -l)
-          
-          cat > $REPORT_FILE << EOF
-# 🤖 Claude完全自動開発レポート
+          echo "実行完了時刻: $(date '+%Y-%m-%d %H:%M:%S JST')"
+          echo "GitHub Actions実行ログを確認してください"
 
-## 📋 実行サマリー
-- **実行ID**: ${{ env.AUTOMATION_ID }}
-- **開始時刻**: ${{ env.START_TIME }}
-- **完了時刻**: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-- **実行時間**: $(echo "$(date +%s) - $(date -d "${{ env.START_TIME }}" +%s)" | bc)秒
-- **ステータス**: ${{ job.status }}
-
-## 🎯 実行指示
-\`\`\`
-${{ steps.extract.outputs.instructions }}
-\`\`\`
-
-## 🏁 検出されたフラグ
-\`\`\`
-${{ steps.extract.outputs.command_flags }}
-\`\`\`
-
-## 📊 実行統計
-| メトリクス | 値 |
-|------------|-----|
-| 作成ファイル数 | $CREATED_FILES |
-| 実行フェーズ数 | 4 |
-| 自動承認 | ✅ 有効 |
-| プロンプト | ❌ 無効化 |
-| サイレントモード | ✅ 有効 |
-
-## 📁 作成されたファイル
-$(cat created_files.txt 2>/dev/null | sed 's/^/- /' || echo "- 情報なし")
-
-## 🔍 実行フェーズ詳細
-
-### Phase 1: 分析 ✅
-- リポジトリ構造分析
-- 技術スタック検出
-- セキュリティ状況評価
-
-### Phase 2: 実装 ✅
-- 自動コード生成
-- ファイル作成・更新
-- 設定ファイル最適化
-
-### Phase 3: 品質保証 ✅
-- 自動テスト実行
-- コード品質チェック
-- セキュリティスキャン
-
-### Phase 4: デプロイ・監視 ✅
-- 監視設定作成
-- ヘルスチェック実装
-- バックアップシステム構築
-
-## 🛡️ セキュリティ対策
-- ✅ 依存関係脆弱性スキャン
-- ✅ シークレット検出
-- ✅ コード品質チェック
-- ✅ 自動バックアップ設定
-
-## 📈 運用改善項目
-- 継続的監視設定完了
-- 自動バックアップ実装
-- ヘルスチェック機能追加
-- Prometheus/Grafana監視スタック準備
-
-## 🔄 継続的改善
-この自動化システムは6時間ごとに定期実行され、以下を継続的に改善します：
-- コード品質向上
-- セキュリティ強化
-- パフォーマンス最適化
-- 運用効率化
-
-## 🎮 操作方法
-\`\`\`bash
-# 次回実行
-@claude --auto-approve --no-prompts --silent-mode [日本語での指示]
-
-# 例
-@claude --auto-approve --no-prompts --silent-mode Reactアプリケーションを作成してください
-\`\`\`
-
----
-🤖 **完全自動生成レポート** | 📅 $(date '+%Y-%m-%d') | ⏰ $(date '+%H:%M JST')
-EOF
-          
-          echo "report_file=$REPORT_FILE" >> $GITHUB_OUTPUT
-          echo "✅ レポート生成完了: $REPORT_FILE"
-          
-      - name: 🔄 Auto Commit & PR Creation
+      - name: 💾 Commit Changes
         if: success()
         run: |
-          echo "🔄 自動コミット・PR作成開始..."
-          
-          # 変更があるかチェック
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "📝 変更を検出、自動PR作成中..."
-            
-            # 自動コミット
-            BRANCH_NAME="claude-auto-dev-$(date +%Y%m%d-%H%M%S)"
-            git config user.name "Claude Auto Development"
-            git config user.email "claude-auto@actions.github.com"
-            
-            git checkout -b "$BRANCH_NAME"
-            git add .
-            git commit -m "🤖 Claude完全自動開発
-
-## 実行サマリー
-- 実行ID: ${{ env.AUTOMATION_ID }}
-- 指示: ${{ steps.extract.outputs.instructions }}
-- 作成ファイル数: $(cat created_files.txt 2>/dev/null | wc -l)
-- 実行フラグ: ${{ steps.extract.outputs.command_flags }}
-
-## 自動実装内容
-$(cat created_files.txt 2>/dev/null | sed 's/^/- /' | head -10)
-
-完全自動化により生成されました。
-"
-            
-            git push origin "$BRANCH_NAME"
-            
-            # PR作成
-            PR_BODY="$(cat ${{ steps.report.outputs.report_file }})"
-            
-            gh pr create \
-              --title "🤖 Claude完全自動開発 - $(date '+%Y年%m月%d日 %H:%M')" \
-              --body "$PR_BODY" \
-              --label "automated,claude-auto-dev,auto-approve" \
-              --assignee "${{ github.actor }}" || echo "PR作成失敗"
-              
-            echo "✅ 自動PR作成完了"
-          else
-            echo "📋 変更なし、PR作成をスキップ"
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: 📱 Final Notifications
-        if: always()
-        run: |
-          echo "📱 最終通知送信中..."
-          
-          STATUS_EMOJI="✅"
-          if [ "${{ job.status }}" != "success" ]; then
-            STATUS_EMOJI="❌"
-          fi
-          
-          SUMMARY="$STATUS_EMOJI Claude完全自動開発完了
-          
-📊 **実行結果**
-• 実行ID: ${{ env.AUTOMATION_ID }}
-• ステータス: ${{ job.status }}
-• 作成ファイル数: $(cat created_files.txt 2>/dev/null | wc -l)
-• 実行時間: $(echo "$(date +%s) - $(date -d "${{ env.START_TIME }}" +%s)" | bc)秒
-• 完了時刻: $(date '+%Y-%m-%d %H:%M JST')
-
-🎯 **実行指示**
-${{ steps.extract.outputs.instructions }}
-
-🏁 **使用フラグ** 
-${{ steps.extract.outputs.command_flags }}
-
-🔗 **詳細ログ**: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          
-          echo "$SUMMARY"
-          
-          # Slack通知
-          if [ -n "${{ secrets.SLACK_WEBHOOK }}" ]; then
-            curl -X POST -H 'Content-type: application/json' \
-              --data "{\"text\":\"$SUMMARY\"}" \
-              "${{ secrets.SLACK_WEBHOOK }}" || echo "Slack通知スキップ"
-          fi
-          
-          # Issue コメント
-          if [ "${{ github.event_name }}" = "issue_comment" ] || [ "${{ github.event_name }}" = "issues" ]; then
-            ISSUE_NUM="${{ github.event.issue.number }}"
-            if [ -n "$ISSUE_NUM" ]; then
-              gh issue comment "$ISSUE_NUM" --body "$SUMMARY" || echo "Issue コメント失敗"
-            fi
-          fi
-          
-          echo "✨ Claude完全自動開発サイクル正常完了"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          git config --local user.email "kensan1969@gmail.com"
+          git config --local user.name "Kensan196948G"
+          git add -A
+          git diff --staged --quiet || git commit -m "🤖 Claude Auto Development: $(date '+%Y-%m-%d %H:%M:%S JST')"
+          git push

@@ -11,7 +11,7 @@ import {
 import { 
     Table, Spinner, Card, Notification, NotificationType, Button, Modal, Input, Select, Textarea 
 } from '../components/CommonUI';
-import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from '../components/ChartPlaceholder';
 import { useAuth } from '../contexts/AuthContext';
 import { serviceImportanceToJapanese, currentServiceStatusToJapanese } from '../localization';
 

@@ -1,7 +1,6 @@
 // 実際のバックエンドAPIとの連携サービス
 import { Incident, ItemStatus, Priority } from '../types';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8082';
+import { apiGet, apiPost, apiPut, apiDelete, ApiError } from './apiUtils';
 
 // API レスポンス型定義
 interface ApiResponse<T> {
@@ -24,48 +23,6 @@ interface IncidentFilters {
   search?: string;
 }
 
-// HTTPエラーハンドリング
-class ApiError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
-
-// API リクエストヘルパー
-async function apiRequest<T>(
-  endpoint: string, 
-  options: RequestInit = {}
-): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
-  
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new ApiError(response.status, data.error || 'API request failed');
-    }
-
-    return data;
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    
-    // ネットワークエラーなど
-    console.error('API Request Error:', error);
-    throw new ApiError(0, 'Network error or server unavailable');
-  }
-}
-
 // インシデント一覧取得
 export async function getIncidents(
   page: number = 1, 
@@ -80,7 +37,7 @@ export async function getIncidents(
     )
   });
 
-  const response = await apiRequest<ApiResponse<Incident[]>>(
+  const response = await apiGet<ApiResponse<Incident[]>>(
     `/api/incidents?${queryParams}`
   );
 
@@ -111,7 +68,7 @@ export async function getIncidents(
 
 // インシデント詳細取得
 export async function getIncidentById(id: string): Promise<Incident> {
-  const response = await apiRequest<any>(`/api/incidents/${id}`);
+  const response = await apiGet<any>(`/api/incidents/${id}`);
   
   // APIレスポンスをフロントエンド型に変換
   const incident = response.data || response;
@@ -141,10 +98,7 @@ export async function createIncident(incidentData: Partial<Incident>): Promise<I
     category: incidentData.category || 'General'
   };
 
-  const response = await apiRequest<ApiResponse<Incident>>('/api/incidents', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  const response = await apiPost<ApiResponse<Incident>>('/api/incidents', payload);
 
   // 作成されたインシデントデータを返す
   const incident = response.incident || response.data || response;
@@ -173,10 +127,7 @@ export async function updateIncident(id: string, updates: Partial<Incident>): Pr
     category: updates.category
   };
 
-  const response = await apiRequest<ApiResponse<Incident>>(`/api/incidents/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  });
+  const response = await apiPut<ApiResponse<Incident>>(`/api/incidents/${id}`, payload);
 
   const incident = response.incident || response.data || response;
   return {
@@ -195,14 +146,12 @@ export async function updateIncident(id: string, updates: Partial<Incident>): Pr
 
 // インシデント削除
 export async function deleteIncident(id: string): Promise<void> {
-  await apiRequest(`/api/incidents/${id}`, {
-    method: 'DELETE',
-  });
+  await apiDelete(`/api/incidents/${id}`);
 }
 
 // インシデント統計取得
 export async function getIncidentStats(): Promise<any[]> {
-  const response = await apiRequest<any[]>('/api/incidents/stats');
+  const response = await apiGet<any[]>('/api/incidents/stats');
   return response;
 }
 

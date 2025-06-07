@@ -1,5 +1,5 @@
 import React, { ReactNode, useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from './RouterPlaceholder';
 import { useAuth } from '../contexts/AuthContext';
 import { NAVIGATION_ITEMS, APP_NAME } from '../constants';
 import { Button } from './CommonUI';

@@ -6,7 +6,7 @@ import { Button, Table, Modal, Input, Textarea, Select, Spinner, Card, Notificat
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../hooks/useToast';
 import { itemStatusToJapanese, priorityToJapanese, impactUrgencyRiskToJapanese } from '../localization';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from '../components/ChartPlaceholder';
 
 const ChangeManagementPage: React.FC = () => {
   const [allChangeRequests, setAllChangeRequests] = useState<ChangeRequest[]>([]);

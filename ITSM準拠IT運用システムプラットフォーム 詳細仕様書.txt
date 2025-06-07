@@ -23,68 +23,180 @@ ITSM準拠IT運用システムプラットフォーム 詳細仕様書
 ## 3. ディレクトリ構成（ルートフォルダ）
 
 ```
-itsm-platform/                ← プロジェクトルート
-├─ frontend/                 ← フロントエンド（React/TS/Vite等）
-│   ├─ src/
-│   │   ├─ components/
-│   │   ├─ pages/
-│   │   ├─ contexts/
-│   │   ├─ types.ts
-│   │   ├─ constants.tsx
-│   │   ├─ localization.ts
-│   │   ├─ App.tsx
-│   │   └─ index.tsx
-│   ├─ public/
-│   │   └─ index.html
-│   ├─ package.json
-│   ├─ tsconfig.json
-│   ├─ vite.config.ts
-│   ├─ .env.local
-│   ├─ .gitignore
-│   └─ README.md
+/mnt/e/ServiceGrid/                ← プロジェクトルート
+├── CLAUDE.md                     ← Claude Code開発ガイド
+├── DEVELOPMENT.md                ← 開発者向けドキュメント
+├── README.md                     ← プロジェクト概要
+├── ITSM準拠IT運用システムプラットフォーム 詳細仕様書.txt
+├── ITSM準拠IT運用システムプラットフォーム 詳細仕様書【最新版2025年6月7日】.txt
+├── 運用マニュアル.md
+├── metadata.json                 ← プロジェクトメタデータ
+├── package.json                  ← Node.js依存関係定義
+├── package-lock.json
+├── tsconfig.json                 ← TypeScript設定
+├── vite.config.ts                ← Vite設定
+├── jest.config.cjs               ← Jest設定
+├── index.html                    ← フロントエンドエントリポイント
+├── index.css                     ← グローバルスタイル
+├── start-all.sh                  ← 一括起動スクリプト
+├── stop-all.sh                   ← 一括停止スクリプト
 │
-├─ backend/                  ← バックエンド（PowerShellスクリプト群）
-│   ├─ api/                  ← REST API各機能
-│   │   ├─ Assets.ps1
-│   │   ├─ Incidents.ps1
-│   │   ├─ ServiceRequests.ps1
-│   │   ├─ Knowledge.ps1
-│   │   ├─ AuditLog.ps1
-│   │   ├─ Changes.ps1
-│   │   ├─ Releases.ps1
-│   │   ├─ Problems.ps1
-│   │   ├─ SLAs.ps1
-│   │   ├─ Capacity.ps1
-│   │   ├─ Availability.ps1
-│   │   ├─ Users.ps1
-│   │   └─ Auth.ps1
-│   ├─ modules/              ← 共通モジュール
-│   │   ├─ DBUtil.psm1
-│   │   ├─ AuthUtil.psm1
-│   │   ├─ LogUtil.psm1
-│   │   └─ Config.psm1
-│   ├─ db/                   ← DB格納先
-│   │   ├─ itsm.sqlite       ← 本番用SQLite DB
-│   │   └─ schema.sql        ← テーブル定義・初期化
-│   ├─ backup/               ← 自動バックアップ置場
-│   └─ jobs/                 ← バッチ・ジョブ（定時処理）
-│       ├─ BackupJob.ps1
-│       ├─ LogArchiveJob.ps1
-│       └─ UserExpireCheck.ps1
+├── src/                          ← フロントエンドソース
+│   ├── App.tsx                   ← メインアプリケーション
+│   ├── index.tsx                 ← エントリポイント
+│   ├── constants.tsx             ← 定数定義
+│   ├── localization.ts           ← 日本語化定義
+│   ├── types.ts                  ← 共通型定義
+│   ├── setupTests.ts             ← テスト設定
+│   ├── vite-env.d.ts             ← Vite型定義
+│   ├── components/               ← 共通UIコンポーネント
+│   │   ├── CommonUI.tsx
+│   │   ├── ErrorBoundary.tsx
+│   │   ├── Layout.tsx
+│   │   ├── Toast.tsx
+│   │   ├── ToastContainer.tsx
+│   │   └── __tests__/
+│   │       └── ErrorBoundary.test.tsx
+│   ├── pages/                    ← 各画面コンポーネント
+│   │   ├── LoginPage.tsx
+│   │   ├── DashboardPage.tsx
+│   │   ├── AssetPage.tsx
+│   │   ├── IncidentPage.tsx
+│   │   ├── ServiceRequestPage.tsx
+│   │   ├── KnowledgePage.tsx
+│   │   ├── AuditLogPage.tsx
+│   │   ├── ChangeManagementPage.tsx
+│   │   ├── ReleaseManagementPage.tsx
+│   │   ├── ProblemManagementPage.tsx
+│   │   ├── ServiceLevelManagementPage.tsx
+│   │   ├── CapacityManagementPage.tsx
+│   │   ├── AvailabilityManagementPage.tsx
+│   │   ├── ComplianceManagementPage.tsx
+│   │   ├── SecurityManagementPage.tsx
+│   │   ├── SettingsPage.tsx
+│   │   └── PlaceholderPage.tsx
+│   ├── contexts/                 ← React Context
+│   │   └── AuthContext.tsx
+│   ├── hooks/                    ← カスタムフック
+│   │   ├── useApi.ts
+│   │   └── useToast.ts
+│   ├── services/                 ← API連携サービス
+│   │   ├── authApiService.ts
+│   │   ├── assetApiService.ts
+│   │   ├── incidentApiService.ts
+│   │   ├── serviceRequestApiService.ts
+│   │   ├── changeApiService.ts
+│   │   ├── geminiService.ts
+│   │   ├── mockItsmService.ts
+│   │   └── testApiConnection.ts
+│   ├── types/                    ← TypeScript型定義
+│   │   ├── index.ts
+│   │   ├── asset.ts
+│   │   ├── incident.ts
+│   │   ├── user.ts
+│   │   ├── audit.ts
+│   │   ├── availability.ts
+│   │   ├── capacity.ts
+│   │   ├── change.ts
+│   │   ├── common.ts
+│   │   ├── compliance.ts
+│   │   ├── dashboard.ts
+│   │   ├── gemini.ts
+│   │   ├── knowledge.ts
+│   │   ├── problem.ts
+│   │   ├── release.ts
+│   │   ├── security.ts
+│   │   └── sla.ts
+│   └── utils/                    ← ユーティリティ関数
+│       ├── errorHandler.ts
+│       └── __tests__/
+│           └── errorHandler.test.ts
 │
-├─ docs/                     ← ドキュメント
-│   ├─ README.md
-│   ├─ 設計仕様書.md
-│   ├─ 画面遷移図.png
-│   ├─ API設計書.md
-│   └─ テーブル定義書.md
+├── backend/                      ← バックエンドソース
+│   ├── README.md
+│   ├── package.json              ← Node.js依存関係（開発用）
+│   ├── package-lock.json
+│   ├── server.js                 ← Express開発サーバー
+│   ├── start-server.js           ← サーバー起動スクリプト
+│   ├── secure-server.js          ← セキュア版サーバー
+│   ├── simple-server.js
+│   ├── quick-server.js
+│   ├── debug-auth.js
+│   ├── test-api.js
+│   ├── test-login-direct.js
+│   ├── api/                      ← REST API実装
+│   │   ├── Assets.ps1            ← PowerShell API
+│   │   ├── Incidents.ps1
+│   │   ├── ServiceRequests.ps1
+│   │   ├── Knowledge.ps1
+│   │   ├── AuditLog.ps1
+│   │   ├── Changes.ps1
+│   │   ├── Releases.ps1
+│   │   ├── Problems.ps1
+│   │   ├── SLAs.ps1
+│   │   ├── Capacity.ps1
+│   │   ├── Availability.ps1
+│   │   ├── Users.ps1
+│   │   ├── Auth.ps1
+│   │   ├── assets.js             ← Node.js API（開発用）
+│   │   ├── incidents.js
+│   │   ├── auth.js
+│   │   ├── service-requests.js
+│   │   ├── knowledge.js
+│   │   ├── audit-logs.js
+│   │   ├── changes.js
+│   │   ├── changes-enhanced.js
+│   │   ├── problems.js
+│   │   ├── slas.js
+│   │   ├── availability.js
+│   │   ├── capacity.js
+│   │   ├── compliance.js
+│   │   └── reports.js
+│   ├── middleware/               ← Express ミドルウェア
+│   │   └── auth.js
+│   ├── modules/                  ← PowerShell共通モジュール
+│   │   ├── DBUtil.psm1
+│   │   ├── AuthUtil.psm1
+│   │   ├── LogUtil.psm1
+│   │   ├── Config.psm1
+│   │   └── PasswordUtil.psm1
+│   ├── db/                       ← データベース
+│   │   ├── itsm.sqlite           ← SQLiteデータベース
+│   │   ├── schema.sql            ← 基本スキーマ
+│   │   ├── schema-enhanced.sql   ← 拡張スキーマ
+│   │   ├── assets-schema.sql     ← 資産管理スキーマ
+│   │   └── incidents-schema.sql  ← インシデント管理スキーマ
+│   ├── scripts/                  ← 初期化・セットアップスクリプト
+│   │   ├── init-database.js
+│   │   ├── init-assets-db.js
+│   │   ├── init-incidents-db.js
+│   │   ├── init-compliance-db.js
+│   │   ├── apply-enhanced-schema.js
+│   │   └── apply-missing-tables.js
+│   ├── jobs/                     ← バッチ処理・定時処理
+│   │   ├── BackupJob.ps1
+│   │   ├── LogArchiveJob.ps1
+│   │   └── UserExpireCheck.ps1
+│   ├── test/                     ← PowerShellテスト
+│   │   ├── Test-APIs.ps1
+│   │   └── run-tests.sh
+│   ├── tests/                    ← Node.jsテスト
+│   │   └── auth.test.js
+│   └── backup/                   ← 自動バックアップ格納先
 │
-├─ logs/                     ← ログファイル
-│   ├─ backend.log
-│   └─ api_access.log
+├── docs/                         ← ドキュメント
+│   ├── README.md
+│   ├── 01_システム概要.md
+│   ├── 02_システム構成.md
+│   ├── 03_API仕様書.md
+│   ├── 04_データベース仕様書.md
+│   ├── 05_フロントエンド仕様書.md
+│   ├── 06_運用マニュアル.md
+│   └── 07_開発者ガイド.md
 │
-├─ .gitignore
-└─ README.md
+└── logs/                         ← ログファイル
+    ├── backend.log
+    └── api_access.log
 ```
 
 ---

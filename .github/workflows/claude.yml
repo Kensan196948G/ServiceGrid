@@ -1,36 +1,24 @@
-name: Claude Code Auto Loop
+name: Claude Manual Action
 
 on:
-  issue_comment:
-    types: [created]
-  pull_request_review_comment:
-    types: [created]
-  issues:
-    types: [opened, assigned]
-  pull_request_review:
-    types: [submitted]
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'Claudeへの日本語指示'
+        required: true
+      file:
+        description: '実行対象ファイル（例: ITSM準拠IT運用システムプラットフォーム 詳細仕様書.txt）'
+        required: true
 
 jobs:
-  claude-auto-dev:
-    if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+  claude:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
     steps:
-      - name: Checkout repository
+      - name: 🚀 Repository Checkout
         uses: actions/checkout@v4
-      - name: Run Claude Code
-        uses: anthropics/claude-code-action@beta
+
+      - name: 🤖 Claude Manual Action
+        uses: anthropic/claude-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          allowed_tools: |
-            mcp__github__create_issue,
-            mcp__github__create_pull_request,
-            mcp__github__merge_pull_request,
-            Edit,Replace,View
+          prompt: ${{ github.event.inputs.prompt }}
+          file: ${{ github.event.inputs.file }}

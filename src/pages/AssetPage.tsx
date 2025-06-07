@@ -1,11 +1,13 @@
 
-import React, { useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, ReactNode, useMemo, useRef } from 'react';
 import { Asset, UserRole } from '../types';
 import { getAssets as getAssetsApi, createAsset as addAsset, updateAsset, deleteAsset, getErrorMessage, generateAssetTag } from '../services/assetApiService';
 import { Button, Table, Modal, Input, Select, Spinner, Card, Notification, NotificationType } from '../components/CommonUI';
 import { useAuth }from '../contexts/AuthContext';
 import { assetTypeToJapanese, assetStatusToJapanese } from '../localization';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from '../components/ChartPlaceholder';
+import { exportToCsv, importFromCsv, ASSET_CSV_HEADERS, CsvValidationError } from '../utils/csvUtils';
+import { validateForm, ASSET_VALIDATION_RULES, ValidationError } from '../utils/formValidation';
 
 const AssetPage: React.FC = () => {
   const [allAssets, setAllAssets] = useState<Asset[]>([]);
@@ -14,6 +16,16 @@ const AssetPage: React.FC = () => {
   const [editingAsset, setEditingAsset] = useState<Partial<Asset> | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: NotificationType } | null>(null);
   const { user } = useAuth();
+  
+  // CSV Import/Export state
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importErrors, setImportErrors] = useState<CsvValidationError[]>([]);
+  const [importData, setImportData] = useState<Partial<Asset>[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Form validation state
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
 
   const assetTypes: Array<Asset['type']> = [
     'Server', 'Desktop', 'Laptop', 'Tablet', 'Phone',
@@ -159,16 +171,53 @@ const AssetPage: React.FC = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingAsset(null);
+    setValidationErrors({});
+    setTouchedFields({});
+  };
+
+  const validateField = (fieldName: string, value: any) => {
+    const rules = ASSET_VALIDATION_RULES[fieldName as keyof typeof ASSET_VALIDATION_RULES];
+    if (!rules) return null;
+    
+    if (rules.required && (!value || String(value).trim() === '')) {
+      return `${getFieldDisplayName(fieldName)}は必須です。`;
+    }
+    
+    if (value && String(value).trim() !== '') {
+      if (rules.maxLength && String(value).length > rules.maxLength) {
+        return `${getFieldDisplayName(fieldName)}は${rules.maxLength}文字以内で入力してください。`;
+      }
+      if (rules.minLength && String(value).length < rules.minLength) {
+        return `${getFieldDisplayName(fieldName)}は${rules.minLength}文字以上で入力してください。`;
+      }
+    }
+    
+    return null;
+  };
+
+  const getFieldDisplayName = (fieldName: string): string => {
+    const names: Record<string, string> = {
+      name: '資産名',
+      assetTag: '資産タグ',
+      type: '資産種類',
+      status: 'ステータス',
+      assignedTo: '割り当て先',
+      location: '場所',
+      description: '説明'
+    };
+    return names[fieldName] || fieldName;
   };
 
   const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (editingAsset) {
-      const updatedAsset = { ...editingAsset, [e.target.name]: e.target.value };
+      const fieldName = e.target.name;
+      const value = e.target.value;
+      const updatedAsset = { ...editingAsset, [fieldName]: value };
       
       // 資産の種類が変更された場合、自動的に資産タグを生成
-      if (e.target.name === 'type' && !editingAsset.id && (!editingAsset.assetTag || editingAsset.assetTag === '')) {
+      if (fieldName === 'type' && !editingAsset.id && (!editingAsset.assetTag || editingAsset.assetTag === '')) {
         try {
-          const generatedTag = await generateAssetTag(e.target.value);
+          const generatedTag = await generateAssetTag(value);
           updatedAsset.assetTag = generatedTag;
         } catch (error) {
           console.error('Failed to generate asset tag:', error);
@@ -176,6 +225,27 @@ const AssetPage: React.FC = () => {
       }
       
       setEditingAsset(updatedAsset);
+      
+      // Real-time validation for touched fields
+      if (touchedFields[fieldName]) {
+        const error = validateField(fieldName, value);
+        setValidationErrors(prev => ({
+          ...prev,
+          [fieldName]: error || ''
+        }));
+      }
+    }
+  };
+
+  const handleFieldBlur = (fieldName: string) => {
+    setTouchedFields(prev => ({ ...prev, [fieldName]: true }));
+    
+    if (editingAsset) {
+      const error = validateField(fieldName, editingAsset[fieldName as keyof Asset]);
+      setValidationErrors(prev => ({
+        ...prev,
+        [fieldName]: error || ''
+      }));
     }
   };
 
@@ -195,6 +265,30 @@ const AssetPage: React.FC = () => {
     e.preventDefault();
     if (!editingAsset) return;
 
+    // Comprehensive form validation
+    const validationResult = validateForm(editingAsset, ASSET_VALIDATION_RULES);
+    
+    if (!validationResult.isValid) {
+      const errorMap: Record<string, string> = {};
+      validationResult.errors.forEach(error => {
+        errorMap[error.field] = error.message;
+      });
+      setValidationErrors(errorMap);
+      
+      // Mark all fields as touched to show errors
+      const touchedFields: Record<string, boolean> = {};
+      Object.keys(ASSET_VALIDATION_RULES).forEach(field => {
+        touchedFields[field] = true;
+      });
+      setTouchedFields(touchedFields);
+      
+      setNotification({ 
+        message: `入力エラーがあります。${validationResult.errors.length}件のエラーを修正してください。`, 
+        type: NotificationType.ERROR 
+      });
+      return;
+    }
+
     try {
       if (editingAsset.id) {
         await updateAsset(editingAsset.id, editingAsset as Asset);
@@ -205,9 +299,12 @@ const AssetPage: React.FC = () => {
       }
       fetchAssets();
       handleCloseModal();
+      // Clear validation state
+      setValidationErrors({});
+      setTouchedFields({});
     } catch (error) {
       console.error("Failed to save asset:", error);
-      setNotification({ message: '資産の保存に失敗しました。', type: NotificationType.ERROR });
+      setNotification({ message: `資産の保存に失敗しました: ${getErrorMessage(error)}`, type: NotificationType.ERROR });
     }
   };
   
@@ -221,6 +318,103 @@ const AssetPage: React.FC = () => {
         console.error("Failed to delete asset:", error);
         setNotification({ message: '資産の削除に失敗しました。', type: NotificationType.ERROR });
       }
+    }
+  };
+
+  // CSV Export Handler
+  const handleExport = () => {
+    if (filteredAssets.length === 0) {
+      setNotification({ message: 'エクスポートするデータがありません。', type: NotificationType.WARNING });
+      return;
+    }
+    
+    const now = new Date();
+    const timestamp = now.toISOString().slice(0, 19).replace(/[T:]/g, '-');
+    const filename = `assets_export_${timestamp}.csv`;
+    
+    exportToCsv(filteredAssets, filename, ASSET_CSV_HEADERS);
+    setNotification({ message: `${filteredAssets.length}件の資産データをエクスポートしました。`, type: NotificationType.SUCCESS });
+  };
+
+  // CSV Import Handler
+  const handleImport = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      setNotification({ message: 'CSVファイルを選択してください。', type: NotificationType.ERROR });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      const result = importFromCsv(content);
+      
+      setImportErrors(result.errors);
+      setImportData(result.data);
+      
+      if (result.success) {
+        setIsImportModalOpen(true);
+      } else {
+        setNotification({ 
+          message: `CSVファイルの解析でエラーが発生しました。${result.errors.length}件のエラーがあります。`, 
+          type: NotificationType.ERROR 
+        });
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+    
+    // Clear the input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    try {
+      setIsLoading(true);
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const assetData of importData) {
+        try {
+          await addAsset(assetData);
+          successCount++;
+        } catch (error) {
+          console.error('Failed to import asset:', assetData.name, error);
+          errorCount++;
+        }
+      }
+      
+      setIsImportModalOpen(false);
+      setImportData([]);
+      setImportErrors([]);
+      
+      if (errorCount === 0) {
+        setNotification({ 
+          message: `${successCount}件の資産が正常にインポートされました。`, 
+          type: NotificationType.SUCCESS 
+        });
+      } else {
+        setNotification({ 
+          message: `${successCount}件成功、${errorCount}件失敗しました。`, 
+          type: NotificationType.WARNING 
+        });
+      }
+      
+      fetchAssets();
+    } catch (error) {
+      console.error('Import failed:', error);
+      setNotification({ message: 'インポート処理中にエラーが発生しました。', type: NotificationType.ERROR });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -245,7 +439,15 @@ const AssetPage: React.FC = () => {
       {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
       <div className="flex justify-between items-center">
         <h2 className="text-3xl font-semibold text-slate-800">資産管理 (CMDB)</h2>
-        {user?.role === UserRole.ADMIN && <Button onClick={() => handleOpenModal()}>新規資産追加</Button>}
+        <div className="flex space-x-2">
+          <Button onClick={handleExport} variant="secondary">CSVエクスポート</Button>
+          {user?.role === UserRole.ADMIN && (
+            <>
+              <Button onClick={handleImport} variant="secondary">CSVインポート</Button>
+              <Button onClick={() => handleOpenModal()}>新規資産追加</Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Asset Dashboard */}
@@ -349,14 +551,20 @@ const AssetPage: React.FC = () => {
                 資産タグ <span className="text-red-500">*</span>
               </label>
               <div className="flex space-x-2">
-                <Input 
-                  name="assetTag" 
-                  value={editingAsset.assetTag || ''} 
-                  onChange={handleInputChange} 
-                  required 
-                  placeholder="例: SRV-001"
-                  className="flex-1"
-                />
+                <div className="flex-1">
+                  <Input 
+                    name="assetTag" 
+                    value={editingAsset.assetTag || ''} 
+                    onChange={handleInputChange} 
+                    onBlur={() => handleFieldBlur('assetTag')}
+                    required 
+                    placeholder="例: SRV-001"
+                    className="flex-1"
+                  />
+                  {validationErrors.assetTag && touchedFields.assetTag && (
+                    <p className="text-sm text-red-600 mt-1">{validationErrors.assetTag}</p>
+                  )}
+                </div>
                 {!editingAsset.id && (
                   <Button 
                     type="button" 
@@ -369,24 +577,75 @@ const AssetPage: React.FC = () => {
                 )}
               </div>
             </div>
-            <Input label="資産名" name="name" value={editingAsset.name || ''} onChange={handleInputChange} required />
-            <Select 
-              label="資産の種類" 
-              name="type" 
-              value={editingAsset.type || 'Server'} 
-              onChange={handleInputChange} 
-              options={assetTypes.map(t => ({ value: t, label: assetTypeToJapanese(t) }))} 
-            />
+            
+            <div className="space-y-2">
+              <Input 
+                label="資産名" 
+                name="name" 
+                value={editingAsset.name || ''} 
+                onChange={handleInputChange} 
+                onBlur={() => handleFieldBlur('name')}
+                required 
+              />
+              {validationErrors.name && touchedFields.name && (
+                <p className="text-sm text-red-600">{validationErrors.name}</p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Select 
+                label="資産の種類" 
+                name="type" 
+                value={editingAsset.type || 'Server'} 
+                onChange={handleInputChange} 
+                options={assetTypes.map(t => ({ value: t, label: assetTypeToJapanese(t) }))} 
+              />
+              {validationErrors.type && touchedFields.type && (
+                <p className="text-sm text-red-600">{validationErrors.type}</p>
+              )}
+            </div>
+            
             <Input label="シリアル番号 (任意)" name="serialNumber" value={editingAsset.serialNumber || ''} onChange={handleInputChange} />
-            <Select 
-              label="ステータス" 
-              name="status" 
-              value={editingAsset.status || 'Active'} 
-              onChange={handleInputChange} 
-              options={assetStatuses.map(s => ({ value: s, label: assetStatusToJapanese(s) }))} 
-            />
-            <Input label="割り当て先 (任意)" name="assignedTo" value={editingAsset.assignedTo || ''} onChange={handleInputChange} />
-            <Input label="場所 (任意)" name="location" value={editingAsset.location || ''} onChange={handleInputChange} />
+            
+            <div className="space-y-2">
+              <Select 
+                label="ステータス" 
+                name="status" 
+                value={editingAsset.status || 'Active'} 
+                onChange={handleInputChange} 
+                options={assetStatuses.map(s => ({ value: s, label: assetStatusToJapanese(s) }))} 
+              />
+              {validationErrors.status && touchedFields.status && (
+                <p className="text-sm text-red-600">{validationErrors.status}</p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Input 
+                label="割り当て先 (任意)" 
+                name="assignedTo" 
+                value={editingAsset.assignedTo || ''} 
+                onChange={handleInputChange} 
+                onBlur={() => handleFieldBlur('assignedTo')}
+              />
+              {validationErrors.assignedTo && touchedFields.assignedTo && (
+                <p className="text-sm text-red-600">{validationErrors.assignedTo}</p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Input 
+                label="場所 (任意)" 
+                name="location" 
+                value={editingAsset.location || ''} 
+                onChange={handleInputChange} 
+                onBlur={() => handleFieldBlur('location')}
+              />
+              {validationErrors.location && touchedFields.location && (
+                <p className="text-sm text-red-600">{validationErrors.location}</p>
+              )}
+            </div>
+            
             <Input label="メーカー (任意)" name="manufacturer" value={editingAsset.manufacturer || ''} onChange={handleInputChange} />
             <Input label="モデル (任意)" name="model" value={editingAsset.model || ''} onChange={handleInputChange} />
             <Input label="購入日 (任意)" type="date" name="purchaseDate" value={editingAsset.purchaseDate ? new Date(editingAsset.purchaseDate).toISOString().split('T')[0] : ''} onChange={handleInputChange} />
@@ -403,6 +662,69 @@ const AssetPage: React.FC = () => {
               <Button type="submit" variant="primary">資産保存</Button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Hidden file input for CSV import */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept=".csv"
+        style={{ display: 'none' }}
+      />
+
+      {/* CSV Import Confirmation Modal */}
+      {isImportModalOpen && (
+        <Modal title="CSVインポートの確認" onClose={() => setIsImportModalOpen(false)}>
+          <div className="space-y-4">
+            <p>以下の{importData.length}件の資産をインポートしようとしています：</p>
+            
+            <div className="max-h-64 overflow-y-auto border rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left">資産タグ</th>
+                    <th className="px-3 py-2 text-left">名前</th>
+                    <th className="px-3 py-2 text-left">種類</th>
+                    <th className="px-3 py-2 text-left">ステータス</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {importData.map((asset, index) => (
+                    <tr key={index} className="border-t">
+                      <td className="px-3 py-2 font-mono text-xs">{asset.assetTag}</td>
+                      <td className="px-3 py-2">{asset.name}</td>
+                      <td className="px-3 py-2">{asset.type && assetTypeToJapanese(asset.type)}</td>
+                      <td className="px-3 py-2">{asset.status && assetStatusToJapanese(asset.status)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {importErrors.length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-semibold text-red-600 mb-2">エラー:</h4>
+                <div className="max-h-32 overflow-y-auto bg-red-50 border border-red-200 rounded p-3">
+                  {importErrors.map((error, index) => (
+                    <p key={index} className="text-sm text-red-700">
+                      行{error.row}: {error.field} - {error.message}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="secondary" onClick={() => setIsImportModalOpen(false)}>
+                キャンセル
+              </Button>
+              <Button type="button" variant="primary" onClick={handleConfirmImport}>
+                インポート実行
+              </Button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>

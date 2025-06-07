@@ -1,0 +1,526 @@
+ITSM準拠IT運用システムプラットフォーム 詳細仕様書【最新版2025年6月7日】
+
+---
+
+## 1. はじめに
+
+本仕様書は、「ITSM準拠IT運用システムプラットフォーム」のフロントエンドおよびバックエンドに関する詳細設計・仕様を記述したものです。特にバックエンドはPowerShellのみ、データベースはSQLiteのみを使用し、運用管理や自動化、IT資産管理を行うことを目的とします。
+
+---
+
+## 2. システム全体像
+
+* **利用者**：IT管理者、IT部門メンバー、現場担当者
+* **主な機能**：IT資産管理／申請・承認ワークフロー／運用ログ管理／状態監視／レポート出力
+* **構成**：
+
+  * フロントエンド：WebUI（HTML/CSS/JavaScript、React、Bootstrap、TypeScriptベース）
+  * バックエンド：PowerShell（REST APIサーバ、バッチ処理、DB制御）
+  * データベース：SQLite
+
+---
+
+## 2.1 運用対象範囲（2025/6/7時点）
+
+* 本システムは現時点で以下のサービスのみ運用管理対象とする
+  　（今後、連携仕様判明次第、他サービスも順次拡張予定）
+
+| サービス名                   | 管理対象                       | API/連携方法・取得可否 |
+| ----------------------- | -------------------------- | ------------- |
+| Microsoft 365（E3）       | ユーザー・ライセンス・OneDrive・Teams等 | 取得・連携可        |
+| Entra ID                | ユーザー・グループ・サインインログ          | 取得・連携可        |
+| Active Directory        | ユーザー・端末・認証ログ               | 取得・連携可        |
+| ファイルサーバー（Windows）       | ファイル・フォルダ・アクセス権            | 取得・連携可        |
+| HENGEOINE, DirectCloud等 | 仕様不明・情報未取得のため未対応           | 拡張予定（未対応）     |
+
+---
+
+## 3. ディレクトリ構成（ルートフォルダ）
+
+```
+/mnt/e/ServiceGrid/                ← プロジェクトルート
+├── CLAUDE.md                     ← Claude Code開発ガイド
+├── DEVELOPMENT.md                ← 開発者向けドキュメント
+├── README.md                     ← プロジェクト概要
+├── ITSM準拠IT運用システムプラットフォーム 詳細仕様書.txt
+├── ITSM準拠IT運用システムプラットフォーム 詳細仕様書【最新版2025年6月7日】.txt
+├── 運用マニュアル.md
+├── metadata.json                 ← プロジェクトメタデータ
+├── package.json                  ← Node.js依存関係定義
+├── package-lock.json
+├── tsconfig.json                 ← TypeScript設定
+├── vite.config.ts                ← Vite設定
+├── jest.config.cjs               ← Jest設定
+├── index.html                    ← フロントエンドエントリポイント
+├── index.css                     ← グローバルスタイル
+├── start-all.sh                  ← 一括起動スクリプト
+├── stop-all.sh                   ← 一括停止スクリプト
+│
+├── src/                          ← フロントエンドソース
+│   ├── App.tsx                   ← メインアプリケーション
+│   ├── index.tsx                 ← エントリポイント
+│   ├── constants.tsx             ← 定数定義
+│   ├── localization.ts           ← 日本語化定義
+│   ├── types.ts                  ← 共通型定義
+│   ├── setupTests.ts             ← テスト設定
+│   ├── vite-env.d.ts             ← Vite型定義
+│   ├── components/               ← 共通UIコンポーネント
+│   │   ├── CommonUI.tsx
+│   │   ├── ErrorBoundary.tsx
+│   │   ├── Layout.tsx
+│   │   ├── Toast.tsx
+│   │   ├── ToastContainer.tsx
+│   │   └── __tests__/
+│   │       └── ErrorBoundary.test.tsx
+│   ├── pages/                    ← 各画面コンポーネント
+│   │   ├── LoginPage.tsx
+│   │   ├── DashboardPage.tsx
+│   │   ├── AssetPage.tsx
+│   │   ├── IncidentPage.tsx
+│   │   ├── ServiceRequestPage.tsx
+│   │   ├── KnowledgePage.tsx
+│   │   ├── AuditLogPage.tsx
+│   │   ├── ChangeManagementPage.tsx
+│   │   ├── ReleaseManagementPage.tsx
+│   │   ├── ProblemManagementPage.tsx
+│   │   ├── ServiceLevelManagementPage.tsx
+│   │   ├── CapacityManagementPage.tsx
+│   │   ├── AvailabilityManagementPage.tsx
+│   │   ├── ComplianceManagementPage.tsx
+│   │   ├── SecurityManagementPage.tsx
+│   │   ├── SettingsPage.tsx
+│   │   └── PlaceholderPage.tsx
+│   ├── contexts/                 ← React Context
+│   │   └── AuthContext.tsx
+│   ├── hooks/                    ← カスタムフック
+│   │   ├── useApi.ts
+│   │   └── useToast.ts
+│   ├── services/                 ← API連携サービス
+│   │   ├── authApiService.ts
+│   │   ├── assetApiService.ts
+│   │   ├── incidentApiService.ts
+│   │   ├── serviceRequestApiService.ts
+│   │   ├── changeApiService.ts
+│   │   ├── geminiService.ts
+│   │   ├── mockItsmService.ts
+│   │   └── testApiConnection.ts
+│   ├── types/                    ← TypeScript型定義
+│   │   ├── index.ts
+│   │   ├── asset.ts
+│   │   ├── incident.ts
+│   │   ├── user.ts
+│   │   ├── audit.ts
+│   │   ├── availability.ts
+│   │   ├── capacity.ts
+│   │   ├── change.ts
+│   │   ├── common.ts
+│   │   ├── compliance.ts
+│   │   ├── dashboard.ts
+│   │   ├── gemini.ts
+│   │   ├── knowledge.ts
+│   │   ├── problem.ts
+│   │   ├── release.ts
+│   │   ├── security.ts
+│   │   └── sla.ts
+│   └── utils/                    ← ユーティリティ関数
+│       ├── errorHandler.ts
+│       └── __tests__/
+│           └── errorHandler.test.ts
+│
+├── backend/                      ← バックエンドソース
+│   ├── README.md
+│   ├── package.json              ← Node.js依存関係（開発用）
+│   ├── package-lock.json
+│   ├── server.js                 ← Express開発サーバー
+│   ├── start-server.js           ← サーバー起動スクリプト
+│   ├── secure-server.js          ← セキュア版サーバー
+│   ├── simple-server.js
+│   ├── quick-server.js
+│   ├── debug-auth.js
+│   ├── test-api.js
+│   ├── test-login-direct.js
+│   ├── api/                      ← REST API実装
+│   │   ├── Assets.ps1            ← PowerShell API
+│   │   ├── Incidents.ps1
+│   │   ├── ServiceRequests.ps1
+│   │   ├── Knowledge.ps1
+│   │   ├── AuditLog.ps1
+│   │   ├── Changes.ps1
+│   │   ├── Releases.ps1
+│   │   ├── Problems.ps1
+│   │   ├── SLAs.ps1
+│   │   ├── Capacity.ps1
+│   │   ├── Availability.ps1
+│   │   ├── Users.ps1
+│   │   ├── Auth.ps1
+│   │   ├── assets.js             ← Node.js API（開発用）
+│   │   ├── incidents.js
+│   │   ├── auth.js
+│   │   ├── service-requests.js
+│   │   ├── knowledge.js
+│   │   ├── audit-logs.js
+│   │   ├── changes.js
+│   │   ├── changes-enhanced.js
+│   │   ├── problems.js
+│   │   ├── slas.js
+│   │   ├── availability.js
+│   │   ├── capacity.js
+│   │   ├── compliance.js
+│   │   └── reports.js
+│   ├── middleware/               ← Express ミドルウェア
+│   │   └── auth.js
+│   ├── modules/                  ← PowerShell共通モジュール
+│   │   ├── DBUtil.psm1
+│   │   ├── AuthUtil.psm1
+│   │   ├── LogUtil.psm1
+│   │   ├── Config.psm1
+│   │   └── PasswordUtil.psm1
+│   ├── db/                       ← データベース
+│   │   ├── itsm.sqlite           ← SQLiteデータベース
+│   │   ├── schema.sql            ← 基本スキーマ
+│   │   ├── schema-enhanced.sql   ← 拡張スキーマ
+│   │   ├── assets-schema.sql     ← 資産管理スキーマ
+│   │   └── incidents-schema.sql  ← インシデント管理スキーマ
+│   ├── scripts/                  ← 初期化・セットアップスクリプト
+│   │   ├── init-database.js
+│   │   ├── init-assets-db.js
+│   │   ├── init-incidents-db.js
+│   │   ├── init-compliance-db.js
+│   │   ├── apply-enhanced-schema.js
+│   │   └── apply-missing-tables.js
+│   ├── jobs/                     ← バッチ処理・定時処理
+│   │   ├── BackupJob.ps1
+│   │   ├── LogArchiveJob.ps1
+│   │   └── UserExpireCheck.ps1
+│   ├── test/                     ← PowerShellテスト
+│   │   ├── Test-APIs.ps1
+│   │   └── run-tests.sh
+│   ├── tests/                    ← Node.jsテスト
+│   │   └── auth.test.js
+│   └── backup/                   ← 自動バックアップ格納先
+│
+├── docs/                         ← ドキュメント
+│   ├── README.md
+│   ├── 01_システム概要.md
+│   ├── 02_システム構成.md
+│   ├── 03_API仕様書.md
+│   ├── 04_データベース仕様書.md
+│   ├── 05_フロントエンド仕様書.md
+│   ├── 06_運用マニュアル.md
+│   └── 07_開発者ガイド.md
+│
+└── logs/                         ← ログファイル
+    ├── backend.log
+    └── api_access.log
+```
+
+---
+
+## 4. フロントエンド詳細
+
+### 4.1 技術スタック
+
+* HTML5 / CSS3 / JavaScript（React/Bootstrap/TypeScript）
+* PowerShellからのAPI呼び出しに対応するAJAX処理
+
+### 4.2 主な画面一覧
+
+* ログイン画面（pages/LoginPage.tsx）
+* ダッシュボード（pages/DashboardPage.tsx）
+* インシデント管理（pages/IncidentPage.tsx）
+* サービス要求管理（pages/ServiceRequestPage.tsx）
+* 資産管理（pages/AssetPage.tsx）
+* ナレッジ管理（pages/KnowledgePage.tsx）
+* 設定画面（pages/SettingsPage.tsx）
+* 監査ログ（pages/AuditLogPage.tsx）
+* 変更管理（pages/ChangeManagementPage.tsx）
+* リリース管理（pages/ReleaseManagementPage.tsx）
+* 問題管理（pages/ProblemManagementPage.tsx）
+* サービスレベル管理（pages/ServiceLevelManagementPage.tsx）
+* キャパシティ管理（pages/CapacityManagementPage.tsx）
+* 可用性管理（pages/AvailabilityManagementPage.tsx）
+* システム設定（追加：確認））
+
+### 4.3 画面ごとの主な機能
+
+#### ログイン画面
+
+* ユーザー名・パスワードによる認証
+* セッション管理（トークン管理、cookie利用）
+
+#### ダッシュボード
+
+* システム全体状況（資産・申請・障害など）の可視化
+* KPI・インシデント・作業タスクのサマリー
+
+#### インシデント管理
+
+* インシデント一覧・詳細表示
+* 登録／編集／クローズ
+* フィルタ・検索・CSV出力
+
+#### サービス要求管理
+
+* サービス申請／承認フロー
+* 申請状況表示、承認／却下
+
+#### 資産管理
+
+* 資産情報一覧・詳細・登録・編集
+* CSVインポート・エクスポート
+* 資産台帳連携
+
+#### ナレッジ管理
+
+* ナレッジ記事の一覧・詳細表示
+* 登録・編集・検索
+
+#### 監査ログ
+
+* 操作ログ一覧・詳細表示
+* ユーザー／イベント種別フィルタ
+
+#### 変更管理
+
+* 変更リクエスト登録・承認フロー
+* 変更履歴の追跡
+
+#### リリース管理
+
+* リリース計画・登録・完了記録
+
+#### 問題管理
+
+* 問題の登録・根本原因分析・クローズ
+
+#### サービスレベル管理
+
+* SLA項目の一覧・達成状況表示
+
+#### キャパシティ管理・可用性管理
+
+* キャパシティ・可用性データの可視化
+* レポート出力
+
+### 4.4 フロントエンド共通仕様
+
+* 日本語対応・レスポンシブデザイン
+* 権限に応じた機能表示切り替え
+* フォームバリデーション（必須項目・形式・値のチェック）
+* ユーザーフィードバック（操作後のトースト通知等）
+
+---
+
+## 5. バックエンド詳細
+
+### 5.1 技術スタック
+
+* PowerShell 7 以上
+* SQLite（PowerShell公式モジュール、またはSystem.Data.SQLite経由で操作）
+* Windows OS上での稼働を前提
+
+### 5.2 主なAPI・バッチ処理
+
+* REST APIサーバ（PowerShellでHTTPリスン、エンドポイント定義）
+
+  * 例：Invoke-RestMethodまたはStart-PSListener
+* 資産データCRUD API
+
+  * GET /assets
+  * POST /assets
+  * PUT /assets/{id}
+  * DELETE /assets/{id}
+* インシデントAPI
+
+  * GET /incidents
+  * POST /incidents
+  * PUT /incidents/{id}
+  * DELETE /incidents/{id}
+* サービス要求API
+
+  * GET /service-requests
+  * POST /service-requests
+  * PUT /service-requests/{id}
+  * DELETE /service-requests/{id}
+* ナレッジAPI
+
+  * GET /knowledge
+  * POST /knowledge
+  * PUT /knowledge/{id}
+  * DELETE /knowledge/{id}
+* 変更管理API
+
+  * GET /changes
+  * POST /changes
+  * PUT /changes/{id}
+  * DELETE /changes/{id}
+* リリース管理API
+
+  * GET /releases
+  * POST /releases
+  * PUT /releases/{id}
+  * DELETE /releases/{id}
+* 問題管理API
+
+  * GET /problems
+  * POST /problems
+  * PUT /problems/{id}
+  * DELETE /problems/{id}
+* サービスレベル・キャパシティ・可用性API
+
+  * GET /slas, /capacity, /availability
+* ログ管理API
+
+  * GET /logs
+* ユーザー管理API
+
+  * GET /users
+  * POST /users
+  * PUT /users/{id}
+  * DELETE /users/{id}
+
+### 5.3 主なバッチ・ジョブ
+
+* 定時バックアップ（資産・申請・ログDBの自動バックアップ）
+* 運用ログの定期集計・アーカイブ
+* アカウントロック・パスワード期限チェック
+
+### 5.4 PowerShellによるDB操作例
+
+* System.Data.SQLite.dll, DBATools, 公式SQLite PowerShellモジュールの利用を想定
+* DB初期化スクリプト（スキーマ定義・初期データ投入）
+* 各種APIからDB CRUD処理（SQL実行）
+
+### 5.5 バックエンドのエラー処理・セキュリティ
+
+* API認証：トークンベース認証・アクセス制御
+* エラーハンドリング：try/catchとログ記録、フロントへの分かりやすいエラー返却
+* SQLインジェクション対策（パラメータ化クエリ徹底）
+
+### 5.6 データスキーマ例（SQLite：既存データスキーマと確認を要する）
+
+#### 資産（assets）
+
+* asset\_id INTEGER PRIMARY KEY AUTOINCREMENT
+* asset\_no TEXT NOT NULL
+* name TEXT
+* type TEXT
+* user TEXT
+* location TEXT
+* status TEXT
+* warranty\_end DATE
+
+#### インシデント（incidents）
+
+* incident\_id INTEGER PRIMARY KEY AUTOINCREMENT
+* title TEXT
+* description TEXT
+* status TEXT
+* priority TEXT
+* assignee TEXT
+* reported\_date DATE
+* resolved\_date DATE
+
+#### サービス要求（service\_requests）
+
+* request\_id INTEGER PRIMARY KEY AUTOINCREMENT
+* subject TEXT
+* detail TEXT
+* status TEXT
+* applicant TEXT
+* requested\_date DATE
+* approved\_by TEXT
+* approved\_date DATE
+
+#### ナレッジ（knowledge）
+
+* knowledge\_id INTEGER PRIMARY KEY AUTOINCREMENT
+* title TEXT
+* content TEXT
+* category TEXT
+* created\_by TEXT
+* created\_date DATE
+
+#### 変更管理（changes）
+
+* change\_id INTEGER PRIMARY KEY AUTOINCREMENT
+* subject TEXT
+* detail TEXT
+* status TEXT
+* requested\_by TEXT
+* approved\_by TEXT
+* request\_date DATE
+* approve\_date DATE
+
+#### リリース管理（releases）
+
+* release\_id INTEGER PRIMARY KEY AUTOINCREMENT
+* title TEXT
+* description TEXT
+* status TEXT
+* release\_date DATE
+* responsible TEXT
+
+#### 問題管理（problems）
+
+* problem\_id INTEGER PRIMARY KEY AUTOINCREMENT
+* title TEXT
+* root\_cause TEXT
+* status TEXT
+* registered\_date DATE
+* closed\_date DATE
+
+#### サービスレベル・キャパシティ・可用性管理（slas, capacity, availability）
+
+* 個別のKPI・履歴データテーブル設計（省略）
+
+#### ログ（logs）
+
+* log\_id INTEGER PRIMARY KEY AUTOINCREMENT
+* event\_type TEXT
+* event\_time DATETIME
+* user TEXT
+* detail TEXT
+
+#### ユーザー（users）
+
+* user\_id INTEGER PRIMARY KEY AUTOINCREMENT
+* username TEXT UNIQUE NOT NULL
+* password TEXT
+* role TEXT
+* display\_name TEXT
+* email TEXT
+
+---
+
+## 6. 非機能要件
+
+* パフォーマンス：1秒以内のレスポンス、同時10ユーザーを想定
+* セキュリティ：権限制御、通信の暗号化（HTTPS/リバプロ等考慮）
+* 保守性：DBスキーマは簡易・拡張性重視、PowerShellスクリプトはモジュール化
+* バックアップ：定期自動バックアップ、リストア手順あり
+
+---
+
+## 7. 運用フロー概要
+
+* 初期導入時にDB初期化・管理者アカウント作成
+* IT資産・インシデント・サービス要求等の登録／申請運用開始
+* 日次で運用ログ・資産・申請のバックアップ
+* 障害発生時は運用ログ参照、リストア対応
+
+---
+
+## 8. 参考：画面遷移図・API構成図
+
+* （別途設計資料を添付・作成）
+
+---
+
+## 9. 改訂履歴
+
+* v1.2 2025/05/30 ディレクトリ構成追加
+* v1.1 2025/05/30 フロントエンド実装内容を反映
+* v1.3 2025/06/07 運用対象範囲の明示と表形式での追記
+
+---
