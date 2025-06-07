@@ -5,6 +5,7 @@ const os = require('os');
 // API モジュールインポート
 const incidentsApi = require('./api/incidents');
 const assetsApi = require('./api/assets');
+const serviceRequestsApi = require('./api/service-requests');
 const complianceApi = require('./api/compliance');
 const changesApi = require('./api/changes-enhanced');
 const authMiddleware = require('./middleware/auth');
@@ -179,6 +180,17 @@ const mockAuthMiddleware = (req, res, next) => {
   }
   next();
 };
+
+// サービスリクエスト管理API
+app.get('/api/service-requests', mockAuthMiddleware, serviceRequestsApi.getServiceRequests);
+app.get('/api/service-requests/stats', mockAuthMiddleware, serviceRequestsApi.getServiceRequestStats);
+app.get('/api/service-requests/:id', mockAuthMiddleware, serviceRequestsApi.getServiceRequestById);
+app.post('/api/service-requests', mockAuthMiddleware, serviceRequestsApi.createServiceRequest);
+app.put('/api/service-requests/:id', mockAuthMiddleware, serviceRequestsApi.updateServiceRequest);
+app.put('/api/service-requests/:id/approve', mockAuthMiddleware, serviceRequestsApi.approveServiceRequest);
+app.put('/api/service-requests/:id/fulfill', mockAuthMiddleware, serviceRequestsApi.fulfillServiceRequest);
+app.put('/api/service-requests/:id/transition', mockAuthMiddleware, serviceRequestsApi.transitionServiceRequest);
+app.delete('/api/service-requests/:id', mockAuthMiddleware, serviceRequestsApi.deleteServiceRequest);
 
 // 変更管理API
 app.get('/api/changes', changesApi.getChanges);

@@ -299,6 +299,7 @@ app.post('/api/service-requests', authenticateToken, serviceRequestsAPI.createSe
 app.put('/api/service-requests/:id', authenticateToken, serviceRequestsAPI.updateServiceRequest);
 app.put('/api/service-requests/:id/approve', authenticateToken, serviceRequestsAPI.approveServiceRequest);
 app.put('/api/service-requests/:id/fulfill', authenticateToken, serviceRequestsAPI.fulfillServiceRequest);
+app.put('/api/service-requests/:id/transition', authenticateToken, serviceRequestsAPI.transitionServiceRequest);
 app.delete('/api/service-requests/:id', authenticateToken, serviceRequestsAPI.deleteServiceRequest);
 
 // ナレッジ管理API

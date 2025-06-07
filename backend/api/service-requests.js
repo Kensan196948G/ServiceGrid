@@ -4,8 +4,14 @@ const bcrypt = require('bcrypt');
 require('dotenv').config();
 
 // データベース接続
-const dbPath = path.join(__dirname, '..', process.env.DB_PATH || 'db/itsm.sqlite');
-const db = new sqlite3.Database(dbPath);
+const dbPath = path.join(__dirname, '..', 'db', 'itsm.sqlite');
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('Service Requests DB connection error:', err);
+  } else {
+    console.log('Service Requests API connected to database:', dbPath);
+  }
+});
 
 // 外部キー制約を有効化
 db.run('PRAGMA foreign_keys = ON');
