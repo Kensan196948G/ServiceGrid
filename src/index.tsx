@@ -1,6 +1,6 @@
 
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 
@@ -9,12 +9,12 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
-ReactDOM.render(
+const root = createRoot(rootElement);
+root.render(
   <React.StrictMode>
     <AuthProvider>
       <App />
     </AuthProvider>
-  </React.StrictMode>,
-  rootElement
+  </React.StrictMode>
 );
     

@@ -1,68 +1,40 @@
 #!/bin/bash
 
-# ITSM システム同時起動スクリプト
-# 自動実行オプション対応: -y, --yes, --force, --auto-approve, --no-prompts
-
-AUTO_MODE=false
-FORCE_MODE=false
-
-# コマンドライン引数解析
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    -y|--yes|--force|--auto-approve|--no-prompts|--silent-mode)
-      AUTO_MODE=true
-      FORCE_MODE=true
-      shift
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
-
-if [ "$AUTO_MODE" = true ]; then
-  echo "🤖 自動実行モード: 全てのプロンプトを自動承認"
-fi
+# ITSM システム最終安定版起動スクリプト（監視ループなし）
 
 echo "🚀 ITSM システムを起動しています..."
 echo "======================================="
 
-# 既存のプロセスをクリーンアップ（強化版）
+# 既存のプロセスをクリーンアップ
 echo "🧹 既存のプロセスをクリーンアップ中..."
-pkill -f "vite" 2>/dev/null || true
-pkill -f "start-server.js" 2>/dev/null || true
+pkill -f "start-all.sh" 2>/dev/null || true
 pkill -f "secure-server.js" 2>/dev/null || true
 pkill -f "simple-frontend-server" 2>/dev/null || true
-pkill -f "3001" 2>/dev/null || true
-pkill -f "8082" 2>/dev/null || true
-
-if [ "$FORCE_MODE" = true ]; then
-  echo "🔥 強制モード: 全ポート強制解放中..."
-  pkill -f "3001" -9 2>/dev/null || true
-  pkill -f "8082" -9 2>/dev/null || true
-  sleep 5
-else
-  sleep 2
-fi
-
-# バックエンドサーバー起動 (セキュア版)
-echo "🛡️  セキュアバックエンドサーバーを起動中..."
-cd /mnt/e/ServiceGrid/backend
-PORT=8082 npm start &
-BACKEND_PID=$!
-cd /mnt/e/ServiceGrid
-
-# バックエンドの起動を待つ
 sleep 3
 
-# フロントエンドサーバー起動
-echo "🎨 Viteフロントエンドサーバーを起動中..."
-npm run dev &
-FRONTEND_PID=$!
+# バックエンドサーバー起動
+echo "🛡️  セキュアバックエンドサーバーを起動中..."
+echo ""
+cd /mnt/e/ServiceGrid/backend
+echo "> itsm-backend@1.0.0 start"
+echo "> PORT=8082 node secure-server.js"
+echo ""
+PORT=8082 node secure-server.js &
+BACKEND_PID=$!
+echo $BACKEND_PID > /mnt/e/ServiceGrid/.backend.pid
 
-# プロセスIDを記録
-echo $BACKEND_PID > .backend.pid
+# バックエンド起動待機
+sleep 8
+
+# フロントエンドサーバー起動
+echo "🎨 フロントエンドサーバーを起動中..."
+cd /mnt/e/ServiceGrid
+node simple-frontend-server.cjs &
+FRONTEND_PID=$!
 echo $FRONTEND_PID > .frontend.pid
+
+# フロントエンド起動待機
+sleep 5
 
 echo "======================================="
 echo "✅ システム起動完了！"
@@ -79,18 +51,13 @@ echo "⏹️  停止方法:"
 echo "   ./stop-all.sh を実行"
 echo "   または Ctrl+C を2回押す"
 echo "======================================="
-
-# 停止シグナルを待つ
-trap 'kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; exit' INT TERM
-
-# バックグラウンドで実行継続
 echo "🎯 プロセスIDが記録されました:"
 echo "   Backend PID: $BACKEND_PID"
 echo "   Frontend PID: $FRONTEND_PID"
 echo ""
 echo "📝 ログ監視中... (Ctrl+C で停止)"
 
-# 初回接続確認
+# 少し待ってから接続確認
 sleep 8
 echo ""
 echo "🔍 初回システム接続確認中..."
@@ -116,11 +83,11 @@ echo "  ✅ http://localhost:3001"
 echo "  ✅ http://127.0.0.1:3001"
 echo "  ✅ http://192.168.3.92:3001 (eth0)"
 echo ""
-echo "📝 システム安定稼働中（監視ループ無効化）"
+echo "📝 システム安定稼働中（監視ループなし）"
 echo "🎉 http://localhost:3001 にアクセスしてください！"
 
 # 停止シグナルを待つ（監視ループは完全に削除）
 trap 'echo ""; echo "🛑 停止シグナル受信 - システム終了中..."; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; exit' INT TERM
 
-# 無限ループ削除 - シンプルに待機
+# 無限ループなし - シンプルに待機
 wait

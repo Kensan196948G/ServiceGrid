@@ -5,7 +5,7 @@ const os = require('os');
 // API モジュールインポート
 const incidentsApi = require('./api/incidents');
 const assetsApi = require('./api/assets');
-const serviceRequestsApi = require('./api/service-requests');
+const serviceRequestsApi = require('./api/service-requests-simple');
 const complianceApi = require('./api/compliance');
 const changesApi = require('./api/changes-enhanced');
 const authMiddleware = require('./middleware/auth');
