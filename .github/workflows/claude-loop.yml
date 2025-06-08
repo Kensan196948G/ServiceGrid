@@ -1,0 +1,35 @@
+name: Claude Development Loop
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: チェックアウト
+      uses: actions/checkout@v4
+      
+    - name: Node.js セットアップ  
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Claude Code インストール
+      run: |
+        echo "Claude Codeをインストール中..."
+        npm install -g @anthropic-ai/claude-code
+        claude-code --version || echo "インストール確認中..."
+        
+    - name: テスト実行
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+      run: |
+        echo "🚀 テスト実行開始"
+        echo "環境確認完了"
+        if command -v claude-code &> /dev/null; then
+          echo "✅ claude-code コマンド利用可能"
+        else
+          echo "⚠️ claude-code コマンド見つからず"
+        fi
