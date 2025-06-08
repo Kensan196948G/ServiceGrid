@@ -198,66 +198,7 @@ app.get('/api/auth/me', authenticateToken, (req, res) => {
   );
 });
 
-// インシデント管理API
-app.get('/api/incidents', authenticateToken, (req, res) => {
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 20;
-  const offset = (page - 1) * limit;
-  
-  const countQuery = 'SELECT COUNT(*) as total FROM incidents';
-  const dataQuery = 'SELECT * FROM incidents ORDER BY created_date DESC LIMIT ? OFFSET ?';
-  
-  db.get(countQuery, (err, countResult) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
-    
-    db.all(dataQuery, [limit, offset], (err, incidents) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
-      }
-      
-      res.json({
-        data: incidents,
-        pagination: {
-          page,
-          limit,
-          total: countResult.total,
-          totalPages: Math.ceil(countResult.total / limit)
-        }
-      });
-    });
-  });
-});
-
-app.post('/api/incidents', authenticateToken, (req, res) => {
-  const { title, description, priority, assignee } = req.body;
-  
-  if (!title || !description) {
-    return res.status(400).json({ error: 'Title and description are required' });
-  }
-  
-  db.run(
-    'INSERT INTO incidents (title, description, status, priority, assignee, reported_date) VALUES (?, ?, ?, ?, ?, CURRENT_DATE)',
-    [title, description, 'Open', priority || 'Medium', assignee],
-    function(err) {
-      if (err) {
-        return res.status(500).json({ error: 'Failed to create incident' });
-      }
-      
-      // 監査ログ
-      db.run(
-        'INSERT INTO logs (event_type, event_time, username, action, details) VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?)',
-        ['Data Modification', req.user.username, 'Create Incident', `Created incident: ${title}`]
-      );
-      
-      res.status(201).json({ 
-        id: this.lastID,
-        message: 'Incident created successfully' 
-      });
-    }
-  );
-});
+// Legacy インシデント管理API routes removed to avoid conflicts with enhanced API
 
 // API モジュールのインポート
 const assetsAPI = require('./api/assets');
@@ -283,7 +224,7 @@ app.post('/api/assets', authenticateToken, assetsAPI.createAsset);
 app.put('/api/assets/:id', authenticateToken, assetsAPI.updateAsset);
 app.delete('/api/assets/:id', authenticateToken, assetsAPI.deleteAsset);
 
-// インシデント管理API（拡張版に置き換え）
+// インシデント管理API
 app.get('/api/incidents', authenticateToken, incidentsAPI.getIncidents);
 app.get('/api/incidents/stats', authenticateToken, incidentsAPI.getIncidentStats);
 app.get('/api/incidents/:id', authenticateToken, incidentsAPI.getIncidentById);

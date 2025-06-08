@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ITSM Operations Platform</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #f8fafc;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, createContext, useContext } = React;
+        
+        // Auth Context
+        const AuthContext = createContext();
+        
+        function AuthProvider({ children }) {
+            const [user, setUser] = useState(null);
+            const [token, setToken] = useState(sessionStorage.getItem('authToken'));
+            
+            const login = async (username, password) => {
+                try {
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        setToken(data.token);
+                        setUser(data.user);
+                        sessionStorage.setItem('authToken', data.token);
+                        sessionStorage.setItem('user', JSON.stringify(data.user));
+                        return { success: true };
+                    }
+                    return { success: false, message: data.message };
+                } catch (error) {
+                    return { success: false, message: 'ネットワークエラー' };
+                }
+            };
+            
+            const logout = () => {
+                setToken(null);
+                setUser(null);
+                sessionStorage.removeItem('authToken');
+                sessionStorage.removeItem('user');
+            };
+            
+            useEffect(() => {
+                const savedUser = sessionStorage.getItem('user');
+                if (savedUser && token) {
+                    setUser(JSON.parse(savedUser));
+                }
+            }, [token]);
+            
+            return React.createElement(AuthContext.Provider, {
+                value: { user, token, login, logout }
+            }, children);
+        }
+        
+        function useAuth() {
+            return useContext(AuthContext);
+        }
+        
+        // Login Page Component
+        function LoginPage() {
+            const [username, setUsername] = useState('admin');
+            const [password, setPassword] = useState('admin123');
+            const [loading, setLoading] = useState(false);
+            const [message, setMessage] = useState('');
+            const { login } = useAuth();
+            
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setMessage('');
+                
+                const result = await login(username, password);
+                if (result.success) {
+                    setMessage('✅ ログイン成功！ダッシュボードに移動中...');
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    setMessage('❌ ' + result.message);
+                }
+                setLoading(false);
+            };
+            
+            return React.createElement('div', {
+                className: 'min-h-screen flex items-center justify-center',
+                style: { background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }
+            }, React.createElement('div', {
+                className: 'max-w-md w-full space-y-8 p-8'
+            }, React.createElement('div', {
+                className: 'bg-white rounded-lg shadow-xl p-8'
+            }, [
+                React.createElement('div', { className: 'text-center', key: 'header' }, [
+                    React.createElement('h2', {
+                        className: 'mt-6 text-3xl font-extrabold text-gray-900',
+                        key: 'title'
+                    }, 'ITSM運用システム'),
+                    React.createElement('p', {
+                        className: 'mt-2 text-sm text-gray-600',
+                        key: 'subtitle'
+                    }, 'ログインしてください')
+                ]),
+                React.createElement('form', {
+                    className: 'mt-8 space-y-6',
+                    onSubmit: handleSubmit,
+                    key: 'form'
+                }, [
+                    React.createElement('div', { className: 'space-y-4', key: 'inputs' }, [
+                        React.createElement('input', {
+                            type: 'text',
+                            placeholder: 'ユーザー名',
+                            value: username,
+                            onChange: (e) => setUsername(e.target.value),
+                            className: 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500',
+                            key: 'username'
+                        }),
+                        React.createElement('input', {
+                            type: 'password',
+                            placeholder: 'パスワード',
+                            value: password,
+                            onChange: (e) => setPassword(e.target.value),
+                            className: 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500',
+                            key: 'password'
+                        })
+                    ]),
+                    React.createElement('button', {
+                        type: 'submit',
+                        disabled: loading,
+                        className: 'w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50',
+                        key: 'submit'
+                    }, loading ? 'ログイン中...' : 'ログイン')
+                ]),
+                message && React.createElement('div', {
+                    className: 'mt-4 text-center text-sm',
+                    key: 'message'
+                }, message),
+                React.createElement('div', {
+                    className: 'mt-6 text-center text-sm text-gray-600',
+                    key: 'test-accounts'
+                }, [
+                    React.createElement('p', { key: 'label' }, 'テストアカウント:'),
+                    React.createElement('p', { key: 'admin' }, '管理者: admin / admin123'),
+                    React.createElement('p', { key: 'operator' }, 'オペレータ: operator / operator123')
+                ])
+            ])));
+        }
+        
+        // Dashboard Page Component
+        function DashboardPage() {
+            const { user, logout, token } = useAuth();
+            const [stats, setStats] = useState({ assets: 0, incidents: 0 });
+            
+            useEffect(() => {
+                const loadStats = async () => {
+                    try {
+                        const [assetsRes, incidentsRes] = await Promise.all([
+                            fetch('/api/assets', { headers: { 'Authorization': `Bearer ${token}` } }),
+                            fetch('/api/incidents', { headers: { 'Authorization': `Bearer ${token}` } })
+                        ]);
+                        
+                        const assetsData = await assetsRes.json();
+                        const incidentsData = await incidentsRes.json();
+                        
+                        setStats({
+                            assets: assetsData.pagination?.total || 0,
+                            incidents: incidentsData.data?.filter(i => i.status === 'Open').length || 0
+                        });
+                    } catch (error) {
+                        console.error('Stats load error:', error);
+                    }
+                };
+                
+                if (token) loadStats();
+            }, [token]);
+            
+            return React.createElement('div', { className: 'min-h-screen' }, [
+                // ナビゲーション
+                React.createElement('nav', {
+                    className: 'bg-indigo-600 text-white shadow-lg',
+                    key: 'nav'
+                }, React.createElement('div', {
+                    className: 'max-w-7xl mx-auto px-4'
+                }, React.createElement('div', {
+                    className: 'flex justify-between h-16'
+                }, [
+                    React.createElement('div', {
+                        className: 'flex items-center',
+                        key: 'logo'
+                    }, React.createElement('h1', {
+                        className: 'text-xl font-bold'
+                    }, 'ITSM運用システム')),
+                    React.createElement('div', {
+                        className: 'flex items-center space-x-4',
+                        key: 'user-info'
+                    }, [
+                        React.createElement('span', {
+                            className: 'text-sm',
+                            key: 'user'
+                        }, `${user?.display_name || 'ユーザー'} (${user?.role || 'user'})`),
+                        React.createElement('button', {
+                            onClick: logout,
+                            className: 'bg-indigo-500 hover:bg-indigo-700 px-3 py-2 rounded',
+                            key: 'logout'
+                        }, 'ログアウト')
+                    ])
+                ]))),
+                
+                // メインコンテンツ
+                React.createElement('div', {
+                    className: 'max-w-7xl mx-auto py-6 px-4',
+                    key: 'main'
+                }, [
+                    React.createElement('div', {
+                        className: 'mb-8',
+                        key: 'header'
+                    }, [
+                        React.createElement('h2', {
+                            className: 'text-3xl font-bold text-gray-900',
+                            key: 'title'
+                        }, 'ダッシュボード'),
+                        React.createElement('p', {
+                            className: 'text-gray-600',
+                            key: 'desc'
+                        }, 'システム全体の状況を確認できます')
+                    ]),
+                    
+                    // ステータスカード
+                    React.createElement('div', {
+                        className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6',
+                        key: 'stats'
+                    }, [
+                        React.createElement('div', {
+                            className: 'bg-white rounded-lg shadow p-6',
+                            key: 'assets'
+                        }, [
+                            React.createElement('div', {
+                                className: 'flex items-center',
+                                key: 'content'
+                            }, [
+                                React.createElement('div', {
+                                    className: 'p-3 rounded-full bg-blue-100 text-blue-600',
+                                    key: 'icon'
+                                }, '📊'),
+                                React.createElement('div', {
+                                    className: 'ml-4',
+                                    key: 'text'
+                                }, [
+                                    React.createElement('p', {
+                                        className: 'text-sm font-medium text-gray-600',
+                                        key: 'label'
+                                    }, '資産数'),
+                                    React.createElement('p', {
+                                        className: 'text-2xl font-semibold text-gray-900',
+                                        key: 'value'
+                                    }, stats.assets)
+                                ])
+                            ])
+                        ]),
+                        
+                        React.createElement('div', {
+                            className: 'bg-white rounded-lg shadow p-6',
+                            key: 'incidents'
+                        }, [
+                            React.createElement('div', {
+                                className: 'flex items-center',
+                                key: 'content'
+                            }, [
+                                React.createElement('div', {
+                                    className: 'p-3 rounded-full bg-red-100 text-red-600',
+                                    key: 'icon'
+                                }, '⚠️'),
+                                React.createElement('div', {
+                                    className: 'ml-4',
+                                    key: 'text'
+                                }, [
+                                    React.createElement('p', {
+                                        className: 'text-sm font-medium text-gray-600',
+                                        key: 'label'
+                                    }, '未解決インシデント'),
+                                    React.createElement('p', {
+                                        className: 'text-2xl font-semibold text-gray-900',
+                                        key: 'value'
+                                    }, stats.incidents)
+                                ])
+                            ])
+                        ]),
+                        
+                        React.createElement('div', {
+                            className: 'bg-white rounded-lg shadow p-6',
+                            key: 'status'
+                        }, [
+                            React.createElement('div', {
+                                className: 'flex items-center',
+                                key: 'content'
+                            }, [
+                                React.createElement('div', {
+                                    className: 'p-3 rounded-full bg-green-100 text-green-600',
+                                    key: 'icon'
+                                }, '✅'),
+                                React.createElement('div', {
+                                    className: 'ml-4',
+                                    key: 'text'
+                                }, [
+                                    React.createElement('p', {
+                                        className: 'text-sm font-medium text-gray-600',
+                                        key: 'label'
+                                    }, 'システム状態'),
+                                    React.createElement('p', {
+                                        className: 'text-2xl font-semibold text-gray-900',
+                                        key: 'value'
+                                    }, '正常')
+                                ])
+                            ])
+                        ]),
+                        
+                        React.createElement('div', {
+                            className: 'bg-white rounded-lg shadow p-6',
+                            key: 'uptime'
+                        }, [
+                            React.createElement('div', {
+                                className: 'flex items-center',
+                                key: 'content'
+                            }, [
+                                React.createElement('div', {
+                                    className: 'p-3 rounded-full bg-yellow-100 text-yellow-600',
+                                    key: 'icon'
+                                }, '⏱️'),
+                                React.createElement('div', {
+                                    className: 'ml-4',
+                                    key: 'text'
+                                }, [
+                                    React.createElement('p', {
+                                        className: 'text-sm font-medium text-gray-600',
+                                        key: 'label'
+                                    }, '稼働時間'),
+                                    React.createElement('p', {
+                                        className: 'text-2xl font-semibold text-gray-900',
+                                        key: 'value'
+                                    }, '99.9%')
+                                ])
+                            ])
+                        ])
+                    ])
+                ])
+            ]);
+        }
+        
+        // Main App Component
+        function App() {
+            const { user } = useAuth();
+            
+            return user ? React.createElement(DashboardPage) : React.createElement(LoginPage);
+        }
+        
+        // Render App
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(
+            React.createElement(AuthProvider, null, React.createElement(App))
+        );
+    </script>
+</body>
+</html>

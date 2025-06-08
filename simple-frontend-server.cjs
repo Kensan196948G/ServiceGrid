@@ -100,13 +100,16 @@ const server = http.createServer((req, res) => {
   }
   
   // 静的ファイル配信
-  let filePath = pathname === '/' ? '/index.html' : pathname;
+  let filePath = pathname === '/' ? '/index-working.html' : pathname;
   filePath = path.join(__dirname, filePath);
   
   const ext = path.extname(filePath);
   const contentType = {
     '.html': 'text/html',
     '.js': 'application/javascript',
+    '.jsx': 'application/javascript',
+    '.ts': 'application/javascript', 
+    '.tsx': 'application/javascript',
     '.css': 'text/css',
     '.json': 'application/json',
     '.png': 'image/png',
@@ -119,8 +122,8 @@ const server = http.createServer((req, res) => {
   fs.readFile(filePath, (err, content) => {
     if (err) {
       if (err.code === 'ENOENT') {
-        // SPAルーティングのため、見つからないパスはindex.htmlを返す
-        fs.readFile(path.join(__dirname, 'index.html'), (err, content) => {
+        // SPAルーティングのため、見つからないパスはindex-working.htmlを返す
+        fs.readFile(path.join(__dirname, 'index-working.html'), (err, content) => {
           if (err) {
             res.writeHead(500);
             res.end('Server Error');
