@@ -1,0 +1,107 @@
+name: Claude API Direct Loop
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  claude-api-loop:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📂 リポジトリチェックアウト
+      uses: actions/checkout@v4
+      
+    - name: 🤖 Claude API 直接呼び出しループ
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+        CLAUDE_MAX_ITERATIONS: 5
+        TZ: Asia/Tokyo
+        SPEC_FILE: "ITSM準拠IT運用システムプラットフォーム 詳細仕様書【最新版2025年6月7日】.txt"
+      run: |
+        echo "🚀 Claude API直接呼び出し自動開発ループ開始"
+        
+        # 仕様書ファイル確認・読み込み
+        if [ -f "$SPEC_FILE" ]; then
+          echo "✅ 仕様書ファイル確認: $SPEC_FILE"
+          SPEC_CONTENT=$(cat "$SPEC_FILE" | head -c 8000)  # API制限対策
+        else
+          echo "⚠️ 仕様書ファイルが見つかりません"
+          SPEC_CONTENT="ITSM準拠IT運用システムプラットフォームの開発を行ってください。"
+        fi
+        
+        ITER=1
+        SUCCESS_COUNT=0
+        
+        while [ $ITER -le $CLAUDE_MAX_ITERATIONS ]; do
+          echo "======================================"
+          echo "🌀 Claude API呼び出し $ITER 回目"
+          echo "======================================"
+          
+          # API呼び出し
+          RESPONSE=$(curl -s -w "%{http_code}" -X POST https://api.anthropic.com/v1/messages \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -d '{
+              "model": "claude-3-sonnet-20240229",
+              "max_tokens": 4000,
+              "messages": [
+                {
+                  "role": "user", 
+                  "content": "'"第${ITER}回目の開発サイクルです。以下の仕様に基づいてITSM準拠のIT運用システムプラットフォームを開発してください：\n\n${SPEC_CONTENT}\n\n前回までの開発状況を考慮し、継続的な改善を行ってください。実際のコード、設定ファイル、ドキュメントを生成してください。"'"
+                }
+              ]
+            }')
+          
+          HTTP_CODE="${RESPONSE: -3}"
+          RESPONSE_BODY="${RESPONSE%???}"
+          
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Claude API呼び出し $ITER 成功"
+            SUCCESS_COUNT=$((SUCCESS_COUNT+1))
+            
+            # レスポンス処理
+            echo "📝 Claude応答（抜粋）:"
+            echo "$RESPONSE_BODY" | jq -r '.content[0].text' | head -20
+            
+            # ファイル生成（例）
+            OUTPUT_FILE="claude_output_${ITER}.md"
+            echo "$RESPONSE_BODY" | jq -r '.content[0].text' > "$OUTPUT_FILE"
+            echo "💾 出力ファイル生成: $OUTPUT_FILE"
+            
+          else
+            echo "⚠️ Claude API エラー (HTTP $HTTP_CODE): ループ $ITER 失敗"
+            echo "エラー詳細: $RESPONSE_BODY"
+          fi
+          
+          ITER=$((ITER+1))
+          
+          # API制限対策の待機
+          if [ $ITER -le $CLAUDE_MAX_ITERATIONS ]; then
+            echo "⏳ API制限対策で10秒待機..."
+            sleep 10
+          fi
+        done
+        
+        echo "======================================"
+        echo "🎉 Claude API自動開発ループ完了"
+        echo "📈 成功回数: $SUCCESS_COUNT / $CLAUDE_MAX_ITERATIONS"
+        echo "======================================"
+        
+        # 生成ファイル一覧
+        echo "📁 生成されたファイル:"
+        ls -la claude_output_*.md 2>/dev/null || echo "生成ファイルなし"
+        
+    - name: 📋 実行結果アーカイブ
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: claude-api-results
+        path: |
+          claude_output_*.md
+          **/*.py
+          **/*.js
+          **/*.md
+        retention-days: 7
