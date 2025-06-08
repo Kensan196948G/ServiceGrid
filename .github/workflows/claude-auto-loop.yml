@@ -155,15 +155,15 @@ jobs:
           
       - name: 🤖 Claude Auto Loop Execution
         env:
-          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}  # 両方の名前で設定
         run: |
           echo "🚀 Claude自動開発・修復ループ開始"
           
           # API キー確認
-          if [ -z "$CLAUDE_API_KEY" ] && [ -z "$CLAUDE_API_KEY" ]; then
+          if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$CLAUDE_API_KEY" ]; then
             echo "❌ APIキーが設定されていません"
-            echo "GitHub Secrets に CLAUDE_API_KEY または CLAUDE_API_KEY を設定してください"
+            echo "GitHub Secrets に CLAUDE_API_KEY または ANTHROPIC_API_KEY を設定してください"
             exit 1
           fi
           
@@ -209,7 +209,7 @@ jobs:
               
               RESPONSE=$(curl -s -w "%{http_code}" -X POST https://api.anthropic.com/v1/messages \
                 -H "Content-Type: application/json" \
-                -H "x-api-key: ${CLAUDE_API_KEY:-$CLAUDE_API_KEY}" \
+                -H "x-api-key: ${ANTHROPIC_API_KEY:-$CLAUDE_API_KEY}" \
                 -H "anthropic-version: 2023-06-01" \
                 -d '{
                   "model": "claude-3-sonnet-20240229",
@@ -320,4 +320,4 @@ jobs:
             **/*.yml
             **/*.yaml
             **/*.json
-          retention-days: 30F
+          retention-days: 30
