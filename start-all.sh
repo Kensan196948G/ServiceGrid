@@ -47,10 +47,10 @@ fi
 
 # バックエンドサーバー起動 (セキュア版)
 echo "🛡️  セキュアバックエンドサーバーを起動中..."
-cd /mnt/e/ServiceGrid/backend
-PORT=8082 npm start &
+cd backend
+PORT=8082 node start-server.js &
 BACKEND_PID=$!
-cd /mnt/e/ServiceGrid
+cd ..
 
 # バックエンドの起動を待つ
 sleep 3

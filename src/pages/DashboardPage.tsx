@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from '../components/RouterPlaceholder';
-import { Card, Spinner, Button, Notification, NotificationType } from '../components/CommonUI';
+import { Card, Spinner, Button, Notification, NotificationType, Modal, Table } from '../components/CommonUI';
 import { 
   getIncidents, 
   getServiceRequests, 
@@ -14,6 +14,7 @@ import {
   refreshActiveAlerts as refreshActiveAlertsAPI,
   acknowledgeAlert as acknowledgeAlertAPI
 } from '../services/mockItsmService';
+import { getAssets } from '../services/assetApiService';
 import { 
   Incident, 
   ServiceRequest, 
@@ -25,7 +26,8 @@ import {
   ServiceHealthStatus,
   AlertItem,
   AlertSeverity,
-  UserRole
+  UserRole,
+  Asset
 } from '../types';
 import { 
   serviceHealthStatusToJapanese, 
@@ -57,6 +59,7 @@ const DashboardPage: React.FC = () => {
   // Data states
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [slas, setSlas] = useState<ServiceLevelAgreement[]>([]);
   const [vulnerabilities, setVulnerabilities] = useState<Vulnerability[]>([]);
   const [complianceControls, setComplianceControls] = useState<ComplianceControl[]>([]);
@@ -67,6 +70,13 @@ const DashboardPage: React.FC = () => {
   const [isServiceStatusRefreshing, setIsServiceStatusRefreshing] = useState(false);
   const [isAlertsRefreshing, setIsAlertsRefreshing] = useState(false);
 
+  // Detailed view states
+  const [showDetailedAssets, setShowDetailedAssets] = useState(false);
+  const [showDetailedIncidents, setShowDetailedIncidents] = useState(false);
+  const [showDetailedRequests, setShowDetailedRequests] = useState(false);
+  const [selectedDetailItem, setSelectedDetailItem] = useState<any>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -74,6 +84,7 @@ const DashboardPage: React.FC = () => {
       const [
         incidentsData,
         requestsData,
+        assetsData,
         slasData,
         vulnerabilitiesData,
         complianceControlsData,
@@ -82,14 +93,16 @@ const DashboardPage: React.FC = () => {
       ] = await Promise.all([
         getIncidents(),
         getServiceRequests(),
+        getAssets(),
         getSLAs(),
         getVulnerabilities(),
         getComplianceControls(),
         getServiceStatuses(),
         getActiveAlerts()
       ]);
-      setIncidents(incidentsData);
-      setServiceRequests(requestsData);
+      setIncidents(Array.isArray(incidentsData) ? incidentsData : incidentsData?.data || []);
+      setServiceRequests(Array.isArray(requestsData) ? requestsData : requestsData?.data || []);
+      setAssets(Array.isArray(assetsData) ? assetsData : assetsData?.data || []);
       setSlas(slasData);
       setVulnerabilities(vulnerabilitiesData);
       setComplianceControls(complianceControlsData);
@@ -146,10 +159,102 @@ const DashboardPage: React.FC = () => {
     }
   };
 
+  // Detail modal handlers
+  const showItemDetail = (item: any, type: 'asset' | 'incident' | 'request') => {
+    setSelectedDetailItem({ ...item, type });
+    setDetailModalOpen(true);
+  };
+
+  const renderDetailModal = () => {
+    if (!selectedDetailItem) return null;
+
+    const { type, ...item } = selectedDetailItem;
+    
+    let content = null;
+    let title = '';
+
+    switch (type) {
+      case 'asset':
+        title = `資産詳細: ${item.name}`;
+        content = (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div><strong>資産タグ:</strong> {item.asset_tag}</div>
+              <div><strong>ステータス:</strong> {item.status}</div>
+              <div><strong>カテゴリ:</strong> {item.category}</div>
+              <div><strong>タイプ:</strong> {item.type}</div>
+              <div><strong>製造元:</strong> {item.manufacturer}</div>
+              <div><strong>モデル:</strong> {item.model}</div>
+              <div><strong>所在地:</strong> {item.location}</div>
+              <div><strong>部門:</strong> {item.department}</div>
+              <div><strong>IPアドレス:</strong> {item.ip_address || 'なし'}</div>
+              <div><strong>購入日:</strong> {item.purchase_date}</div>
+            </div>
+            {item.description && (
+              <div><strong>説明:</strong> {item.description}</div>
+            )}
+            {item.notes && (
+              <div><strong>備考:</strong> {item.notes}</div>
+            )}
+          </div>
+        );
+        break;
+      
+      case 'incident':
+        title = `インシデント詳細: ${item.title}`;
+        content = (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div><strong>ステータス:</strong> {itemStatusToJapanese(item.status)}</div>
+              <div><strong>優先度:</strong> {priorityToJapanese(item.priority)}</div>
+              <div><strong>報告者:</strong> {item.reported_by || item.reportedBy}</div>
+              <div><strong>担当者:</strong> {item.assigned_to || item.assignedTo || '未割り当て'}</div>
+              <div><strong>カテゴリ:</strong> {item.category}</div>
+              <div><strong>作成日:</strong> {new Date(item.created_at || item.createdAt).toLocaleString()}</div>
+            </div>
+            <div><strong>説明:</strong> {item.description}</div>
+          </div>
+        );
+        break;
+        
+      case 'request':
+        title = `サービス要求詳細: ${item.subject || item.title}`;
+        content = (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div><strong>ステータス:</strong> {itemStatusToJapanese(item.status)}</div>
+              <div><strong>要求者:</strong> {item.applicant || item.requestedBy}</div>
+              <div><strong>申請日:</strong> {new Date(item.requested_date || item.createdAt).toLocaleString()}</div>
+              <div><strong>承認者:</strong> {item.approved_by || '未承認'}</div>
+              <div><strong>承認日:</strong> {item.approved_date ? new Date(item.approved_date).toLocaleString() : '未承認'}</div>
+            </div>
+            <div><strong>詳細:</strong> {item.detail || item.description}</div>
+          </div>
+        );
+        break;
+    }
+
+    return (
+      <Modal
+        isOpen={detailModalOpen}
+        onClose={() => setDetailModalOpen(false)}
+        title={title}
+        size="lg"
+      >
+        {content}
+      </Modal>
+    );
+  };
 
   // Derived data for display
-  const openIncidentsCount = incidents.filter(inc => inc.status === ItemStatus.OPEN || inc.status === ItemStatus.IN_PROGRESS || inc.status === ItemStatus.NEW).length;
-  const openRequestsCount = serviceRequests.filter(req => req.status === ItemStatus.OPEN || req.status === ItemStatus.IN_PROGRESS || req.status === ItemStatus.NEW).length;
+  const openIncidentsCount = incidents.filter(inc => 
+    inc.status === ItemStatus.OPEN || inc.status === ItemStatus.IN_PROGRESS || inc.status === ItemStatus.NEW ||
+    inc.status === 'Open' || inc.status === 'In Progress' || inc.status === 'New'
+  ).length;
+  const openRequestsCount = serviceRequests.filter(req => 
+    req.status === ItemStatus.OPEN || req.status === ItemStatus.IN_PROGRESS || req.status === ItemStatus.NEW ||
+    req.status === 'Submitted' || req.status === 'In Progress' || req.status === 'Open'
+  ).length;
   
   const slaComplianceRate = () => {
     const relevantSlas = slas.filter(s => s.performanceStatus);
@@ -208,21 +313,96 @@ const DashboardPage: React.FC = () => {
       {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
       <h2 className="text-3xl font-semibold text-slate-800">ダッシュボード</h2>
 
-      {/* Overview Stats */}
+      {/* Overview Stats with clickable details */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card title="オープンインシデント" className="text-center">
+        <Card title="オープンインシデント" className="text-center cursor-pointer hover:shadow-lg transition-shadow" 
+              actions={<Button size="sm" variant="ghost" onClick={() => setShowDetailedIncidents(!showDetailedIncidents)}>
+                {showDetailedIncidents ? '隠す' : '詳細'}
+              </Button>}>
             <p className="text-4xl font-bold text-red-600">{openIncidentsCount}</p>
         </Card>
-        <Card title="オープンサービスリクエスト" className="text-center">
+        <Card title="オープンサービスリクエスト" className="text-center cursor-pointer hover:shadow-lg transition-shadow"
+              actions={<Button size="sm" variant="ghost" onClick={() => setShowDetailedRequests(!showDetailedRequests)}>
+                {showDetailedRequests ? '隠す' : '詳細'}
+              </Button>}>
             <p className="text-4xl font-bold text-yellow-600">{openRequestsCount}</p>
         </Card>
-        <Card title="SLA遵守率 (全体)" className="text-center">
-            <p className="text-4xl font-bold text-green-600">{slaComplianceRate()}</p>
+        <Card title="管理中資産" className="text-center cursor-pointer hover:shadow-lg transition-shadow"
+              actions={<Button size="sm" variant="ghost" onClick={() => setShowDetailedAssets(!showDetailedAssets)}>
+                {showDetailedAssets ? '隠す' : '詳細'}
+              </Button>}>
+            <p className="text-4xl font-bold text-blue-600">{assets.length}</p>
         </Card>
          <Card title="セキュリティ状況" className="text-center">
             <p className={`text-2xl font-bold ${securityStatusSummary().includes("危険") ? 'text-red-600' : securityStatusSummary().includes("警告") ? 'text-yellow-600' : 'text-green-600'}`}>{securityStatusSummary()}</p>
         </Card>
       </div>
+
+      {/* Detailed Views */}
+      {showDetailedAssets && (
+        <Card title="資産一覧（最新10件）" className="lg:col-span-full">
+          <div className="max-h-80 overflow-y-auto">
+            <Table
+              columns={[
+                { Header: '資産タグ', accessor: 'asset_tag' },
+                { Header: '名前', accessor: 'name' },
+                { Header: 'タイプ', accessor: 'type' },
+                { Header: 'ステータス', accessor: 'status' },
+                { Header: '所在地', accessor: 'location' },
+                { Header: '部門', accessor: 'department' }
+              ]}
+              data={assets.slice(0, 10)}
+              onRowClick={(asset) => showItemDetail(asset, 'asset')}
+            />
+          </div>
+          <Button variant="ghost" size="sm" className="mt-3 w-full" onClick={() => navigate('/assets')}>
+            すべての資産を表示
+          </Button>
+        </Card>
+      )}
+
+      {showDetailedIncidents && (
+        <Card title="インシデント一覧（オープン中）" className="lg:col-span-full">
+          <div className="max-h-80 overflow-y-auto">
+            <Table
+              columns={[
+                { Header: 'タイトル', accessor: 'title' },
+                { Header: 'ステータス', accessor: (row) => itemStatusToJapanese(row.status) },
+                { Header: '優先度', accessor: (row) => priorityToJapanese(row.priority) },
+                { Header: '報告者', accessor: (row) => row.reported_by || row.reportedBy },
+                { Header: '担当者', accessor: (row) => row.assigned_to || row.assignedTo || '未割り当て' },
+                { Header: '作成日', accessor: (row) => new Date(row.created_at || row.createdAt).toLocaleDateString() }
+              ]}
+              data={incidents.filter(inc => inc.status === ItemStatus.OPEN || inc.status === ItemStatus.IN_PROGRESS || inc.status === ItemStatus.NEW || inc.status === 'Open' || inc.status === 'In Progress')}
+              onRowClick={(incident) => showItemDetail(incident, 'incident')}
+            />
+          </div>
+          <Button variant="ghost" size="sm" className="mt-3 w-full" onClick={() => navigate('/incidents')}>
+            すべてのインシデントを表示
+          </Button>
+        </Card>
+      )}
+
+      {showDetailedRequests && (
+        <Card title="サービス要求一覧（オープン中）" className="lg:col-span-full">
+          <div className="max-h-80 overflow-y-auto">
+            <Table
+              columns={[
+                { Header: 'タイトル', accessor: (row) => row.subject || row.title },
+                { Header: 'ステータス', accessor: (row) => itemStatusToJapanese(row.status) },
+                { Header: '要求者', accessor: (row) => row.applicant || row.requestedBy },
+                { Header: '申請日', accessor: (row) => new Date(row.requested_date || row.createdAt).toLocaleDateString() },
+                { Header: '承認状況', accessor: (row) => row.approved_by ? '承認済み' : '未承認' }
+              ]}
+              data={serviceRequests.filter(req => req.status === ItemStatus.OPEN || req.status === ItemStatus.IN_PROGRESS || req.status === ItemStatus.NEW || req.status === 'Submitted' || req.status === 'In Progress')}
+              onRowClick={(request) => showItemDetail(request, 'request')}
+            />
+          </div>
+          <Button variant="ghost" size="sm" className="mt-3 w-full" onClick={() => navigate('/service-requests')}>
+            すべてのサービス要求を表示
+          </Button>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Service Status Card */}
@@ -387,6 +567,9 @@ const DashboardPage: React.FC = () => {
           </Button>
         </Card>
       </div>
+
+      {/* Detail Modal */}
+      {renderDetailModal()}
     </div>
   );
 };
