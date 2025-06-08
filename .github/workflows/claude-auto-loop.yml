@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       instructions:
-        description: 'Claude への日本語指示'
+        description: 'Claudeへの日本語指示'
         required: false
         default: '包括的なシステム診断と自動改善を実行してください'
       mode:
@@ -22,12 +22,7 @@ on:
     - cron: '0 */6 * * *'
 
 env:
-  CLAUDE_AUTO_APPROVE: "true"
-  CLAUDE_NO_PROMPTS: "true"
-  CLAUDE_SILENT_MODE: "true"
-  CLAUDE_LANGUAGE: "ja"
   CLAUDE_MAX_ITERATIONS: "5"
-  CLAUDE_TIMEOUT: "3600"
   TZ: 'Asia/Tokyo'
 
 jobs:
@@ -52,8 +47,9 @@ jobs:
 
       - name: 🔧 Environment Setup
         run: |
-          echo "Claude完全自動化環境セットアップ中..."
+          echo "Claude公式CLI環境セットアップ中..."
           sudo apt-get update && sudo apt-get install -y jq curl git bc
+          npm install -g @anthropic-ai/claude-code
 
       - name: 📝 Find Latest Spec File
         id: specfile
@@ -73,26 +69,17 @@ jobs:
         if: github.event_name == 'issue_comment'
         id: parseclaude
         run: |
-          # コメント本文を取得
           COMMENT="${{ github.event.comment.body }}"
-          # デフォルト値
-          CLAUDE_OPTS="--auto-approve --no-prompts --silent-mode --mode full-auto"
+          MODE="full-auto"
           INSTRUCTIONS="包括的なシステム診断と自動改善を実行してください"
-          # @claudeコマンド行のみを抽出
-          CMD_LINE=$(echo "$COMMENT" | grep '@claude')
-          if [ -n "$CMD_LINE" ]; then
-            # --mode や --instructions オプションを抽出（必要に応じて拡張）
-            if echo "$CMD_LINE" | grep -q -- '--mode'; then
-              MODE=$(echo "$CMD_LINE" | sed -n 's/.*--mode[ =]\?\([^ ]*\).*/\1/p')
-              [ -n "$MODE" ] && CLAUDE_OPTS=$(echo "$CLAUDE_OPTS" | sed "s/--mode [^ ]*/--mode $MODE/")
-            fi
-            if echo "$CMD_LINE" | grep -q -- '--instructions'; then
-              INSTRUCTIONS=$(echo "$CMD_LINE" | sed -n 's/.*--instructions[ =]\?\([^ ]*\).*/\1/p')
-            fi
+          if echo "$COMMENT" | grep -q -- '--mode'; then
+            MODE=$(echo "$COMMENT" | sed -n 's/.*--mode[ =]\?\([^ ]*\).*/\1/p')
           fi
-          echo "CLAUDE_OPTS=$CLAUDE_OPTS" >> $GITHUB_ENV
+          if echo "$COMMENT" | grep -q -- '--instructions'; then
+            INSTRUCTIONS=$(echo "$COMMENT" | sed -n 's/.*--instructions[ =]\?\([^ ]*\).*/\1/p')
+          fi
+          echo "MODE=$MODE" >> $GITHUB_ENV
           echo "INSTRUCTIONS=$INSTRUCTIONS" >> $GITHUB_ENV
-          echo "パース結果: $CLAUDE_OPTS / $INSTRUCTIONS"
 
       - name: 🤖 Claude Auto Loop Execution
         env:
@@ -104,12 +91,14 @@ jobs:
             echo "----------------------"
             echo "🌀 ループ $ITER 回目"
             echo "----------------------"
-            # コマンド/オプションを自動適用
-            npx claude-cli \
+            claude-code \
               --file "$SPEC_FILE" \
-              $CLAUDE_OPTS \
               --instructions "$INSTRUCTIONS" \
-              --lang "ja"
+              --lang "ja" \
+              --auto-approve \
+              --no-prompts \
+              --silent-mode \
+              --mode "$MODE"
             STATUS=$?
             if [ $STATUS -eq 0 ]; then
               echo "✅ Claude開発ループ $ITER 完了"

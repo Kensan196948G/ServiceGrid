@@ -1,6 +1,29 @@
 #!/bin/bash
 
-# ITSM システム停止スクリプト
+# ITSM システム停止スクリプト  
+# 自動実行オプション対応: -y, --yes, --force, --auto-approve, --no-prompts
+
+AUTO_MODE=false
+FORCE_MODE=false
+
+# コマンドライン引数解析
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -y|--yes|--force|--auto-approve|--no-prompts|--silent-mode)
+      AUTO_MODE=true
+      FORCE_MODE=true
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+if [ "$AUTO_MODE" = true ]; then
+  echo "🤖 自動実行モード: 強制停止実行"
+fi
+
 echo "🛑 ITSM システムを停止しています..."
 echo "======================================="
 
