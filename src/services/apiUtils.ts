@@ -1,6 +1,6 @@
 // 共通API ユーティリティ関数
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8082';
+const API_BASE_URL = process.env.VITE_API_BASE_URL || 'http://localhost:8082';
 
 // 認証トークンを取得
 export function getAuthToken(): string | null {

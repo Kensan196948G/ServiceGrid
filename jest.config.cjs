@@ -21,6 +21,7 @@ module.exports = {
   testEnvironmentOptions: {
     url: 'http://localhost:3001'
   },
+  setupFiles: ['<rootDir>/jest.setup.js'],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     '!src/**/*.d.ts',

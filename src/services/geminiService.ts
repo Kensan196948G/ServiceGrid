@@ -13,7 +13,7 @@ import { GEMINI_TEXT_MODEL, GEMINI_API_KEY_ENV_VAR } from "../constants";
 
 const getApiKey = (): string | undefined => {
   // Viteの環境変数を使用してAPIキーを取得
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKey = process.env.VITE_GEMINI_API_KEY;
   
   if (apiKey) {
     return apiKey;

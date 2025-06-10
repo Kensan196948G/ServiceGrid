@@ -1,6 +1,6 @@
 import { KnowledgeArticle, KnowledgeStats, KnowledgeFilter, CreateKnowledgeArticle, UpdateKnowledgeArticle } from '../types/knowledge';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8082';
+const API_BASE_URL = process.env.VITE_API_BASE_URL || 'http://localhost:8082';
 
 // 共通のヘッダー取得
 const getAuthHeaders = () => {

@@ -14,6 +14,8 @@ const serviceRequestsApi = require('./api/service-requests');
 const changesApi = require('./api/changes');
 const knowledgeApi = require('./api/knowledge');
 const slasApi = require('./api/slas');
+const securityApi = require('./api/security');
+const complianceApi = require('./api/compliance');
 
 const app = express();
 const PORT = process.env.PORT || 8082;
@@ -148,7 +150,9 @@ app.get('/', (req, res) => {
         'GET /api/service-requests - Service Requests API (JWT required)',
         'GET /api/changes - Change Management API (JWT required)',
         'GET /api/knowledge - Knowledge Base API (JWT required)',
-        'GET /api/slas - SLA Management API (JWT required)'
+        'GET /api/slas - SLA Management API (JWT required)',
+        'GET /api/security - Security Management API (JWT required)',
+        'GET /api/compliance - Compliance Management API (JWT required)'
       ]
     }
   });
@@ -253,6 +257,12 @@ app.post('/api/slas', authenticateToken, requireRole(['administrator', 'operator
 app.put('/api/slas/:id', authenticateToken, requireRole(['administrator', 'operator']), slasApi.updateSLA);
 app.post('/api/slas/bulk-update', authenticateToken, requireRole(['administrator', 'operator']), slasApi.bulkUpdateSLAs);
 app.delete('/api/slas/:id', authenticateToken, requireRole(['administrator']), slasApi.deleteSLA);
+
+// セキュリティ管理API
+app.use('/api/security', authenticateToken, securityApi);
+
+// コンプライアンス管理API
+app.use('/api/compliance', authenticateToken, complianceApi);
 
 // ================================================
 // エラーハンドリング

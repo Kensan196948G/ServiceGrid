@@ -1,7 +1,7 @@
 // API接続テスト用ヘルパー
 export async function testApiConnection(): Promise<boolean> {
   try {
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8082';
+    const API_BASE_URL = process.env.VITE_API_BASE_URL || 'http://localhost:8082';
     console.log('Testing API connection to:', API_BASE_URL);
     
     const response = await fetch(`${API_BASE_URL}/api/health`);
@@ -17,7 +17,7 @@ export async function testApiConnection(): Promise<boolean> {
 
 export async function testIncidentsApi(): Promise<any> {
   try {
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8082';
+    const API_BASE_URL = process.env.VITE_API_BASE_URL || 'http://localhost:8082';
     console.log('Testing incidents API:', `${API_BASE_URL}/api/incidents`);
     
     const response = await fetch(`${API_BASE_URL}/api/incidents`);

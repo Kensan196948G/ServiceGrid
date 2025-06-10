@@ -5,7 +5,7 @@
 
 import { Problem, ProblemStats, ProblemFilters, ProblemResponse, Priority, ProblemStatus } from '../types/problem';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8082';
+const API_BASE_URL = process.env.VITE_API_BASE_URL || 'http://localhost:8082';
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {
