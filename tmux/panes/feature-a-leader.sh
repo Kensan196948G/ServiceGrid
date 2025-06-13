@@ -1,12 +1,14 @@
 #!/bin/bash
 
 # Feature-A: 統合リーダー
-# 設計統一・アーキテクチャ管理・他ペインとの調整
+# 設計統一・アーキテクチャ管理・他ペインとの調整・Worktree統合管理
 
 set -e
 
 PROJECT_ROOT="/mnt/e/ServiceGrid"
-FEATURE_NAME="Feature-A: 統合リーダー"
+WORKTREE_ROOT="$PROJECT_ROOT/worktrees"
+LEADER_WORKTREE="$WORKTREE_ROOT/feature-a-leader"
+FEATURE_NAME="Feature-A: 統合リーダー (Worktree対応)"
 
 # 色付きメッセージ関数
 print_header() {
@@ -31,23 +33,57 @@ print_warning() {
     echo -e "\033[1;33m[WARNING]\033[0m $1"
 }
 
+# Worktree初期化
+init_worktree() {
+    print_info "統合リーダー用Worktreeを初期化中..."
+    
+    if [ ! -d "$LEADER_WORKTREE" ]; then
+        print_warning "Worktreeが未作成です。Worktree管理ツールを起動します..."
+        bash "$PROJECT_ROOT/tmux/tools/worktree-manager.sh" init
+    else
+        cd "$LEADER_WORKTREE"
+        print_success "統合リーダーWorktreeに移動しました: $LEADER_WORKTREE"
+    fi
+}
+
+# Worktree状況確認
+check_worktree_status() {
+    print_info "Worktree状況を確認中..."
+    
+    bash "$PROJECT_ROOT/tmux/tools/worktree-manager.sh" status
+    echo ""
+    
+    print_info "各Worktreeの同期状況:"
+    bash "$PROJECT_ROOT/tmux/tools/sync-worktrees.sh" report
+}
+
 # 統合リーダーメニュー表示
 show_leader_menu() {
     echo ""
-    echo "🎯 統合リーダー - 操作メニュー"
-    echo "────────────────────────────────"
-    echo "1) 📊 プロジェクト全体状況確認"
-    echo "2) 🏗️  アーキテクチャ監視"
-    echo "3) 🔍 コード品質チェック"
-    echo "4) 📋 各ペイン作業状況確認"
-    echo "5) 🚀 統合テスト実行"
-    echo "6) 📝 設計ドキュメント更新"
-    echo "7) 🔄 他ペインとの調整"
-    echo "8) 📈 進捗レポート生成"
-    echo "9) ⚙️  設定統一チェック"
+    echo "🎯 統合リーダー - 操作メニュー (Worktree統合管理)"
+    echo "────────────────────────────────────────────"
+    echo "📁 Worktree管理"
+    echo "1) 🏗️  Worktree環境初期化"
+    echo "2) 📊 全Worktree状況確認"
+    echo "3) 🔄 全Worktree同期実行"
+    echo "4) 🎯 段階的統合実行"
+    echo "────────────────────────────────────────────"
+    echo "🎛️  プロジェクト管理"
+    echo "5) 📊 プロジェクト全体状況確認"
+    echo "6) 🏗️  アーキテクチャ監視"
+    echo "7) 🔍 コード品質チェック"
+    echo "8) 📋 各ペイン作業状況確認"
+    echo "9) 🚀 統合テスト実行"
+    echo "────────────────────────────────────────────"
+    echo "📝 ドキュメント・レポート"
+    echo "a) 📝 設計ドキュメント更新"
+    echo "b) 🔄 他ペインとの調整"
+    echo "c) 📈 進捗レポート生成"
+    echo "d) ⚙️  設定統一チェック"
+    echo "────────────────────────────────────────────"
     echo "0) 🔄 メニュー再表示"
     echo "q) 終了"
-    echo "────────────────────────────────"
+    echo "────────────────────────────────────────────"
 }
 
 # プロジェクト全体状況確認
@@ -469,37 +505,55 @@ check_configuration_unity() {
 main_loop() {
     print_header
     
+    # Worktree初期化確認
+    init_worktree
+    
     while true; do
         show_leader_menu
         echo -n "選択してください: "
         read -r choice
         
         case $choice in
+            # Worktree管理
             1)
-                check_project_status
+                bash "$PROJECT_ROOT/tmux/tools/worktree-manager.sh" init
                 ;;
             2)
-                monitor_architecture
+                check_worktree_status
                 ;;
             3)
-                check_code_quality
+                bash "$PROJECT_ROOT/tmux/tools/sync-worktrees.sh" auto-sync
                 ;;
             4)
-                check_pane_status
+                bash "$PROJECT_ROOT/tmux/tools/merge-controller.sh" integrate
                 ;;
+            # プロジェクト管理
             5)
-                run_integration_tests
+                check_project_status
                 ;;
             6)
-                update_design_docs
+                monitor_architecture
                 ;;
             7)
-                coordinate_with_panes
+                check_code_quality
                 ;;
             8)
-                generate_progress_report
+                check_pane_status
                 ;;
             9)
+                run_integration_tests
+                ;;
+            # ドキュメント・レポート
+            a|A)
+                update_design_docs
+                ;;
+            b|B)
+                coordinate_with_panes
+                ;;
+            c|C)
+                generate_progress_report
+                ;;
+            d|D)
                 check_configuration_unity
                 ;;
             0)

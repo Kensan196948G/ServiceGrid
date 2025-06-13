@@ -9,6 +9,7 @@ set -e
 SESSION_NAME="itsm-dev"
 PROJECT_ROOT="/mnt/e/ServiceGrid"
 TMUX_DIR="$PROJECT_ROOT/tmux"
+WORKTREE_ROOT="$PROJECT_ROOT/worktrees"
 
 # 色付きメッセージ関数
 print_info() {
@@ -84,6 +85,49 @@ check_dependencies() {
     fi
     
     print_success "依存関係チェック完了"
+}
+
+# Worktree環境チェック・初期化
+check_worktree_environment() {
+    print_info "Git Worktree環境をチェック中..."
+    
+    cd "$PROJECT_ROOT"
+    
+    # Git環境確認
+    if [ ! -d ".git" ]; then
+        print_error "Gitリポジトリが見つかりません"
+        exit 1
+    fi
+    
+    # Worktree管理ツール確認
+    if [ ! -f "$TMUX_DIR/tools/worktree-manager.sh" ]; then
+        print_error "Worktree管理ツールが見つかりません"
+        exit 1
+    fi
+    
+    # Worktree環境確認
+    local worktree_count=$(git worktree list | wc -l)
+    
+    if [ "$worktree_count" -eq 1 ]; then
+        print_warning "Worktree環境が未初期化です"
+        
+        read -p "Worktree環境を初期化しますか？ (y/N): " init_worktree
+        if [[ $init_worktree =~ ^[Yy]$ ]]; then
+            print_info "Worktree環境を初期化中..."
+            bash "$TMUX_DIR/tools/worktree-manager.sh" init
+            
+            if [ $? -eq 0 ]; then
+                print_success "Worktree環境初期化完了"
+            else
+                print_error "Worktree環境初期化に失敗しました"
+                exit 1
+            fi
+        else
+            print_warning "Worktree環境なしで開発環境を起動します"
+        fi
+    else
+        print_success "Worktree環境確認完了 ($((worktree_count - 1)) worktrees)"
+    fi
 }
 
 # tmux設定適用
@@ -207,6 +251,7 @@ main() {
     check_tmux
     check_project_directory
     check_dependencies
+    check_worktree_environment
     
     # 既存セッションクリーンアップ
     cleanup_existing_session
