@@ -1,0 +1,527 @@
+#!/bin/bash
+
+# Feature-B: UI/テスト自動修復
+# React/TypeScript・Jest/RTL・ESLint・自動修復
+
+set -e
+
+PROJECT_ROOT="/mnt/e/ServiceGrid"
+FEATURE_NAME="Feature-B: UI/テスト自動修復"
+
+# 色付きメッセージ関数
+print_header() {
+    echo -e "\033[1;32m========================================\033[0m"
+    echo -e "\033[1;32m  $FEATURE_NAME\033[0m"
+    echo -e "\033[1;32m========================================\033[0m"
+}
+
+print_info() {
+    echo -e "\033[1;34m[INFO]\033[0m $1"
+}
+
+print_success() {
+    echo -e "\033[1;32m[SUCCESS]\033[0m $1"
+}
+
+print_error() {
+    echo -e "\033[1;31m[ERROR]\033[0m $1"
+}
+
+print_warning() {
+    echo -e "\033[1;33m[WARNING]\033[0m $1"
+}
+
+# UI開発メニュー表示
+show_ui_menu() {
+    echo ""
+    echo "🎨 UI/テスト自動修復 - 操作メニュー"
+    echo "────────────────────────────────"
+    echo "1) 🚀 フロントエンド開発サーバー起動"
+    echo "2) 🧪 テストwatch実行"
+    echo "3) ✨ ESLint自動修復"
+    echo "4) 🔍 TypeScript型チェック"
+    echo "5) 📊 テストカバレッジ表示"
+    echo "6) 🔧 コンポーネント自動修復"
+    echo "7) 📱 UI動作確認"
+    echo "8) 🔄 依存関係更新"
+    echo "9) 📝 テスト自動生成"
+    echo "a) 🎯 全自動修復モード"
+    echo "0) 🔄 メニュー再表示"
+    echo "q) 終了"
+    echo "────────────────────────────────"
+}
+
+# フロントエンド開発サーバー起動
+start_dev_server() {
+    print_info "フロントエンド開発サーバーを起動中..."
+    
+    cd "$PROJECT_ROOT"
+    
+    # 既存サーバーチェック
+    if pgrep -f "vite.*3001" > /dev/null; then
+        print_warning "開発サーバーは既に稼働中です (Port 3001)"
+        return
+    fi
+    
+    # 依存関係インストール確認
+    if [ ! -d "node_modules" ]; then
+        print_info "依存関係をインストール中..."
+        npm install
+    fi
+    
+    # 開発サーバー起動
+    print_info "Vite開発サーバーを起動中... (Port 3001)"
+    npm run dev &
+    
+    # 起動確認
+    sleep 3
+    if pgrep -f "vite.*3001" > /dev/null; then
+        print_success "開発サーバー起動完了: http://localhost:3001"
+    else
+        print_error "開発サーバー起動に失敗しました"
+    fi
+}
+
+# テストwatch実行
+start_test_watch() {
+    print_info "テストwatchを開始中..."
+    
+    cd "$PROJECT_ROOT"
+    
+    # 既存テストwatch確認
+    if pgrep -f "npm.*test.*watch" > /dev/null; then
+        print_warning "テストwatchは既に実行中です"
+        return
+    fi
+    
+    # テスト実行
+    print_info "Jest テストwatchモード開始..."
+    npm run test:watch &
+    
+    sleep 2
+    if pgrep -f "npm.*test.*watch" > /dev/null; then
+        print_success "テストwatch開始完了"
+    else
+        print_error "テストwatch開始に失敗しました"
+    fi
+}
+
+# ESLint自動修復
+run_eslint_fix() {
+    print_info "ESLint自動修復を実行中..."
+    
+    cd "$PROJECT_ROOT"
+    
+    # ESLint設定確認
+    if [ ! -f ".eslintrc.js" ] && [ ! -f ".eslintrc.json" ]; then
+        print_warning "ESLint設定ファイルが見つかりません"
+        return
+    fi
+    
+    # 修復前の問題数カウント
+    local before_issues
+    before_issues=$(npx eslint src/ --format=json 2>/dev/null | jq length 2>/dev/null || echo "0")
+    
+    print_info "修復前のLint問題数: $before_issues"
+    
+    # 自動修復実行
+    print_info "ESLint自動修復実行中..."
+    if npx eslint src/ --fix; then
+        print_success "ESLint自動修復完了"
+        
+        # 修復後の問題数チェック
+        local after_issues
+        after_issues=$(npx eslint src/ --format=json 2>/dev/null | jq length 2>/dev/null || echo "0")
+        print_info "修復後のLint問題数: $after_issues"
+        
+        if [ "$after_issues" -lt "$before_issues" ]; then
+            print_success "$((before_issues - after_issues))個の問題を自動修復しました"
+        fi
+    else
+        print_error "ESLint自動修復中にエラーが発生しました"
+    fi
+}
+
+# TypeScript型チェック
+run_type_check() {
+    print_info "TypeScript型チェックを実行中..."
+    
+    cd "$PROJECT_ROOT"
+    
+    if npm run typecheck; then
+        print_success "TypeScript型チェック: 合格"
+    else
+        print_error "TypeScript型エラーが検出されました"
+        
+        # 自動修復可能な型エラーの修復を試行
+        print_info "自動修復可能な型エラーを確認中..."
+        auto_fix_type_errors
+    fi
+}
+
+# 型エラー自動修復
+auto_fix_type_errors() {
+    print_info "型エラー自動修復を試行中..."
+    
+    # よくある型エラーパターンの修復
+    local files_to_fix
+    files_to_fix=$(find src -name '*.ts' -o -name '*.tsx')
+    
+    for file in $files_to_fix; do
+        # any型の明示的な型注釈追加
+        if grep -q ': any' "$file"; then
+            print_info "$file: any型を確認中..."
+        fi
+        
+        # 未使用インポートの削除
+        if command -v sed &> /dev/null; then
+            # 基本的なクリーンアップ（安全な操作のみ）
+            sed -i '/^import.*{[^}]*}.*from.*["\'].*["\'];$/s/,\s*}/}/' "$file" 2>/dev/null || true
+        fi
+    done
+    
+    print_info "基本的な型エラー修復完了"
+}
+
+# テストカバレッジ表示
+show_test_coverage() {
+    print_info "テストカバレッジを生成中..."
+    
+    cd "$PROJECT_ROOT"
+    
+    if npm run test:coverage; then
+        print_success "テストカバレッジ生成完了"
+        
+        if [ -f "coverage/lcov-report/index.html" ]; then
+            print_success "カバレッジレポート: coverage/lcov-report/index.html"
+        fi
+        
+        # カバレッジサマリー表示
+        if [ -f "coverage/coverage-summary.json" ]; then
+            print_info "カバレッジサマリー:"
+            if command -v jq &> /dev/null; then
+                jq '.total' coverage/coverage-summary.json 2>/dev/null || echo "詳細はcoverage/ディレクトリを確認してください"
+            fi
+        fi
+    else
+        print_error "テストカバレッジ生成に失敗しました"
+    fi
+}
+
+# コンポーネント自動修復
+fix_components_auto() {
+    print_info "コンポーネント自動修復を実行中..."
+    
+    cd "$PROJECT_ROOT"
+    
+    local components_dir="src/components"
+    local pages_dir="src/pages"
+    
+    # コンポーネントファイル確認
+    if [ -d "$components_dir" ]; then
+        print_info "コンポーネントディレクトリ確認完了"
+        
+        # React import の統一
+        find "$components_dir" "$pages_dir" -name '*.tsx' -type f | while read -r file; do
+            # React 18+ の import 形式に統一
+            if ! grep -q "import React" "$file"; then
+                if grep -q "useState\|useEffect\|useContext" "$file"; then
+                    print_info "React import追加: $(basename "$file")"
+                    sed -i '1i import React from "react";' "$file" 2>/dev/null || true
+                fi
+            fi
+            
+            # 未使用のconsole.log削除
+            if grep -q "console.log" "$file"; then
+                print_warning "console.log検出: $(basename "$file")"
+                # 本番環境では削除（開発中は残す）
+            fi
+        done
+        
+        print_success "コンポーネント基本修復完了"
+    fi
+}
+
+# UI動作確認
+check_ui_functionality() {
+    print_info "UI動作確認を実行中..."
+    
+    cd "$PROJECT_ROOT"
+    
+    # 開発サーバー状況確認
+    if pgrep -f "vite.*3001" > /dev/null; then
+        print_success "開発サーバー: 稼働中 (http://localhost:3001)"
+        
+        # 基本的なエンドポイントチェック
+        if command -v curl &> /dev/null; then
+            if curl -s http://localhost:3001 > /dev/null; then
+                print_success "フロントエンド: アクセス可能"
+            else
+                print_warning "フロントエンド: アクセス不可"
+            fi
+        fi
+    else
+        print_warning "開発サーバーが起動していません"
+        print_info "起動しますか？ (y/n)"
+        read -r response
+        if [[ "$response" =~ ^[Yy]$ ]]; then
+            start_dev_server
+        fi
+    fi
+    
+    # バックエンドAPI確認
+    if command -v curl &> /dev/null; then
+        if curl -s http://localhost:8082/api/health > /dev/null 2>&1; then
+            print_success "バックエンドAPI: 応答あり"
+        else
+            print_warning "バックエンドAPI: 応答なし (Port 8082)"
+        fi
+    fi
+    
+    # 重要なページのテスト実行
+    print_info "重要ページのテスト実行中..."
+    if [ -f "src/pages/LoginPage.tsx" ]; then
+        npm test -- --testPathPattern="LoginPage" --watchAll=false 2>/dev/null && print_success "LoginPage: テスト合格" || print_warning "LoginPage: テスト要確認"
+    fi
+    
+    if [ -f "src/pages/DashboardPage.tsx" ]; then
+        npm test -- --testPathPattern="DashboardPage" --watchAll=false 2>/dev/null && print_success "DashboardPage: テスト合格" || print_warning "DashboardPage: テスト要確認"
+    fi
+}
+
+# 依存関係更新
+update_dependencies() {
+    print_info "依存関係の更新チェック中..."
+    
+    cd "$PROJECT_ROOT"
+    
+    # セキュリティ監査
+    print_info "セキュリティ監査実行中..."
+    if npm audit; then
+        print_success "セキュリティ監査: 問題なし"
+    else
+        print_warning "セキュリティ脆弱性が検出されました"
+        print_info "自動修復を実行しますか？ (y/n)"
+        read -r response
+        if [[ "$response" =~ ^[Yy]$ ]]; then
+            npm audit fix
+        fi
+    fi
+    
+    # 依存関係更新確認
+    if command -v npm-check-updates &> /dev/null; then
+        print_info "利用可能な更新確認中..."
+        ncu
+    else
+        print_info "npm-check-updates未インストール"
+        print_info "インストールしますか？ (y/n)"
+        read -r response
+        if [[ "$response" =~ ^[Yy]$ ]]; then
+            npm install -g npm-check-updates
+        fi
+    fi
+}
+
+# テスト自動生成
+generate_tests_auto() {
+    print_info "テスト自動生成を実行中..."
+    
+    cd "$PROJECT_ROOT"
+    
+    # テストが存在しないコンポーネント検出
+    local components_without_tests=()
+    
+    find src/components -name '*.tsx' -type f | while read -r component; do
+        local component_name
+        component_name=$(basename "$component" .tsx)
+        local test_file="src/components/__tests__/${component_name}.test.tsx"
+        
+        if [ ! -f "$test_file" ]; then
+            print_info "テストが不足: $component_name"
+            
+            # 基本的なテストテンプレート生成
+            mkdir -p "src/components/__tests__"
+            cat > "$test_file" << EOF
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import { ${component_name} } from '../${component_name}';
+
+describe('${component_name}', () => {
+  it('renders without crashing', () => {
+    render(<${component_name} />);
+  });
+  
+  it('displays expected content', () => {
+    render(<${component_name} />);
+    // Add specific test assertions here
+  });
+});
+EOF
+            print_success "テスト生成完了: $test_file"
+        fi
+    done
+    
+    # ページテスト自動生成
+    find src/pages -name '*.tsx' -type f | while read -r page; do
+        local page_name
+        page_name=$(basename "$page" .tsx)
+        local test_file="src/pages/__tests__/${page_name}.test.tsx"
+        
+        if [ ! -f "$test_file" ] && [ "$page_name" != "index" ]; then
+            print_info "ページテストが不足: $page_name"
+            
+            mkdir -p "src/pages/__tests__"
+            cat > "$test_file" << EOF
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import { BrowserRouter } from 'react-router-dom';
+import { ${page_name} } from '../${page_name}';
+
+const renderWithRouter = (component: React.ReactElement) => {
+  return render(
+    <BrowserRouter>
+      {component}
+    </BrowserRouter>
+  );
+};
+
+describe('${page_name}', () => {
+  it('renders without crashing', () => {
+    renderWithRouter(<${page_name} />);
+  });
+  
+  it('displays page title or header', () => {
+    renderWithRouter(<${page_name} />);
+    // Add specific test assertions here
+  });
+});
+EOF
+            print_success "ページテスト生成完了: $test_file"
+        fi
+    done
+}
+
+# 全自動修復モード
+run_full_auto_fix() {
+    print_info "全自動修復モードを開始します..."
+    
+    echo ""
+    print_info "🔄 Step 1: ESLint自動修復"
+    run_eslint_fix
+    
+    echo ""
+    print_info "🔄 Step 2: TypeScript型チェック"
+    run_type_check
+    
+    echo ""
+    print_info "🔄 Step 3: コンポーネント修復"
+    fix_components_auto
+    
+    echo ""
+    print_info "🔄 Step 4: テスト自動生成"
+    generate_tests_auto
+    
+    echo ""
+    print_info "🔄 Step 5: テスト実行"
+    npm test -- --watchAll=false
+    
+    echo ""
+    print_info "🔄 Step 6: 開発サーバー確認"
+    if ! pgrep -f "vite.*3001" > /dev/null; then
+        start_dev_server
+    fi
+    
+    echo ""
+    print_success "全自動修復モード完了"
+    print_info "継続監視を開始しますか？ (y/n)"
+    read -r response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        continuous_monitoring
+    fi
+}
+
+# 継続監視モード
+continuous_monitoring() {
+    print_info "継続監視モードを開始します..."
+    print_info "停止するには Ctrl+C を押してください"
+    
+    while true; do
+        sleep 30
+        
+        # ファイル変更監視（簡易版）
+        local changed_files
+        changed_files=$(find src -name '*.ts' -o -name '*.tsx' -newer /tmp/last_check 2>/dev/null | wc -l)
+        
+        if [ "$changed_files" -gt 0 ]; then
+            print_info "ファイル変更を検出しました ($changed_files ファイル)"
+            
+            # 自動チェック実行
+            npm run typecheck &> /dev/null && print_success "型チェック: OK" || print_warning "型チェック: エラー検出"
+            npx eslint src/ &> /dev/null && print_success "ESLint: OK" || print_warning "ESLint: エラー検出"
+        fi
+        
+        touch /tmp/last_check
+    done
+}
+
+# メインループ
+main_loop() {
+    print_header
+    
+    while true; do
+        show_ui_menu
+        echo -n "選択してください: "
+        read -r choice
+        
+        case $choice in
+            1)
+                start_dev_server
+                ;;
+            2)
+                start_test_watch
+                ;;
+            3)
+                run_eslint_fix
+                ;;
+            4)
+                run_type_check
+                ;;
+            5)
+                show_test_coverage
+                ;;
+            6)
+                fix_components_auto
+                ;;
+            7)
+                check_ui_functionality
+                ;;
+            8)
+                update_dependencies
+                ;;
+            9)
+                generate_tests_auto
+                ;;
+            a|A)
+                run_full_auto_fix
+                ;;
+            0)
+                clear
+                print_header
+                ;;
+            q|Q)
+                print_info "UI/テスト自動修復を終了します"
+                exit 0
+                ;;
+            *)
+                print_warning "無効な選択です。再度選択してください。"
+                ;;
+        esac
+        
+        echo ""
+        echo "Press Enter to continue..."
+        read -r
+    done
+}
+
+# スクリプト開始
+main_loop
