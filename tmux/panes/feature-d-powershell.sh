@@ -9,6 +9,25 @@ PROJECT_ROOT="/mnt/e/ServiceGrid"
 FEATURE_NAME="Feature-D: PowerShell API修復"
 BACKEND_DIR="$PROJECT_ROOT/backend"
 
+# Claude自動起動設定
+setup_claude() {
+    echo "🤖 Claude自動起動設定中..."
+    
+    # .envからAPIキー読み込み
+    if [ -f "$PROJECT_ROOT/.env" ]; then
+        export $(grep -v '^#' "$PROJECT_ROOT/.env" | xargs)
+    fi
+    
+    # Claude起動
+    if command -v claude &> /dev/null; then
+        echo "⚡ Feature-D専用Claude起動中..."
+        echo "✅ Claude起動完了"
+        exec claude
+    else
+        echo "⚠️ claudeコマンドが見つかりません"
+    fi
+}
+
 # 色付きメッセージ関数
 print_header() {
     echo -e "\033[1;35m========================================\033[0m"
@@ -131,7 +150,7 @@ run_powershell_tests() {
     # run-tests.sh存在確認
     if [ ! -f "run-tests.sh" ]; then
         print_warning "run-tests.sh が見つかりません"
-        print_info "run-tests.sh を生成しますか？ (y/n)"
+        print_info "run-tests.sh を生成しますか？ y/n"
         read -r response
         if [[ "$response" =~ ^[Yy]$ ]]; then
             generate_run_tests_script
@@ -914,7 +933,7 @@ run_full_auto_mode() {
     fi
     
     echo ""
-    print_info "継続監視を開始しますか？ (y/n)"
+    print_info "継続監視を開始しますか？ y/n"
     read -r response
     if [[ "$response" =~ ^[Yy]$ ]]; then
         continuous_powershell_monitoring
@@ -1010,4 +1029,6 @@ main_loop() {
 }
 
 # スクリプト開始
+print_header
+setup_claude
 main_loop

@@ -1,32 +1,154 @@
-// インシデント管理API実装
+/**
+ * インシデント管理API実装 - 強化版
+ * 優先度管理、SLA連携、エスカレーション機能を含む包括的なAPI
+ */
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const { 
+  createValidationError, 
+  createDatabaseError, 
+  createNotFoundError,
+  apiResponse,
+  asyncHandler 
+} = require('../utils/errorHandler');
 
 const DB_PATH = path.join(__dirname, '..', 'db', 'itsm.sqlite');
 
-// データベース接続取得
-function getDbConnection() {
-  return new sqlite3.Database(DB_PATH);
+// インシデントカテゴリ一覧
+const INCIDENT_CATEGORIES = [
+  'Infrastructure', 'Application', 'Hardware', 'Network', 
+  'Security', 'Database', 'Software', 'Service Request', 'Other'
+];
+
+// ステータス遷移ルール
+const STATUS_TRANSITIONS = {
+  'Open': ['In Progress', 'Resolved', 'Closed'],
+  'In Progress': ['Open', 'Resolved', 'Closed'],
+  'Resolved': ['In Progress', 'Closed'],
+  'Closed': ['Open'] // 再オープンのみ許可
+};
+
+/**
+ * ステータス遷移のバリデーション
+ */
+function validateStatusTransition(currentStatus, newStatus) {
+  if (!currentStatus) return true; // 新規作成時
+  if (currentStatus === newStatus) return true; // 同じステータス
+  
+  const allowedTransitions = STATUS_TRANSITIONS[currentStatus] || [];
+  return allowedTransitions.includes(newStatus);
 }
 
-// バリデーション関数
+// データベース接続取得
+function getDbConnection() {
+  return new sqlite3.Database(DB_PATH, (err) => {
+    if (err) {
+      console.error('データベース接続エラー:', err.message);
+    }
+  });
+}
+
+/**
+ * インシデントの優先度スコア計算
+ * インパクトと緊急度に基づいて優先度を自動設定
+ */
+function calculatePriority(impact, urgency) {
+  const priorityMatrix = {
+    'High,High': 'Critical',
+    'High,Medium': 'High', 
+    'High,Low': 'Medium',
+    'Medium,High': 'High',
+    'Medium,Medium': 'Medium',
+    'Medium,Low': 'Low',
+    'Low,High': 'Medium',
+    'Low,Medium': 'Low',
+    'Low,Low': 'Low'
+  };
+  
+  return priorityMatrix[`${impact},${urgency}`] || 'Medium';
+}
+
+/**
+ * SLA目標時間計算
+ */
+function calculateSlaTarget(priority) {
+  const slaTargets = {
+    'Critical': 1, // 1時間
+    'High': 4,     // 4時間
+    'Medium': 24,  // 24時間
+    'Low': 72      // 72時間
+  };
+  
+  return slaTargets[priority] || 24;
+}
+
+/**
+ * エスカレーションチェック
+ */
+function checkEscalation(createdAt, priority) {
+  const now = new Date();
+  const created = new Date(createdAt);
+  const hoursElapsed = (now - created) / (1000 * 60 * 60);
+  const target = calculateSlaTarget(priority);
+  
+  return {
+    isEscalated: hoursElapsed > target,
+    hoursElapsed: Math.round(hoursElapsed * 100) / 100,
+    targetHours: target,
+    remainingHours: Math.max(0, target - hoursElapsed)
+  };
+}
+
+/**
+ * インシデントデータの強化バリデーション
+ */
 function validateIncidentData(data, isUpdate = false) {
   const errors = [];
   
+  // タイトルバリデーション
   if (!isUpdate || data.title !== undefined) {
     if (!data.title || data.title.trim().length === 0) {
       errors.push('タイトルは必須です');
+    } else if (data.title.length < 5) {
+      errors.push('タイトルは5文字以上で入力してください');
     } else if (data.title.length > 200) {
       errors.push('タイトルは200文字以内で入力してください');
     }
   }
   
+  // 説明バリデーション
   if (!isUpdate || data.description !== undefined) {
     if (!data.description || data.description.trim().length === 0) {
       errors.push('説明は必須です');
+    } else if (data.description.length < 10) {
+      errors.push('説明は10文字以上で入力してください');
     } else if (data.description.length > 2000) {
       errors.push('説明は2000文字以内で入力してください');
     }
+  }
+  
+  // 優先度バリデーション
+  if (data.priority && !['Low', 'Medium', 'High', 'Critical'].includes(data.priority)) {
+    errors.push('優先度の値が無効です');
+  }
+  
+  // ステータスバリデーション
+  if (data.status && !['Open', 'In Progress', 'Resolved', 'Closed'].includes(data.status)) {
+    errors.push('ステータスの値が無効です');
+  }
+  
+  // インパクト・緊急度バリデーション
+  if (data.impact && !['Low', 'Medium', 'High'].includes(data.impact)) {
+    errors.push('インパクトの値が無効です');
+  }
+  
+  if (data.urgency && !['Low', 'Medium', 'High'].includes(data.urgency)) {
+    errors.push('緊急度の値が無効です');
+  }
+  
+  // メールアドレスバリデーション
+  if (data.reported_by_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.reported_by_email)) {
+    errors.push('有効なメールアドレスを入力してください');
   }
   
   if (!isUpdate || data.reported_by !== undefined) {

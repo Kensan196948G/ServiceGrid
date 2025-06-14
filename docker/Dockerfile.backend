@@ -1,0 +1,54 @@
+# バックエンド用Dockerfile
+FROM node:20-alpine AS base
+
+# セキュリティ設定とツールインストール
+RUN apk add --no-cache \
+    dumb-init \
+    curl \
+    sqlite \
+    && rm -rf /var/cache/apk/*
+
+# 作業ディレクトリを設定
+WORKDIR /app
+
+# package.jsonとpackage-lock.jsonをコピー
+COPY backend/package*.json ./
+
+# 依存関係をインストール
+RUN npm ci --only=production && npm cache clean --force
+
+# アプリケーションユーザーを作成
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# ソースコードをコピー
+COPY backend/ .
+
+# データベースディレクトリを作成
+RUN mkdir -p /app/db /app/logs /app/backup && \
+    chown -R nodejs:nodejs /app
+
+# 環境変数を設定
+ENV NODE_ENV=production
+ENV PORT=8082
+ENV DB_PATH=/app/db/itsm.sqlite
+
+# ヘルスチェック用エンドポイント追加
+COPY docker/healthcheck.js /app/healthcheck.js
+
+# ヘルスチェック設定
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD node healthcheck.js || exit 1
+
+# ポート開放
+EXPOSE 8082
+
+# ボリュームマウントポイント
+VOLUME ["/app/db", "/app/logs", "/app/backup"]
+
+# 非rootユーザーで実行
+USER nodejs
+
+# アプリケーション起動
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "start-server.js"]

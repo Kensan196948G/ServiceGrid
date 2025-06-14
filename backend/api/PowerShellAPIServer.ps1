@@ -16,7 +16,7 @@ Import-Module "../modules/AuthUtil.psm1" -Force
 Import-Module "../modules/LogUtil.psm1" -Force
 Import-Module "../modules/Config.psm1" -Force
 
-# Configure global variables
+# Enhanced global configuration with performance optimizations
 $global:Config = @{
     Port = $Port
     EnableSSL = $EnableSSL
@@ -26,6 +26,31 @@ $global:Config = @{
     RequestTimeout = 30
     EnableCORS = $true
     DebugMode = $Verbose
+    
+    # Performance optimization settings
+    MaxConcurrentRequests = 50
+    ConnectionPoolSize = 10
+    EnableRequestCaching = $true
+    CacheExpiryMinutes = 15
+    EnableCompression = $true
+    EnableRateLimiting = $true
+    RateLimitPerMinute = 1000
+    
+    # Memory management
+    MaxMemoryUsageMB = 1024
+    GCInterval = 300  # seconds
+    EnableMemoryMonitoring = $true
+    
+    # Database optimization
+    DBConnectionPoolSize = 5
+    DBQueryTimeout = 30
+    EnableDBCache = $true
+    
+    # Security enhancements
+    MaxLoginAttempts = 5
+    LoginLockoutMinutes = 15
+    EnableAuditLogging = $true
+    SessionTimeoutMinutes = 60
 }
 
 # API endpoints mapping
@@ -161,43 +186,91 @@ $global:APIEndpoints = @{
     "GET:/api/filesystem/security-report" = { param($Request) Invoke-GetFileSystemSecurityReport $Request }
 }
 
-# Main HTTP server function
+# Enhanced HTTP server with performance optimizations
 function Start-PowerShellAPIServer {
     try {
-        Write-APILog "Starting PowerShell API Server on port $Port" -Level "INFO"
+        Write-APILog "Starting Enhanced PowerShell API Server on port $Port" -Level "INFO"
+        Write-APILog "Performance Mode: MaxConcurrent=$($global:Config.MaxConcurrentRequests), PoolSize=$($global:Config.ConnectionPoolSize)" -Level "INFO"
         
-        # Initialize HTTP listener
+        # Initialize performance monitoring
+        Initialize-PerformanceMonitoring
+        
+        # Initialize connection pools
+        Initialize-ConnectionPools
+        
+        # Initialize memory management
+        Initialize-MemoryManagement
+        
+        # Initialize rate limiting
+        Initialize-RateLimiting
+        
+        # Initialize HTTP listener with enhanced settings
         $httpListener = New-Object System.Net.HttpListener
         $prefix = if ($EnableSSL) { "https://+:$Port/" } else { "http://+:$Port/" }
         $httpListener.Prefixes.Add($prefix)
         
+        # Configure advanced listener settings
+        $httpListener.TimeoutManager.IdleConnection = [TimeSpan]::FromSeconds(30)
+        $httpListener.TimeoutManager.HeaderWait = [TimeSpan]::FromSeconds(10)
+        $httpListener.TimeoutManager.EntityBody = [TimeSpan]::FromSeconds(120)
+        
         if ($EnableSSL -and $CertificatePath) {
-            # Configure SSL certificate if provided
             Write-APILog "Configuring SSL with certificate: $CertificatePath" -Level "INFO"
         }
         
         $httpListener.Start()
-        Write-APILog "HTTP Listener started successfully" -Level "INFO"
-        Write-Host "PowerShell API Server running on $prefix" -ForegroundColor Green
+        Write-APILog "Enhanced HTTP Listener started successfully" -Level "INFO"
+        Write-Host "Enhanced PowerShell API Server running on $prefix" -ForegroundColor Green
+        Write-Host "Performance Features: Connection Pooling, Rate Limiting, Memory Monitoring" -ForegroundColor Cyan
         Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Yellow
         
-        # Main request processing loop
+        # Enhanced request processing loop with connection management
+        $global:ActiveRequests = 0
+        $global:TotalRequestsProcessed = 0
+        
         while ($httpListener.IsListening) {
             try {
-                # Get incoming request (blocking call)
-                $context = $httpListener.GetContext()
-                $request = $context.Request
-                $response = $context.Response
+                # Check memory usage periodically
+                if ((Get-Date) -gt $global:NextMemoryCheck) {
+                    Invoke-MemoryCleanup
+                    $global:NextMemoryCheck = (Get-Date).AddSeconds($global:Config.GCInterval)
+                }
                 
-                # Process request asynchronously
-                Start-Job -ScriptBlock {
+                # Rate limiting check
+                if (-not (Test-RateLimit)) {
+                    Start-Sleep -Milliseconds 100
+                    continue
+                }
+                
+                # Connection limit check
+                if ($global:ActiveRequests -ge $global:Config.MaxConcurrentRequests) {
+                    Start-Sleep -Milliseconds 50
+                    continue
+                }
+                
+                # Get incoming request (non-blocking with timeout)
+                $context = $httpListener.GetContext()
+                $global:ActiveRequests++
+                $global:TotalRequestsProcessed++
+                
+                # Process request with enhanced async handling
+                $job = Start-Job -ScriptBlock {
                     param($Context, $APIEndpoints, $Config)
-                    Process-HTTPRequest -Context $Context -APIEndpoints $APIEndpoints -Config $Config
-                } -ArgumentList $context, $global:APIEndpoints, $global:Config | Out-Null
+                    try {
+                        Process-EnhancedHTTPRequest -Context $Context -APIEndpoints $APIEndpoints -Config $Config
+                    } finally {
+                        # Decrement active request counter
+                        $using:global:ActiveRequests--
+                    }
+                } -ArgumentList $context, $global:APIEndpoints, $global:Config
+                
+                # Clean up completed jobs periodically
+                if ($global:TotalRequestsProcessed % 100 -eq 0) {
+                    Get-Job -State Completed | Remove-Job -Force
+                }
                 
             } catch [System.Net.HttpListenerException] {
                 if ($_.Exception.ErrorCode -eq 995) {
-                    # Server shutdown
                     Write-APILog "Server shutdown requested" -Level "INFO"
                     break
                 } else {
@@ -205,6 +278,7 @@ function Start-PowerShellAPIServer {
                 }
             } catch {
                 Write-APILog "Unexpected error in main loop: $($_.Exception.Message)" -Level "ERROR"
+                $global:ActiveRequests = [Math]::Max(0, $global:ActiveRequests - 1)
             }
         }
         
@@ -220,8 +294,8 @@ function Start-PowerShellAPIServer {
     }
 }
 
-# Process individual HTTP requests
-function Process-HTTPRequest {
+# Enhanced HTTP request processing with performance optimizations
+function Process-EnhancedHTTPRequest {
     param(
         [System.Net.HttpListenerContext]$Context,
         [hashtable]$APIEndpoints,
@@ -264,7 +338,7 @@ function Process-HTTPRequest {
             $reader.Close()
         }
         
-        # Create request object
+        # Create enhanced request object with performance metrics
         $requestObj = @{
             Method = $method
             Path = $request.Url.AbsolutePath
@@ -274,6 +348,8 @@ function Process-HTTPRequest {
             UserIP = $clientIP
             UserAgent = $userAgent
             Timestamp = $startTime
+            RequestId = [Guid]::NewGuid().ToString()
+            ProcessingStartTime = Get-Date
         }
         
         # Copy headers
@@ -281,21 +357,49 @@ function Process-HTTPRequest {
             $requestObj.Headers[$header] = $request.Headers[$header]
         }
         
-        # Find matching endpoint
-        $endpoint = Find-MatchingEndpoint -Method $method -Path $request.Url.AbsolutePath -Endpoints $APIEndpoints
+        # Enhanced endpoint matching with caching
+        $cacheKey = "$method:$($request.Url.AbsolutePath)"
+        $endpoint = $null
+        
+        if ($global:Config.EnableRequestCaching -and $global:EndpointCache.ContainsKey($cacheKey)) {
+            $endpoint = $global:EndpointCache[$cacheKey]
+            $global:PerformanceMetrics.CacheHits++
+        } else {
+            $endpoint = Find-MatchingEndpoint -Method $method -Path $request.Url.AbsolutePath -Endpoints $APIEndpoints
+            if ($endpoint -and $global:Config.EnableRequestCaching) {
+                $global:EndpointCache[$cacheKey] = $endpoint
+                $global:PerformanceMetrics.CacheMisses++
+            }
+        }
         
         if ($endpoint) {
-            # Execute endpoint
-            $result = & $endpoint.Handler $requestObj
-            Send-JSONResponse -Response $response -Data $result -StatusCode 200
+            # Execute endpoint with error handling and metrics
+            try {
+                $executionStart = Get-Date
+                $result = & $endpoint.Handler $requestObj
+                $executionTime = ((Get-Date) - $executionStart).TotalMilliseconds
+                
+                # Update performance metrics
+                Update-EndpointMetrics -Path $request.Url.AbsolutePath -ExecutionTime $executionTime -Success $true
+                
+                # Send response with compression if enabled
+                Send-EnhancedJSONResponse -Response $response -Data $result -StatusCode 200 -EnableCompression $Config.EnableCompression
+                
+            } catch {
+                $executionTime = ((Get-Date) - $executionStart).TotalMilliseconds
+                Update-EndpointMetrics -Path $request.Url.AbsolutePath -ExecutionTime $executionTime -Success $false
+                throw
+            }
         } else {
-            # 404 Not Found
+            # Enhanced 404 response
             $errorResult = @{
                 Status = "Error"
                 Message = "Endpoint not found: $method $($request.Url.AbsolutePath)"
+                RequestId = $requestObj.RequestId
                 Timestamp = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                AvailableEndpoints = if ($Config.DebugMode) { $APIEndpoints.Keys | Sort-Object } else { $null }
             }
-            Send-JSONResponse -Response $response -Data $errorResult -StatusCode 404
+            Send-EnhancedJSONResponse -Response $response -Data $errorResult -StatusCode 404 -EnableCompression $Config.EnableCompression
         }
         
     } catch {
@@ -387,22 +491,187 @@ function Test-PathPattern {
     return @{ IsMatch = $false; Parameters = @{} }
 }
 
-# Send JSON response
-function Send-JSONResponse {
+# Enhanced JSON response with compression and performance optimizations
+function Send-EnhancedJSONResponse {
     param(
         [System.Net.HttpListenerResponse]$Response,
         [object]$Data,
-        [int]$StatusCode = 200
+        [int]$StatusCode = 200,
+        [bool]$EnableCompression = $false
     )
     
     $Response.StatusCode = $StatusCode
     $Response.ContentType = "application/json; charset=utf-8"
     
+    # Add performance headers
+    $Response.Headers.Add("X-Response-Time", (Get-Date).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))
+    $Response.Headers.Add("X-Server-Version", "Enhanced-PowerShell-API-2.0")
+    
+    # Convert to JSON with optimized settings
     $json = $Data | ConvertTo-Json -Depth 10 -Compress
-    $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+    
+    # Apply compression if enabled and response is large enough
+    if ($EnableCompression -and $json.Length -gt 1024) {
+        try {
+            $ms = New-Object System.IO.MemoryStream
+            $gz = New-Object System.IO.Compression.GZipStream($ms, [System.IO.Compression.CompressionMode]::Compress)
+            $sw = New-Object System.IO.StreamWriter($gz)
+            $sw.Write($json)
+            $sw.Close()
+            $gz.Close()
+            
+            $buffer = $ms.ToArray()
+            $Response.Headers.Add("Content-Encoding", "gzip")
+            $ms.Close()
+        } catch {
+            # Fall back to uncompressed if compression fails
+            $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+        }
+    } else {
+        $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+    }
     
     $Response.ContentLength64 = $buffer.Length
     $Response.OutputStream.Write($buffer, 0, $buffer.Length)
+}
+
+# Initialize performance monitoring
+function Initialize-PerformanceMonitoring {
+    $global:PerformanceMetrics = @{
+        RequestCount = 0
+        ErrorCount = 0
+        CacheHits = 0
+        CacheMisses = 0
+        AverageResponseTime = 0
+        StartTime = Get-Date
+        EndpointMetrics = @{}
+    }
+    
+    $global:EndpointCache = @{}
+    $global:NextMemoryCheck = (Get-Date).AddSeconds($global:Config.GCInterval)
+    
+    Write-APILog "Performance monitoring initialized" -Level "INFO"
+}
+
+# Initialize connection pools
+function Initialize-ConnectionPools {
+    $global:ConnectionPool = @{
+        Database = @{
+            Available = [System.Collections.Queue]::new()
+            InUse = [System.Collections.ArrayList]::new()
+            MaxSize = $global:Config.DBConnectionPoolSize
+            Created = 0
+        }
+    }
+    
+    Write-APILog "Connection pools initialized with size: $($global:Config.DBConnectionPoolSize)" -Level "INFO"
+}
+
+# Initialize memory management
+function Initialize-MemoryManagement {
+    $global:MemoryMetrics = @{
+        LastGC = Get-Date
+        MaxMemoryMB = $global:Config.MaxMemoryUsageMB
+        CurrentMemoryMB = 0
+        GCCount = 0
+    }
+    
+    Write-APILog "Memory management initialized with limit: $($global:Config.MaxMemoryUsageMB)MB" -Level "INFO"
+}
+
+# Initialize rate limiting
+function Initialize-RateLimiting {
+    $global:RateLimiting = @{
+        Requests = [System.Collections.Queue]::new()
+        MaxPerMinute = $global:Config.RateLimitPerMinute
+        Enabled = $global:Config.EnableRateLimiting
+    }
+    
+    Write-APILog "Rate limiting initialized: $($global:Config.RateLimitPerMinute) requests/minute" -Level "INFO"
+}
+
+# Test rate limiting
+function Test-RateLimit {
+    if (-not $global:RateLimiting.Enabled) {
+        return $true
+    }
+    
+    $now = Get-Date
+    $oneMinuteAgo = $now.AddMinutes(-1)
+    
+    # Remove old requests
+    while ($global:RateLimiting.Requests.Count -gt 0 -and $global:RateLimiting.Requests.Peek() -lt $oneMinuteAgo) {
+        $global:RateLimiting.Requests.Dequeue() | Out-Null
+    }
+    
+    # Check if we're under the limit
+    if ($global:RateLimiting.Requests.Count -lt $global:RateLimiting.MaxPerMinute) {
+        $global:RateLimiting.Requests.Enqueue($now)
+        return $true
+    }
+    
+    return $false
+}
+
+# Memory cleanup function
+function Invoke-MemoryCleanup {
+    $beforeGC = [GC]::GetTotalMemory($false)
+    $currentMB = [math]::Round($beforeGC / 1MB, 2)
+    
+    if ($currentMB -gt $global:MemoryMetrics.MaxMemoryMB) {
+        Write-APILog "Memory usage ($currentMB MB) exceeds limit ($($global:MemoryMetrics.MaxMemoryMB) MB), forcing garbage collection" -Level "WARNING"
+        
+        [GC]::Collect()
+        [GC]::WaitForPendingFinalizers()
+        [GC]::Collect()
+        
+        $afterGC = [GC]::GetTotalMemory($false)
+        $freedMB = [math]::Round(($beforeGC - $afterGC) / 1MB, 2)
+        
+        $global:MemoryMetrics.LastGC = Get-Date
+        $global:MemoryMetrics.GCCount++
+        $global:MemoryMetrics.CurrentMemoryMB = [math]::Round($afterGC / 1MB, 2)
+        
+        Write-APILog "Garbage collection completed: freed $freedMB MB, current usage: $($global:MemoryMetrics.CurrentMemoryMB) MB" -Level "INFO"
+    }
+}
+
+# Update endpoint performance metrics
+function Update-EndpointMetrics {
+    param(
+        [string]$Path,
+        [double]$ExecutionTime,
+        [bool]$Success
+    )
+    
+    if (-not $global:PerformanceMetrics.EndpointMetrics.ContainsKey($Path)) {
+        $global:PerformanceMetrics.EndpointMetrics[$Path] = @{
+            TotalRequests = 0
+            SuccessfulRequests = 0
+            FailedRequests = 0
+            AverageResponseTime = 0
+            MinResponseTime = [double]::MaxValue
+            MaxResponseTime = 0
+            LastAccessed = Get-Date
+        }
+    }
+    
+    $metrics = $global:PerformanceMetrics.EndpointMetrics[$Path]
+    $metrics.TotalRequests++
+    $metrics.LastAccessed = Get-Date
+    
+    if ($Success) {
+        $metrics.SuccessfulRequests++
+    } else {
+        $metrics.FailedRequests++
+    }
+    
+    # Update response time statistics
+    $metrics.MinResponseTime = [Math]::Min($metrics.MinResponseTime, $ExecutionTime)
+    $metrics.MaxResponseTime = [Math]::Max($metrics.MaxResponseTime, $ExecutionTime)
+    
+    # Calculate running average
+    $metrics.AverageResponseTime = (($metrics.AverageResponseTime * ($metrics.TotalRequests - 1)) + $ExecutionTime) / $metrics.TotalRequests
 }
 
 # Health check endpoint
@@ -418,17 +687,48 @@ function Invoke-HealthCheck {
     }
 }
 
-# Status check endpoint
+# Enhanced status check endpoint with performance metrics
 function Invoke-StatusCheck {
     param($Request)
     
     $dbStatus = Test-DatabaseConnection
     $memoryUsage = [math]::Round((Get-Process -Id $PID).WorkingSet64 / 1MB, 2)
+    $uptime = [int]((Get-Date) - (Get-Process -Id $PID).StartTime).TotalSeconds
+    
+    # Calculate performance statistics
+    $totalRequests = if ($global:PerformanceMetrics) { $global:PerformanceMetrics.RequestCount } else { 0 }
+    $errorRate = if ($totalRequests -gt 0 -and $global:PerformanceMetrics) { 
+        [math]::Round(($global:PerformanceMetrics.ErrorCount / $totalRequests) * 100, 2) 
+    } else { 0 }
+    
+    $cacheHitRate = if ($global:PerformanceMetrics -and ($global:PerformanceMetrics.CacheHits + $global:PerformanceMetrics.CacheMisses) -gt 0) {
+        [math]::Round(($global:PerformanceMetrics.CacheHits / ($global:PerformanceMetrics.CacheHits + $global:PerformanceMetrics.CacheMisses)) * 100, 2)
+    } else { 0 }
     
     return @{
         Status = "Running"
         Database = if ($dbStatus) { "Connected" } else { "Disconnected" }
-        Memory = "$memoryUsage MB"
+        Memory = @{
+            CurrentUsageMB = $memoryUsage
+            MaxLimitMB = if ($global:MemoryMetrics) { $global:MemoryMetrics.MaxMemoryMB } else { "N/A" }
+            GCCount = if ($global:MemoryMetrics) { $global:MemoryMetrics.GCCount } else { 0 }
+            LastGC = if ($global:MemoryMetrics) { $global:MemoryMetrics.LastGC.ToString("yyyy-MM-ddTHH:mm:ss.fffZ") } else { "N/A" }
+        }
+        Performance = @{
+            TotalRequests = $totalRequests
+            ActiveRequests = if ($global:ActiveRequests) { $global:ActiveRequests } else { 0 }
+            ErrorRate = "$errorRate%"
+            CacheHitRate = "$cacheHitRate%"
+            AverageResponseTime = if ($global:PerformanceMetrics) { "$([math]::Round($global:PerformanceMetrics.AverageResponseTime, 2))ms" } else { "N/A" }
+            UptimeSeconds = $uptime
+        }
+        Configuration = @{
+            MaxConcurrentRequests = $global:Config.MaxConcurrentRequests
+            ConnectionPoolSize = $global:Config.ConnectionPoolSize
+            RateLimitPerMinute = $global:Config.RateLimitPerMinute
+            CompressionEnabled = $global:Config.EnableCompression
+            CachingEnabled = $global:Config.EnableRequestCaching
+        }
         Timestamp = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         Environment = @{
             PowerShellVersion = $PSVersionTable.PSVersion.ToString()

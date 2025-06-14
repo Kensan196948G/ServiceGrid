@@ -1,4 +1,8 @@
-import { useState, useCallback } from 'react';
+/**
+ * 汎用API呼び出し用カスタムフック
+ * ローディング状態、エラーハンドリング、自動リトライ機能を提供
+ */
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { handleApiError, logError } from '../utils/errorHandler';
 
 interface UseApiState<T> {
@@ -8,9 +12,13 @@ interface UseApiState<T> {
 }
 
 interface UseApiOptions {
+  retryCount?: number;
+  retryDelay?: number;
+  timeout?: number;
   onSuccess?: (data: any) => void;
   onError?: (error: any) => void;
   showErrorToast?: boolean;
+  abortSignal?: AbortSignal;
 }
 
 export function useApi<T>() {

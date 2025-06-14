@@ -1,4 +1,9 @@
-// Comprehensive form validation utilities
+/**
+ * フォームバリデーション ユーティリティ
+ * 包括的なバリデーション機能を提供
+ */
+import React from 'react';
+
 export interface ValidationRule {
   required?: boolean;
   minLength?: number;

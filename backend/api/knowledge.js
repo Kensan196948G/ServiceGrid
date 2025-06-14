@@ -358,10 +358,10 @@ const deleteKnowledge = (req, res) => {
 };
 
 /**
- * ナレッジ検索（高度検索機能）
+ * ナレッジ検索（強化版高度検索機能）
  */
 const searchKnowledge = (req, res) => {
-  const { q, category, created_by, date_from, date_to } = req.query;
+  const { q, category, created_by, date_from, date_to, search_type = 'all', tags, min_rating } = req.query;
   const page = parseInt(req.query.page) || 1;
   const limit = Math.min(parseInt(req.query.limit) || 20, 100);
   const offset = (page - 1) * limit;
@@ -370,8 +370,28 @@ const searchKnowledge = (req, res) => {
     return res.status(400).json({ error: '検索キーワードは2文字以上で入力してください' });
   }
   
-  let whereConditions = ['(title LIKE ? OR content LIKE ?)'];
-  let queryParams = [`%${q}%`, `%${q}%`];
+  // キーワード分解（スペース区切りで複数キーワード対応）
+  const keywords = q.trim().split(/\s+/).filter(keyword => keyword.length > 1);
+  
+  let whereConditions = [];
+  let queryParams = [];
+  
+  // 検索タイプによる条件分岐
+  if (search_type === 'title') {
+    const titleConditions = keywords.map(keyword => 'title LIKE ?').join(' AND ');
+    whereConditions.push(`(${titleConditions})`);
+    keywords.forEach(keyword => queryParams.push(`%${keyword}%`));
+  } else if (search_type === 'content') {
+    const contentConditions = keywords.map(keyword => 'content LIKE ?').join(' AND ');
+    whereConditions.push(`(${contentConditions})`);
+    keywords.forEach(keyword => queryParams.push(`%${keyword}%`));
+  } else { // 'all'
+    const allConditions = keywords.map(keyword => '(title LIKE ? OR content LIKE ?)').join(' AND ');
+    whereConditions.push(`(${allConditions})`);
+    keywords.forEach(keyword => {
+      queryParams.push(`%${keyword}%`, `%${keyword}%`);
+    });
+  }
   
   if (category) {
     whereConditions.push('category = ?');
@@ -384,16 +404,38 @@ const searchKnowledge = (req, res) => {
   }
   
   if (date_from) {
-    whereConditions.push('created_date >= ?');
+    whereConditions.push('DATE(created_date) >= ?');
     queryParams.push(date_from);
   }
   
   if (date_to) {
-    whereConditions.push('created_date <= ?');
+    whereConditions.push('DATE(created_date) <= ?');
     queryParams.push(date_to);
   }
   
-  const whereClause = 'WHERE ' + whereConditions.join(' AND ');
+  if (tags) {
+    const tagList = tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+    if (tagList.length > 0) {
+      const tagConditions = tagList.map(() => 'tags LIKE ?').join(' OR ');
+      whereConditions.push(`(${tagConditions})`);
+      tagList.forEach(tag => queryParams.push(`%${tag}%`));
+    }
+  }
+  
+  if (min_rating) {
+    const minRatingValue = parseFloat(min_rating);
+    if (!isNaN(minRatingValue)) {
+      whereConditions.push('(rating_total * 1.0 / NULLIF(rating_count, 0)) >= ?');
+      queryParams.push(minRatingValue);
+    }
+  }
+  
+  // 公開済みのみ表示
+  whereConditions.push("(status IS NULL OR status = 'Published')");
+  
+  const whereClause = whereConditions.length > 0 
+    ? 'WHERE ' + whereConditions.join(' AND ')
+    : '';
   
   // カウントクエリ
   const countQuery = `SELECT COUNT(*) as total FROM knowledge ${whereClause}`;
@@ -407,40 +449,108 @@ const searchKnowledge = (req, res) => {
     const total = countResult.total;
     const totalPages = Math.ceil(total / limit);
     
-    // データ取得クエリ（関連度でソート）
-    const dataQuery = `
+    // 強化された関連度スコア計算
+    let relevanceQuery = `
       SELECT knowledge_id, title, 
              SUBSTR(content, 1, 300) as excerpt,
-             category, created_by, created_date, updated_date,
-             CASE 
-               WHEN title LIKE ? THEN 10
-               WHEN title LIKE ? THEN 5
-               ELSE 1
-             END as relevance_score
+             category, created_by, created_date, updated_date, tags,
+             (rating_total * 1.0 / NULLIF(rating_count, 0)) as avg_rating,
+             rating_count,
+             (
+    `;
+    
+    // タイトルでのマッチスコア
+    keywords.forEach((keyword, index) => {
+      if (index > 0) relevanceQuery += ' + ';
+      relevanceQuery += `CASE WHEN title LIKE '%${keyword}%' THEN 20 ELSE 0 END`;
+    });
+    
+    relevanceQuery += ' + ';
+    
+    // タイトル先頭マッチスコア
+    keywords.forEach((keyword, index) => {
+      if (index > 0) relevanceQuery += ' + ';
+      relevanceQuery += `CASE WHEN title LIKE '${keyword}%' THEN 10 ELSE 0 END`;
+    });
+    
+    relevanceQuery += ' + ';
+    
+    // コンテンツでのマッチ回数
+    keywords.forEach((keyword, index) => {
+      if (index > 0) relevanceQuery += ' + ';
+      relevanceQuery += `(LENGTH(content) - LENGTH(REPLACE(UPPER(content), UPPER('${keyword}'), ''))) / LENGTH('${keyword}') * 2`;
+    });
+    
+    relevanceQuery += ` + 
+               CASE WHEN category = ? THEN 5 ELSE 0 END +
+               CASE WHEN (rating_total * 1.0 / NULLIF(rating_count, 0)) >= 4.0 THEN 15 ELSE 0 END +
+               CASE WHEN rating_count >= 5 THEN 10 ELSE 0 END
+             ) as relevance_score
       FROM knowledge 
       ${whereClause} 
-      ORDER BY relevance_score DESC, updated_date DESC
+      ORDER BY relevance_score DESC, avg_rating DESC, updated_date DESC
       LIMIT ? OFFSET ?
     `;
     
-    const searchParams = [`%${q}%`, `${q}%`, ...queryParams, limit, offset];
+    const searchParams = [...queryParams, category || '', limit, offset];
     
-    db.all(dataQuery, searchParams, (err, rows) => {
+    db.all(relevanceQuery, searchParams, (err, rows) => {
       if (err) {
         console.error('Database error:', err);
         return res.status(500).json({ error: 'データベースエラーが発生しました' });
       }
       
-      res.json({
-        data: rows,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages
-        },
-        search_query: q,
-        filters: { category, created_by, date_from, date_to }
+      // ハイライトされた抜粋を生成
+      const enhancedRows = rows.map(row => {
+        let highlightedExcerpt = row.excerpt;
+        keywords.forEach(keyword => {
+          const regex = new RegExp(`(${keyword})`, 'gi');
+          highlightedExcerpt = highlightedExcerpt.replace(regex, '<mark>$1</mark>');
+        });
+        
+        return {
+          ...row,
+          highlighted_excerpt: highlightedExcerpt,
+          avg_rating: row.avg_rating ? parseFloat(row.avg_rating.toFixed(2)) : null,
+          relevance_score: Math.round(row.relevance_score)
+        };
+      });
+      
+      // 関連キーワード推奨
+      const suggestionQuery = `
+        SELECT DISTINCT category, COUNT(*) as count
+        FROM knowledge 
+        WHERE (title LIKE ? OR content LIKE ?) AND status = 'Published'
+        GROUP BY category 
+        ORDER BY count DESC 
+        LIMIT 5
+      `;
+      
+      db.all(suggestionQuery, [`%${keywords[0]}%`, `%${keywords[0]}%`], (err, suggestions) => {
+        if (err) {
+          console.error('Database error:', err);
+          suggestions = [];
+        }
+        
+        res.json({
+          data: enhancedRows,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages
+          },
+          search_query: q,
+          keywords_used: keywords,
+          search_type,
+          filters: { category, created_by, date_from, date_to, tags, min_rating },
+          suggestions: suggestions || [],
+          search_metadata: {
+            total_keywords: keywords.length,
+            search_scope: search_type,
+            results_with_rating: enhancedRows.filter(row => row.avg_rating).length
+          }
+        });
       });
     });
   });
@@ -582,6 +692,227 @@ const rateKnowledge = (req, res) => {
   );
 };
 
+/**
+ * 関連ナレッジ推奨（コンテンツベースフィルタリング）
+ */
+const getRelatedKnowledge = (req, res) => {
+  const { id } = req.params;
+  const limit = Math.min(parseInt(req.query.limit) || 5, 10);
+  
+  // 現在のナレッジ情報取得
+  db.get(
+    'SELECT title, content, category, tags FROM knowledge WHERE knowledge_id = ?',
+    [id],
+    (err, currentKnowledge) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'データベースエラーが発生しました' });
+      }
+      
+      if (!currentKnowledge) {
+        return res.status(404).json({ error: 'ナレッジが見つかりません' });
+      }
+      
+      // キーワード抽出（タイトルから重要な単語を抽出）
+      const titleWords = currentKnowledge.title
+        .toLowerCase()
+        .replace(/[^\w\sあ-んア-ン一-龯]/g, '')
+        .split(/\s+/)
+        .filter(word => word.length > 2);
+      
+      // タグがある場合はタグも使用
+      const tags = currentKnowledge.tags ? 
+        currentKnowledge.tags.split(',').map(tag => tag.trim()) : [];
+      
+      const searchTerms = [...titleWords, ...tags].slice(0, 5); // 上位5個のキーワード
+      
+      if (searchTerms.length === 0) {
+        // キーワードがない場合はカテゴリー同じものを返す
+        const categoryQuery = `
+          SELECT knowledge_id, title, 
+                 SUBSTR(content, 1, 200) as excerpt,
+                 category, created_by, updated_date,
+                 (rating_total * 1.0 / NULLIF(rating_count, 0)) as avg_rating,
+                 rating_count
+          FROM knowledge 
+          WHERE category = ? AND knowledge_id != ? AND (status IS NULL OR status = 'Published')
+          ORDER BY (rating_total * 1.0 / NULLIF(rating_count, 0)) DESC, updated_date DESC
+          LIMIT ?
+        `;
+        
+        db.all(categoryQuery, [currentKnowledge.category, id, limit], (err, rows) => {
+          if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: 'データベースエラーが発生しました' });
+          }
+          
+          res.json({
+            success: true,
+            current_knowledge_id: id,
+            related_knowledge: rows.map(row => ({
+              ...row,
+              avg_rating: row.avg_rating ? parseFloat(row.avg_rating.toFixed(2)) : null,
+              relationship_reason: 'same_category'
+            })),
+            recommendation_basis: 'category_match'
+          });
+        });
+        return;
+      }
+      
+      // 関連度スコアでソート
+      const relatedQuery = `
+        SELECT knowledge_id, title, 
+               SUBSTR(content, 1, 200) as excerpt,
+               category, created_by, updated_date, tags,
+               (rating_total * 1.0 / NULLIF(rating_count, 0)) as avg_rating,
+               rating_count,
+               (
+                 CASE WHEN category = ? THEN 20 ELSE 0 END +
+                 ${searchTerms.map(() => 'CASE WHEN (title LIKE ? OR content LIKE ? OR tags LIKE ?) THEN 10 ELSE 0 END').join(' + ')}
+               ) as relevance_score
+        FROM knowledge 
+        WHERE knowledge_id != ? AND (status IS NULL OR status = 'Published')
+        HAVING relevance_score > 0
+        ORDER BY relevance_score DESC, (rating_total * 1.0 / NULLIF(rating_count, 0)) DESC, updated_date DESC
+        LIMIT ?
+      `;
+      
+      const queryParams = [currentKnowledge.category];
+      searchTerms.forEach(term => {
+        queryParams.push(`%${term}%`, `%${term}%`, `%${term}%`);
+      });
+      queryParams.push(id, limit);
+      
+      db.all(relatedQuery, queryParams, (err, rows) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'データベースエラーが発生しました' });
+        }
+        
+        const enhancedRows = rows.map(row => {
+          let relationshipReason = [];
+          if (row.category === currentKnowledge.category) relationshipReason.push('same_category');
+          
+          searchTerms.forEach(term => {
+            if (row.title.toLowerCase().includes(term.toLowerCase())) relationshipReason.push('title_match');
+            if (row.tags && row.tags.toLowerCase().includes(term.toLowerCase())) relationshipReason.push('tag_match');
+          });
+          
+          return {
+            ...row,
+            avg_rating: row.avg_rating ? parseFloat(row.avg_rating.toFixed(2)) : null,
+            relevance_score: Math.round(row.relevance_score),
+            relationship_reason: relationshipReason.join(', ') || 'content_match'
+          };
+        });
+        
+        res.json({
+          success: true,
+          current_knowledge_id: id,
+          related_knowledge: enhancedRows,
+          recommendation_basis: 'content_similarity',
+          search_terms_used: searchTerms
+        });
+      });
+    }
+  );
+};
+
+/**
+ * ナレッジベース検索推奨（よく検索されるキーワード等）
+ */
+const getSearchSuggestions = (req, res) => {
+  const { query } = req.query;
+  
+  if (!query || query.length < 2) {
+    return res.status(400).json({ error: 'クエリは2文字以上で入力してください' });
+  }
+  
+  const queries = [
+    // タイトルの部分一致
+    `SELECT title as suggestion, 'title' as type, COUNT(*) as frequency
+     FROM knowledge 
+     WHERE title LIKE ? AND (status IS NULL OR status = 'Published')
+     GROUP BY title 
+     ORDER BY frequency DESC 
+     LIMIT 5`,
+    
+    // カテゴリー推奨
+    `SELECT category as suggestion, 'category' as type, COUNT(*) as frequency
+     FROM knowledge 
+     WHERE category LIKE ? AND (status IS NULL OR status = 'Published')
+     GROUP BY category 
+     ORDER BY frequency DESC 
+     LIMIT 3`,
+    
+    // タグ推奨
+    `SELECT DISTINCT TRIM(tag_value) as suggestion, 'tag' as type, 1 as frequency
+     FROM (
+       SELECT TRIM(SUBSTR(tags, 1, INSTR(tags||',', ',')-1)) as tag_value FROM knowledge WHERE tags LIKE ? AND tags IS NOT NULL
+       UNION ALL
+       SELECT TRIM(SUBSTR(tags, INSTR(tags, ',')+1)) as tag_value FROM knowledge WHERE tags LIKE ? AND INSTR(tags, ',') > 0
+     ) tag_split
+     WHERE tag_value LIKE ?
+     LIMIT 3`
+  ];
+  
+  const searchPattern = `%${query}%`;
+  
+  Promise.all([
+    new Promise((resolve, reject) => {
+      db.all(queries[0], [searchPattern], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    }),
+    new Promise((resolve, reject) => {
+      db.all(queries[1], [searchPattern], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    }),
+    new Promise((resolve, reject) => {
+      db.all(queries[2], [searchPattern, searchPattern, searchPattern], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    })
+  ])
+  .then(([titleSuggestions, categorySuggestions, tagSuggestions]) => {
+    const allSuggestions = [
+      ...titleSuggestions,
+      ...categorySuggestions,
+      ...tagSuggestions
+    ];
+    
+    // 重複除去とソート
+    const uniqueSuggestions = allSuggestions
+      .filter((suggestion, index, self) => 
+        index === self.findIndex(s => s.suggestion === suggestion.suggestion))
+      .sort((a, b) => {
+        // タイプ別優先度: title > category > tag
+        const typeOrder = { title: 3, category: 2, tag: 1 };
+        if (typeOrder[a.type] !== typeOrder[b.type]) {
+          return typeOrder[b.type] - typeOrder[a.type];
+        }
+        return b.frequency - a.frequency;
+      })
+      .slice(0, 10);
+    
+    res.json({
+      success: true,
+      query,
+      suggestions: uniqueSuggestions,
+      total_suggestions: uniqueSuggestions.length
+    });
+  })
+  .catch(err => {
+    console.error('Database error:', err);
+    res.status(500).json({ error: 'データベースエラーが発生しました' });
+  });
+};
+
 module.exports = {
   getKnowledge,
   getKnowledgeStats,
@@ -590,6 +921,8 @@ module.exports = {
   updateKnowledge,
   deleteKnowledge,
   searchKnowledge,
+  getRelatedKnowledge,
+  getSearchSuggestions,
   approveKnowledge,
   rateKnowledge
 };

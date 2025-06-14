@@ -1,4 +1,11 @@
 import React, { useState, useEffect, ReactNode } from 'react';
+import { 
+  Home, FileText, Settings, Users, AlertTriangle, Package, 
+  BarChart3, Shield, CheckSquare, Clock, GitMerge, BookOpen,
+  TrendingUp, Server, Lock, FileCheck, Menu, X, Search,
+  Plus, Trash2, Edit, Eye, Filter, RefreshCw, Download,
+  Upload, Bell, LogOut, User
+} from 'lucide-react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -37,13 +44,19 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: string;
 }
 
-export const Input: React.FC<InputProps> = ({ label, id, error, className, ...props }) => {
+export const Input: React.FC<InputProps> = ({ label, id, error, className, required, ...props }) => {
   return (
     <div className="w-full">
-      {label && <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1">{label}</label>}
+      {label && (
+        <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1">
+          {label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+      )}
       <input
         id={id}
-        className={`block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${error ? 'border-red-500' : ''} ${className || ''}`}
+        className={`block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${error ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : ''} ${className || ''}`}
+        required={required}
         {...props}
       />
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
@@ -75,22 +88,24 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
   options: { value: string | number; label: string }[];
+  placeholder?: string;
 }
 
-export const Select: React.FC<SelectProps> = ({ label, id, error, options, className, ...props }) => {
+export const Select: React.FC<SelectProps> = ({ label, id, error, options, placeholder, className, ...props }) => {
   return (
     <div className="w-full">
       {label && <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1">{label}</label>}
       <select
         id={id}
-        className={`block w-full px-3 py-2 border border-slate-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${error ? 'border-red-500' : ''} ${className || ''}`}
+        className={`block w-full px-3 py-2 border border-slate-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors hover:border-slate-400 ${error ? 'border-red-500 focus:ring-red-500' : ''} ${className || ''}`}
         {...props}
       >
+        {placeholder && <option value="" disabled>{placeholder}</option>}
         {options.map(option => (
           <option key={option.value} value={option.value}>{option.label}</option>
         ))}
       </select>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs text-red-600" role="alert">{error}</p>}
     </div>
   );
 };
@@ -170,14 +185,52 @@ interface TableProps<T,> {
   columns: { Header: string; accessor: keyof T | ((row: T) => ReactNode) }[];
   data: T[];
   onRowClick?: (row: T) => void;
+  loading?: boolean;
+  emptyMessage?: string;
 }
 
-export const Table = <T extends { id: string | number },>({ columns, data, onRowClick }: TableProps<T>): ReactNode => {
-  if (!data || data.length === 0) {
-    return <p className="text-slate-500 italic">データがありません。</p>;
-  }
+interface EmptyStateProps {
+  title?: string;
+  description?: string;
+  action?: ReactNode;
+}
+
+export const EmptyState: React.FC<EmptyStateProps> = ({ 
+  title = "データがありません", 
+  description = "現在表示できるデータがありません。",
+  action 
+}) => {
   return (
-    <div className="overflow-x-auto">
+    <div className="text-center py-8">
+      <div className="text-slate-400 text-6xl mb-4">📋</div>
+      <h3 className="text-lg font-medium text-slate-700 mb-2">{title}</h3>
+      <p className="text-slate-500 mb-4">{description}</p>
+      {action && <div>{action}</div>}
+    </div>
+  );
+};
+
+export const Table = <T extends { id: string | number },>({ columns, data, onRowClick, loading = false, emptyMessage = 'データがありません' }: TableProps<T>): ReactNode => {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Spinner size="lg" />
+        <span className="ml-3 text-slate-600">読み込み中...</span>
+      </div>
+    );
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-slate-400 text-lg mb-2">📊</div>
+        <p className="text-slate-600">{emptyMessage}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto border border-slate-200 rounded-lg shadow-sm">
       <table className="min-w-full divide-y divide-slate-200">
         <thead className="bg-slate-50">
           <tr>
@@ -189,8 +242,15 @@ export const Table = <T extends { id: string | number },>({ columns, data, onRow
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-slate-200">
-          {data.map((row) => (
-            <tr key={row.id} onClick={() => onRowClick && onRowClick(row)} className={onRowClick ? 'hover:bg-slate-50 cursor-pointer' : ''}>
+          {data.map((row, rowIndex) => (
+            <tr 
+              key={row.id} 
+              onClick={() => onRowClick && onRowClick(row)} 
+              className={`
+                ${onRowClick ? 'hover:bg-blue-50 cursor-pointer transition-colors duration-150' : ''}
+                ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-slate-25'}
+              `}
+            >
               {columns.map((column, index) => (
                 <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
                   {typeof column.accessor === 'function' ? column.accessor(row) : String(row[column.accessor] ?? '')}
@@ -240,33 +300,65 @@ interface NotificationProps {
 
 export const Notification: React.FC<NotificationProps> = ({ message, type, onClose, duration = 5000 }) => {
   const [visible, setVisible] = useState(true);
+  const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
     if (duration > 0) {
       const timer = setTimeout(() => {
-        setVisible(false);
-        if (onClose) onClose();
+        setIsExiting(true);
+        setTimeout(() => {
+          setVisible(false);
+          if (onClose) onClose();
+        }, 300);
       }, duration);
       return () => clearTimeout(timer);
     }
   }, [duration, onClose]);
 
+  const handleClose = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      setVisible(false);
+      if (onClose) onClose();
+    }, 300);
+  };
+
   if (!visible) return null;
 
-  const baseStyles = 'p-4 rounded-md shadow-lg text-sm font-medium fixed top-5 right-5 z-[100]';
+  const baseStyles = `p-4 rounded-md shadow-lg text-sm font-medium fixed top-5 right-5 z-[100] transform transition-all duration-300 ${
+    isExiting ? 'translate-x-full opacity-0' : 'translate-x-0 opacity-100'
+  }`;
   const typeStyles = {
-    [NotificationType.SUCCESS]: 'bg-green-500 text-white',
-    [NotificationType.ERROR]: 'bg-red-500 text-white',
-    [NotificationType.INFO]: 'bg-blue-500 text-white',
-    [NotificationType.WARNING]: 'bg-yellow-500 text-black',
+    [NotificationType.SUCCESS]: 'bg-green-500 text-white border-l-4 border-green-700',
+    [NotificationType.ERROR]: 'bg-red-500 text-white border-l-4 border-red-700',
+    [NotificationType.INFO]: 'bg-blue-500 text-white border-l-4 border-blue-700',
+    [NotificationType.WARNING]: 'bg-yellow-500 text-black border-l-4 border-yellow-700',
+  };
+
+  const iconMap = {
+    [NotificationType.SUCCESS]: '✓',
+    [NotificationType.ERROR]: '✗',
+    [NotificationType.INFO]: 'ℹ',
+    [NotificationType.WARNING]: '⚠',
   };
 
   return (
-    <div className={`${baseStyles} ${typeStyles[type]}`}>
-      <span>{message}</span>
-      {onClose && (
-         <button onClick={() => { setVisible(false); if (onClose) onClose();}} className="ml-4 text-lg leading-none">&times;</button>
-      )}
+    <div className={`${baseStyles} ${typeStyles[type]}`} role="alert" aria-live="polite">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center">
+          <span className="mr-2 font-bold text-lg">{iconMap[type]}</span>
+          <span>{message}</span>
+        </div>
+        {onClose && (
+          <button 
+            onClick={handleClose} 
+            className="ml-4 text-lg leading-none hover:opacity-75 focus:outline-none focus:ring-2 focus:ring-white rounded"
+            aria-label="通知を閉じる"
+          >
+            &times;
+          </button>
+        )}
+      </div>
     </div>
   );
 };

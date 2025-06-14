@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ITSM Platform - 5ペイン並列開発環境開始スクリプト
-# VSCode + Claude Code + tmux 統合開発環境
+# VSCode + Claude + tmux 統合開発環境
 
 set -e
 
@@ -179,23 +179,24 @@ create_pane_layout() {
         exit 1
     fi
     
-    # ペイン分割（シンプルで確実な方法）
+    # ペイン分割（3段構成: 要求通りの配置）
     print_info "ペイン分割中..."
     
-    # 水平分割で2つのペインに分割
+    # 1段目: 水平分割で2つのペイン（左右）
     tmux split-window -h -t "$SESSION_NAME:0" -c "$PROJECT_ROOT"
     
-    # 左ペインを垂直分割（上下2つ）
+    # 2段目: 下部を作成（垂直分割）
     tmux split-window -v -t "$SESSION_NAME:0.0" -c "$PROJECT_ROOT"
-    
-    # 右ペインを垂直分割（上下2つ）
     tmux split-window -v -t "$SESSION_NAME:0.1" -c "$PROJECT_ROOT"
     
-    # 右下ペインを水平分割（5つ目のペイン作成）
-    tmux split-window -h -t "$SESSION_NAME:0.3" -c "$PROJECT_ROOT"
+    # 3段目: 最下部をフル幅で作成
+    tmux split-window -v -t "$SESSION_NAME:0.2" -c "$PROJECT_ROOT"
     
-    # レイアウト調整
-    tmux select-layout -t "$SESSION_NAME:0" tiled
+    # ペイン再配置: 0→2, 1→3, 2→4, 3→0, 4→1にする
+    # 現在: 0,1,2,3,4 → 目標: 2,3,4,0,1
+    tmux swap-pane -s "$SESSION_NAME:0.0" -t "$SESSION_NAME:0.3" # 0↔3
+    tmux swap-pane -s "$SESSION_NAME:0.1" -t "$SESSION_NAME:0.4" # 1↔4  
+    tmux swap-pane -s "$SESSION_NAME:0.2" -t "$SESSION_NAME:0.3" # 2↔3
     
     # ペイン番号確認
     local pane_count=$(tmux list-panes -t "$SESSION_NAME:0" | wc -l)
@@ -216,13 +217,13 @@ setup_pane_commands() {
     local pane_count=$(tmux list-panes -t "$SESSION_NAME:0" | wc -l)
     print_info "利用可能ペイン数: $pane_count"
     
-    # 各ペインにコマンド設定（存在確認付き）
+    # 各ペインにコマンド設定（要求通りの配置順）
     local pane_configs=(
-        "0:Feature-A:統合リーダー:feature-a-leader.sh:設計統一・アーキテクチャ管理・調整"
-        "1:Feature-B:UI/テスト自動修復:feature-b-ui.sh:React/TypeScript・Jest/RTL・ESLint"
-        "2:Feature-C:API開発:feature-c-api.sh:Node.js・Express・テスト通過ループ"
-        "3:Feature-D:PowerShell API:feature-d-powershell.sh:PowerShell・run-tests.sh・Windows対応"
-        "4:Feature-E:非機能要件:feature-e-nonfunc.sh:SLA・ログ・セキュリティ・監視"
+        "0:Feature-B:UI/テスト自動修復:feature-b-ui.sh:React/TypeScript・Jest/RTL・ESLint"
+        "1:Feature-C:API開発:feature-c-api.sh:Node.js・Express・テスト通過ループ"
+        "2:Feature-D:PowerShell API:feature-d-powershell.sh:PowerShell・run-tests.sh・Windows対応"
+        "3:Feature-E:非機能要件:feature-e-nonfunc.sh:SLA・ログ・セキュリティ・監視"
+        "4:Feature-A:統合リーダー:feature-a-leader.sh:設計統一・アーキテクチャ管理・調整"
     )
     
     for config in "${pane_configs[@]}"; do
@@ -271,13 +272,18 @@ show_development_info() {
     echo "📁 プロジェクト: $PROJECT_ROOT"
     echo "🔧 tmux設定: ~/.config/tmux/tmux.conf"
     echo ""
-    echo "🚀 各ペイン構成:"
+    echo "🚀 各ペイン構成 (3段レイアウト - 要求通り):"
     echo "  ┌─────────────────────────────────────┐"
-    echo "  │ 0:Feature-A │ 1:Feature-B │ 2:Feature-C │"
-    echo "  │ 統合リーダー │ UI/テスト   │ API開発     │"
+    echo "  │ 1段目                               │"
+    echo "  │ 0:Feature-B │ 1:Feature-C           │"
+    echo "  │ UI/テスト   │ API開発               │"
     echo "  ├─────────────────────────────────────┤"
-    echo "  │ 3:Feature-D │ 4:Feature-E │             │"
-    echo "  │ PowerShell  │ 非機能要件  │             │"
+    echo "  │ 2段目                               │"
+    echo "  │ 2:Feature-D │ 3:Feature-E           │"
+    echo "  │ PowerShell  │ 非機能要件            │"
+    echo "  ├─────────────────────────────────────┤"
+    echo "  │ 3段目 (フル幅)                      │"
+    echo "  │ 4:Feature-A (統合リーダー)          │"
     echo "  └─────────────────────────────────────┘"
     echo ""
     echo "⌨️  操作方法:"

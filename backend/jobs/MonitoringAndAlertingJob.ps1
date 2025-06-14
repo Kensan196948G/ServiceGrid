@@ -819,13 +819,258 @@ function Initialize-MonitoringTables {
     }
 }
 
+# SLA monitoring functions (強化版)
+function Invoke-SLAMonitoring {
+    try {
+        $result = @{
+            SLAViolations = @{}
+            ResponseTimes = @{}
+            ResolutionTimes = @{}
+            Availability = @{}
+            Alerts = @()
+        }
+        
+        # Response time SLA monitoring
+        try {
+            $responseTimeQuery = @"
+                SELECT 
+                    priority,
+                    AVG(CASE 
+                        WHEN responded_date IS NOT NULL 
+                        THEN JULIANDAY(responded_date) - JULIANDAY(created_date)
+                        ELSE NULL 
+                    END) * 24 * 60 as avg_response_minutes
+                FROM incidents 
+                WHERE created_date >= DATE('now', '-24 hours')
+                AND status != 'Draft'
+                GROUP BY priority
+"@
+            
+            $responseResults = Invoke-DatabaseQuery -Query $responseTimeQuery
+            $slaLimits = @{
+                'Critical' = 15  # 15 minutes
+                'High' = 60      # 1 hour
+                'Medium' = 240   # 4 hours
+                'Low' = 480      # 8 hours
+            }
+            
+            foreach ($item in $responseResults) {
+                $priority = $item.priority
+                $avgTime = [math]::Round($item.avg_response_minutes, 2)
+                $slaLimit = $slaLimits[$priority]
+                
+                $result.ResponseTimes[$priority] = @{
+                    AverageMinutes = $avgTime
+                    SLALimit = $slaLimit
+                    Status = if ($avgTime -gt $slaLimit) { "VIOLATION" } else { "OK" }
+                    Violation = $avgTime -gt $slaLimit
+                }
+                
+                if ($avgTime -gt $slaLimit) {
+                    $alert = Create-Alert -Type "SLA_RESPONSE_VIOLATION" -Severity $AlertSeverity.WARNING -Message "Response time SLA violation for $priority priority: $avgTime minutes (limit: $slaLimit)"
+                    $result.Alerts += $alert
+                }
+            }
+        } catch {
+            $result.ResponseTimes.Error = $_.Exception.Message
+        }
+        
+        # Resolution time SLA monitoring
+        try {
+            $resolutionTimeQuery = @"
+                SELECT 
+                    priority,
+                    AVG(CASE 
+                        WHEN resolved_date IS NOT NULL 
+                        THEN JULIANDAY(resolved_date) - JULIANDAY(created_date)
+                        ELSE NULL 
+                    END) * 24 as avg_resolution_hours
+                FROM incidents 
+                WHERE created_date >= DATE('now', '-7 days')
+                AND status = 'Resolved'
+                GROUP BY priority
+"@
+            
+            $resolutionResults = Invoke-DatabaseQuery -Query $resolutionTimeQuery
+            $resolutionSLALimits = @{
+                'Critical' = 4   # 4 hours
+                'High' = 24      # 24 hours
+                'Medium' = 72    # 3 days
+                'Low' = 168      # 7 days
+            }
+            
+            foreach ($item in $resolutionResults) {
+                $priority = $item.priority
+                $avgHours = [math]::Round($item.avg_resolution_hours, 2)
+                $slaLimit = $resolutionSLALimits[$priority]
+                
+                $result.ResolutionTimes[$priority] = @{
+                    AverageHours = $avgHours
+                    SLALimit = $slaLimit
+                    Status = if ($avgHours -gt $slaLimit) { "VIOLATION" } else { "OK" }
+                    Violation = $avgHours -gt $slaLimit
+                }
+                
+                if ($avgHours -gt $slaLimit) {
+                    $alert = Create-Alert -Type "SLA_RESOLUTION_VIOLATION" -Severity $AlertSeverity.ERROR -Message "Resolution time SLA violation for $priority priority: $avgHours hours (limit: $slaLimit)"
+                    $result.Alerts += $alert
+                }
+            }
+        } catch {
+            $result.ResolutionTimes.Error = $_.Exception.Message
+        }
+        
+        # Service availability monitoring
+        try {
+            $uptimeQuery = @"
+                SELECT 
+                    COUNT(*) as total_incidents,
+                    SUM(CASE WHEN priority IN ('Critical', 'High') THEN 1 ELSE 0 END) as critical_incidents,
+                    AVG(CASE 
+                        WHEN resolved_date IS NOT NULL 
+                        THEN JULIANDAY(resolved_date) - JULIANDAY(created_date)
+                        ELSE NULL 
+                    END) * 24 * 60 as avg_downtime_minutes
+                FROM incidents 
+                WHERE created_date >= DATE('now', '-30 days')
+                AND category = 'Service Outage'
+"@
+            
+            $uptimeResult = Invoke-DatabaseQuery -Query $uptimeQuery
+            $targetAvailability = 99.9  # 99.9% SLA target
+            $monthlyMinutes = 30 * 24 * 60  # 30 days in minutes
+            $downtimeMinutes = $uptimeResult.avg_downtime_minutes * $uptimeResult.total_incidents
+            $actualAvailability = [math]::Round((($monthlyMinutes - $downtimeMinutes) / $monthlyMinutes) * 100, 3)
+            
+            $result.Availability = @{
+                TargetPercent = $targetAvailability
+                ActualPercent = $actualAvailability
+                DowntimeMinutes = [math]::Round($downtimeMinutes, 2)
+                Status = if ($actualAvailability -lt $targetAvailability) { "VIOLATION" } else { "OK" }
+                Violation = $actualAvailability -lt $targetAvailability
+            }
+            
+            if ($actualAvailability -lt $targetAvailability) {
+                $alert = Create-Alert -Type "SLA_AVAILABILITY_VIOLATION" -Severity $AlertSeverity.CRITICAL -Message "Service availability SLA violation: $actualAvailability% (target: $targetAvailability%)"
+                $result.Alerts += $alert
+            }
+        } catch {
+            $result.Availability.Error = $_.Exception.Message
+        }
+        
+        return $result
+        
+    } catch {
+        Write-MonitoringLog "SLA monitoring failed: $($_.Exception.Message)" -Level "ERROR"
+        throw
+    }
+}
+
+# Real-time dashboard data collection
+function Get-RealTimeDashboardData {
+    try {
+        $dashboardData = @{
+            SystemHealth = @{}
+            ActiveIncidents = @{}
+            ServiceRequests = @{}
+            SLAStatus = @{}
+            AlertSummary = @{}
+            Timestamp = Get-Date
+        }
+        
+        # System health summary
+        $perfResults = Invoke-PerformanceMonitoring
+        $dbResults = Invoke-DatabaseMonitoring
+        
+        $dashboardData.SystemHealth = @{
+            CPUUsage = $perfResults.CPU.Usage
+            MemoryUsage = $perfResults.Memory.Usage
+            DiskUsage = ($perfResults.Disk.Drives | Measure-Object -Property UsagePercent -Maximum).Maximum
+            DatabaseConnectivity = $dbResults.Connectivity.Status
+            OverallStatus = if ($perfResults.CPU.Status -eq "OK" -and $perfResults.Memory.Status -eq "OK" -and $dbResults.Connectivity.Status -eq "OK") { "Healthy" } else { "Warning" }
+        }
+        
+        # Active incidents summary
+        $incidentQuery = @"
+            SELECT 
+                status,
+                priority,
+                COUNT(*) as count
+            FROM incidents 
+            WHERE status IN ('Open', 'In Progress')
+            GROUP BY status, priority
+"@
+        $activeIncidents = Invoke-DatabaseQuery -Query $incidentQuery
+        $dashboardData.ActiveIncidents = $activeIncidents
+        
+        # Service requests summary
+        $srQuery = @"
+            SELECT 
+                status,
+                COUNT(*) as count
+            FROM service_requests 
+            WHERE status IN ('Pending', 'Under Review', 'In Progress')
+            GROUP BY status
+"@
+        $activeServiceRequests = Invoke-DatabaseQuery -Query $srQuery
+        $dashboardData.ServiceRequests = $activeServiceRequests
+        
+        # SLA status
+        $slaResults = Invoke-SLAMonitoring
+        $dashboardData.SLAStatus = @{
+            ResponseTimeViolations = ($slaResults.ResponseTimes.Values | Where-Object { $_.Violation }).Count
+            ResolutionTimeViolations = ($slaResults.ResolutionTimes.Values | Where-Object { $_.Violation }).Count
+            AvailabilityStatus = $slaResults.Availability.Status
+        }
+        
+        # Alert summary
+        $alertQuery = @"
+            SELECT 
+                severity,
+                COUNT(*) as count
+            FROM monitoring_alerts 
+            WHERE timestamp >= DATE('now', '-24 hours')
+            AND resolved = 0
+            GROUP BY severity
+"@
+        $activeAlerts = Invoke-DatabaseQuery -Query $alertQuery
+        $dashboardData.AlertSummary = $activeAlerts
+        
+        return $dashboardData
+        
+    } catch {
+        Write-MonitoringLog "Failed to collect dashboard data: $($_.Exception.Message)" -Level "ERROR"
+        return $null
+    }
+}
+
+# Export dashboard data to JSON file
+function Export-DashboardData {
+    param([string]$OutputPath = "../logs/dashboard-data.json")
+    
+    try {
+        $dashboardData = Get-RealTimeDashboardData
+        if ($dashboardData) {
+            $jsonData = $dashboardData | ConvertTo-Json -Depth 5
+            $fullPath = Join-Path $PSScriptRoot $OutputPath
+            $jsonData | Out-File -FilePath $fullPath -Encoding UTF8
+            Write-MonitoringLog "Dashboard data exported to $fullPath" -Level "INFO"
+        }
+    } catch {
+        Write-MonitoringLog "Failed to export dashboard data: $($_.Exception.Message)" -Level "ERROR"
+    }
+}
+
 # Main execution
 if ($MyInvocation.InvocationName -ne '.') {
     try {
         # Initialize monitoring tables
         Initialize-MonitoringTables
         
-        # Start monitoring service
+        # Export dashboard data for real-time monitoring
+        Export-DashboardData
+        
+        # Start monitoring service with enhanced SLA monitoring
         Start-MonitoringService -IntervalSeconds $IntervalSeconds -RunOnce:$RunOnce -Verbose:$Verbose
         
     } catch {

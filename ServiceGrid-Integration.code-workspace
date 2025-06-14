@@ -1,0 +1,45 @@
+{
+    "folders": [
+        {
+            "name": "🎯 Feature-A 統合リーダー",
+            "path": "."
+        },
+        {
+            "name": "🎨 Feature-B UI/テスト", 
+            "path": "./src"
+        },
+        {
+            "name": "🔧 Feature-C API開発",
+            "path": "./backend"
+        },
+        {
+            "name": "💻 Feature-D PowerShell",
+            "path": "./backend/modules"
+        },
+        {
+            "name": "🔒 Feature-E 非機能要件",
+            "path": "./docs"
+        },
+        {
+            "name": "🎛️ Tmux管理",
+            "path": "./tmux"
+        }
+    ],
+    "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "feature-a.integration.enabled": true,
+        "feature-a.tmux.session": "itsm-dev-4pane"
+    },
+    "tasks": {
+        "version": "2.0.0",
+        "tasks": []
+    },
+    "extensions": {
+        "recommendations": [
+            "ms-vscode.vscode-typescript-next",
+            "bradlc.vscode-tailwindcss",
+            "esbenp.prettier-vscode",
+            "ms-vscode.powershell"
+        ]
+    }
+}

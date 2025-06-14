@@ -7,7 +7,7 @@ Import-Module "../modules/DBUtil.psm1" -Force
 Import-Module "../modules/AuthUtil.psm1" -Force
 Import-Module "../modules/LogUtil.psm1" -Force
 
-# Microsoft Graph API configuration
+# Enhanced Microsoft Graph API configuration with error handling
 $global:M365Config = @{
     TenantId = $env:M365_TENANT_ID
     ClientId = $env:M365_CLIENT_ID
@@ -23,76 +23,260 @@ $global:M365Config = @{
     )
     AccessToken = $null
     TokenExpiry = $null
-}
-
-# Get Microsoft Graph access token
-function Get-M365AccessToken {
-    try {
-        # Check if current token is still valid
-        if ($global:M365Config.AccessToken -and $global:M365Config.TokenExpiry -gt (Get-Date).AddMinutes(5)) {
-            return $global:M365Config.AccessToken
-        }
-        
-        # Request new token
-        $tokenUrl = "https://login.microsoftonline.com/$($global:M365Config.TenantId)/oauth2/v2.0/token"
-        
-        $body = @{
-            client_id = $global:M365Config.ClientId
-            client_secret = $global:M365Config.ClientSecret
-            scope = $global:M365Config.Scopes -join " "
-            grant_type = "client_credentials"
-        }
-        
-        $response = Invoke-RestMethod -Uri $tokenUrl -Method POST -Body $body -ContentType "application/x-www-form-urlencoded"
-        
-        $global:M365Config.AccessToken = $response.access_token
-        $global:M365Config.TokenExpiry = (Get-Date).AddSeconds($response.expires_in)
-        
-        Write-APILog "Microsoft 365 access token obtained successfully" -Level "INFO"
-        return $response.access_token
-        
-    } catch {
-        Write-APILog "Failed to obtain Microsoft 365 access token: $($_.Exception.Message)" -Level "ERROR"
-        throw "Microsoft 365 authentication failed: $($_.Exception.Message)"
+    
+    # Enhanced configuration for reliability
+    MaxRetries = 3
+    RetryDelaySeconds = @(2, 5, 10)  # Exponential backoff
+    TimeoutSeconds = 60
+    RateLimitBuffer = 10  # Reserve 10% of rate limit
+    
+    # Rate limiting tracking
+    RateLimit = @{
+        Remaining = 10000
+        Reset = (Get-Date).AddHours(1)
+        LastChecked = Get-Date
     }
+    
+    # Connection status
+    ConnectionStatus = 'Unknown'
+    LastConnectivityCheck = $null
+    
+    # Performance metrics
+    Metrics = @{
+        TotalRequests = 0
+        SuccessfulRequests = 0
+        FailedRequests = 0
+        RetryCount = 0
+        AverageResponseTime = 0
+        LastResetTime = Get-Date
+    }
+    
+    # Cache settings
+    EnableCache = $true
+    CacheExpiryMinutes = 15
+    MaxCacheEntries = 1000
 }
 
-# Make authenticated Graph API request
+# Initialize M365 cache
+$global:M365Cache = @{
+    Users = @{}
+    Groups = @{}
+    Licenses = @{}
+    Teams = @{}
+    LastCleaned = Get-Date
+}
+
+# Enhanced Microsoft Graph access token with retry logic
+function Get-M365AccessToken {
+    param(
+        [int]$MaxRetries = 3
+    )
+    
+    # Check if current token is still valid
+    if ($global:M365Config.AccessToken -and $global:M365Config.TokenExpiry -gt (Get-Date).AddMinutes(5)) {
+        return $global:M365Config.AccessToken
+    }
+    
+    $retryCount = 0
+    $lastError = $null
+    
+    while ($retryCount -lt $MaxRetries) {
+        try {
+            Write-APILog "Requesting Microsoft 365 access token (attempt $($retryCount + 1)/$MaxRetries)" -Level "DEBUG"
+            
+            # Validate configuration
+            if (-not $global:M365Config.TenantId -or -not $global:M365Config.ClientId -or -not $global:M365Config.ClientSecret) {
+                throw "Microsoft 365 configuration is incomplete. Please check TenantId, ClientId, and ClientSecret."
+            }
+            
+            $tokenUrl = "https://login.microsoftonline.com/$($global:M365Config.TenantId)/oauth2/v2.0/token"
+            
+            $body = @{
+                client_id = $global:M365Config.ClientId
+                client_secret = $global:M365Config.ClientSecret
+                scope = $global:M365Config.Scopes -join " "
+                grant_type = "client_credentials"
+            }
+            
+            $splat = @{
+                Uri = $tokenUrl
+                Method = "POST"
+                Body = $body
+                ContentType = "application/x-www-form-urlencoded"
+                TimeoutSec = $global:M365Config.TimeoutSeconds
+                ErrorAction = "Stop"
+            }
+            
+            $response = Invoke-RestMethod @splat
+            
+            $global:M365Config.AccessToken = $response.access_token
+            $global:M365Config.TokenExpiry = (Get-Date).AddSeconds($response.expires_in - 300)  # 5 minute buffer
+            $global:M365Config.ConnectionStatus = 'Connected'
+            $global:M365Config.LastConnectivityCheck = Get-Date
+            
+            Write-APILog "Microsoft 365 access token obtained successfully" -Level "INFO"
+            return $response.access_token
+            
+        } catch {
+            $lastError = $_.Exception.Message
+            $retryCount++
+            $global:M365Config.ConnectionStatus = 'Error'
+            
+            Write-APILog "Failed to obtain M365 access token (attempt $retryCount/$MaxRetries): $lastError" -Level "WARNING"
+            
+            # Check if this is a retryable error
+            $isRetryable = $lastError -match "timeout|network|connection|temporary|rate|5\d\d"
+            
+            if ($retryCount -lt $MaxRetries -and $isRetryable) {
+                $delay = $global:M365Config.RetryDelaySeconds[[Math]::Min($retryCount - 1, $global:M365Config.RetryDelaySeconds.Length - 1)]
+                Write-APILog "Retrying M365 authentication in $delay seconds..." -Level "INFO"
+                Start-Sleep -Seconds $delay
+            } elseif (-not $isRetryable) {
+                Write-APILog "Non-retryable authentication error: $lastError" -Level "ERROR"
+                break
+            }
+        }
+    }
+    
+    $global:M365Config.Metrics.FailedRequests++
+    throw "Microsoft 365 authentication failed after $MaxRetries attempts: $lastError"
+}
+
+# Enhanced Graph API request with rate limiting and retry logic
 function Invoke-GraphAPIRequest {
     param(
         [string]$Endpoint,
         [string]$Method = "GET",
         [object]$Body = $null,
-        [switch]$UseBeta = $false
+        [switch]$UseBeta = $false,
+        [int]$MaxRetries = $null,
+        [switch]$SkipCache = $false
     )
     
-    try {
-        $token = Get-M365AccessToken
-        $baseUrl = if ($UseBeta) { $global:M365Config.BetaBaseUrl } else { $global:M365Config.GraphBaseUrl }
-        $uri = "$baseUrl/$Endpoint"
-        
-        $headers = @{
-            "Authorization" = "Bearer $token"
-            "Content-Type" = "application/json"
+    if (-not $MaxRetries) { $MaxRetries = $global:M365Config.MaxRetries }
+    $requestStart = Get-Date
+    $global:M365Config.Metrics.TotalRequests++
+    
+    # Check cache first (for GET requests)
+    if ($Method -eq "GET" -and -not $SkipCache -and $global:M365Config.EnableCache) {
+        $cacheKey = "$Method`:$Endpoint"
+        $cachedResult = Get-M365CachedResult -Key $cacheKey
+        if ($cachedResult) {
+            Write-APILog "Returning cached result for: $Endpoint" -Level "DEBUG"
+            return $cachedResult
         }
-        
-        $params = @{
-            Uri = $uri
-            Method = $Method
-            Headers = $headers
-        }
-        
-        if ($Body) {
-            $params.Body = $Body | ConvertTo-Json -Depth 10
-        }
-        
-        $response = Invoke-RestMethod @params
-        return $response
-        
-    } catch {
-        Write-APILog "Graph API request failed: $($_.Exception.Message)" -Level "ERROR"
-        throw "Graph API error: $($_.Exception.Message)"
     }
+    
+    # Check rate limiting
+    if (-not (Test-M365RateLimit)) {
+        throw "Microsoft 365 API rate limit exceeded. Please wait before making more requests."
+    }
+    
+    $retryCount = 0
+    $lastError = $null
+    
+    while ($retryCount -lt $MaxRetries) {
+        try {
+            $token = Get-M365AccessToken
+            $baseUrl = if ($UseBeta) { $global:M365Config.BetaBaseUrl } else { $global:M365Config.GraphBaseUrl }
+            $uri = "$baseUrl/$Endpoint"
+            
+            $headers = @{
+                "Authorization" = "Bearer $token"
+                "Content-Type" = "application/json"
+                "ConsistencyLevel" = "eventual"  # For advanced queries
+            }
+            
+            $params = @{
+                Uri = $uri
+                Method = $Method
+                Headers = $headers
+                TimeoutSec = $global:M365Config.TimeoutSeconds
+                ErrorAction = "Stop"
+            }
+            
+            if ($Body) {
+                $params.Body = $Body | ConvertTo-Json -Depth 10 -Compress
+            }
+            
+            Write-APILog "Making Graph API request: $Method $Endpoint" -Level "DEBUG"
+            
+            $response = Invoke-RestMethod @params
+            
+            # Update rate limit info from response headers
+            Update-M365RateLimit -Response $response
+            
+            # Cache successful GET responses
+            if ($Method -eq "GET" -and $global:M365Config.EnableCache -and -not $SkipCache) {
+                Set-M365CachedResult -Key "$Method`:$Endpoint" -Value $response
+            }
+            
+            # Update metrics
+            $responseTime = ((Get-Date) - $requestStart).TotalMilliseconds
+            Update-M365Metrics -Success $true -ResponseTime $responseTime -RetryCount $retryCount
+            
+            return $response
+            
+        } catch {
+            $lastError = $_.Exception.Message
+            $retryCount++
+            
+            # Parse HTTP status code
+            $statusCode = if ($_.Exception.Response) { $_.Exception.Response.StatusCode.value__ } else { 0 }
+            
+            Write-APILog "Graph API request failed (attempt $retryCount/$MaxRetries): $lastError (Status: $statusCode)" -Level "WARNING"
+            
+            # Handle specific error codes
+            $shouldRetry = $false
+            switch ($statusCode) {
+                429 {  # Too Many Requests
+                    $shouldRetry = $true
+                    $retryAfter = Get-RetryAfterHeader -Exception $_.Exception
+                    $delay = if ($retryAfter) { $retryAfter } else { [Math]::Pow(2, $retryCount) * 2 }
+                    Write-APILog "Rate limited. Waiting $delay seconds before retry..." -Level "INFO"
+                    Start-Sleep -Seconds $delay
+                }
+                503 {  # Service Unavailable
+                    $shouldRetry = $true
+                    $delay = [Math]::Pow(2, $retryCount) * 2
+                    Write-APILog "Service unavailable. Waiting $delay seconds before retry..." -Level "INFO"
+                    Start-Sleep -Seconds $delay
+                }
+                500 { # Internal Server Error
+                    $shouldRetry = $true
+                    $delay = [Math]::Pow(2, $retryCount) * 2
+                    Start-Sleep -Seconds $delay
+                }
+                401 {  # Unauthorized - token might be expired
+                    if ($retryCount -eq 1) {
+                        Write-APILog "Authentication failed, clearing token cache..." -Level "INFO"
+                        $global:M365Config.AccessToken = $null
+                        $global:M365Config.TokenExpiry = $null
+                        $shouldRetry = $true
+                    }
+                }
+                default {
+                    # For other errors, check if it's network-related
+                    if ($lastError -match "timeout|network|connection|DNS") {
+                        $shouldRetry = $true
+                        $delay = $global:M365Config.RetryDelaySeconds[[Math]::Min($retryCount - 1, $global:M365Config.RetryDelaySeconds.Length - 1)]
+                        Start-Sleep -Seconds $delay
+                    }
+                }
+            }
+            
+            if (-not $shouldRetry -or $retryCount -ge $MaxRetries) {
+                break
+            }
+        }
+    }
+    
+    # Update metrics for failed request
+    $responseTime = ((Get-Date) - $requestStart).TotalMilliseconds
+    Update-M365Metrics -Success $false -ResponseTime $responseTime -RetryCount $retryCount
+    $global:M365Config.Metrics.FailedRequests++
+    
+    throw "Graph API request failed after $MaxRetries attempts: $lastError"
 }
 
 # Get Microsoft 365 users
@@ -621,5 +805,215 @@ function Initialize-M365Tables {
     }
 }
 
-# Initialize tables on module load
+# Test Microsoft 365 rate limiting
+function Test-M365RateLimit {
+    $now = Get-Date
+    
+    # Reset rate limit tracking if needed
+    if ($now -gt $global:M365Config.RateLimit.Reset) {
+        $global:M365Config.RateLimit.Remaining = 10000  # Conservative estimate
+        $global:M365Config.RateLimit.Reset = $now.AddHours(1)
+    }
+    
+    # Check if we have enough requests remaining
+    $bufferRequests = [Math]::Ceiling($global:M365Config.RateLimit.Remaining * ($global:M365Config.RateLimitBuffer / 100))
+    return $global:M365Config.RateLimit.Remaining -gt $bufferRequests
+}
+
+# Update rate limit information from response headers
+function Update-M365RateLimit {
+    param($Response)
+    
+    try {
+        # Microsoft Graph uses different headers than standard REST APIs
+        # Look for throttling information in response
+        if ($Response.PSObject.Properties['@odata.deltaLink'] -or $Response.PSObject.Properties['@odata.nextLink']) {
+            # This is a successful response, assume good rate limit status
+            $global:M365Config.RateLimit.LastChecked = Get-Date
+        }
+    } catch {
+        # Ignore errors in rate limit parsing
+    }
+}
+
+# Get retry-after header value
+function Get-RetryAfterHeader {
+    param($Exception)
+    
+    try {
+        if ($Exception.Response -and $Exception.Response.Headers['Retry-After']) {
+            $retryAfter = $Exception.Response.Headers['Retry-After']
+            if ($retryAfter -match '^\\d+$') {
+                return [int]$retryAfter
+            }
+        }
+    } catch {
+        # Ignore errors
+    }
+    
+    return $null
+}
+
+# Get cached result
+function Get-M365CachedResult {
+    param([string]$Key)
+    
+    if (-not $global:M365Cache.ContainsKey($Key)) {
+        return $null
+    }
+    
+    $cached = $global:M365Cache[$Key]
+    $age = ((Get-Date) - $cached.Timestamp).TotalMinutes
+    
+    if ($age -gt $global:M365Config.CacheExpiryMinutes) {
+        $global:M365Cache.Remove($Key)
+        return $null
+    }
+    
+    return $cached.Data
+}
+
+# Set cached result
+function Set-M365CachedResult {
+    param(
+        [string]$Key,
+        [object]$Value
+    )
+    
+    # Limit cache size
+    if ($global:M365Cache.Count -gt $global:M365Config.MaxCacheEntries) {
+        Clear-M365ExpiredCache
+    }
+    
+    $global:M365Cache[$Key] = @{
+        Data = $Value
+        Timestamp = Get-Date
+    }
+}
+
+# Clear expired cache entries
+function Clear-M365ExpiredCache {
+    $now = Get-Date
+    $expiredKeys = @()
+    
+    foreach ($key in $global:M365Cache.Keys) {
+        if ($key -eq 'LastCleaned') { continue }
+        
+        $cached = $global:M365Cache[$key]
+        if ($cached -and $cached.Timestamp) {
+            $age = ($now - $cached.Timestamp).TotalMinutes
+            if ($age -gt $global:M365Config.CacheExpiryMinutes) {
+                $expiredKeys += $key
+            }
+        }
+    }
+    
+    foreach ($key in $expiredKeys) {
+        $global:M365Cache.Remove($key)
+    }
+    
+    $global:M365Cache.LastCleaned = $now
+    
+    if ($expiredKeys.Count -gt 0) {
+        Write-APILog \"Cleared $($expiredKeys.Count) expired M365 cache entries\" -Level \"DEBUG\"
+    }
+}
+
+# Update performance metrics
+function Update-M365Metrics {
+    param(
+        [bool]$Success,
+        [double]$ResponseTime,
+        [int]$RetryCount = 0
+    )
+    
+    if ($Success) {
+        $global:M365Config.Metrics.SuccessfulRequests++
+    }
+    
+    if ($RetryCount -gt 0) {
+        $global:M365Config.Metrics.RetryCount += $RetryCount
+    }
+    
+    # Update average response time
+    $total = $global:M365Config.Metrics.SuccessfulRequests + $global:M365Config.Metrics.FailedRequests
+    if ($total -gt 0) {
+        $global:M365Config.Metrics.AverageResponseTime = 
+            (($global:M365Config.Metrics.AverageResponseTime * ($total - 1)) + $ResponseTime) / $total
+    }
+}
+
+# Get M365 performance metrics
+function Get-M365PerformanceMetrics {
+    $uptime = ((Get-Date) - $global:M365Config.Metrics.LastResetTime).TotalHours
+    $totalRequests = $global:M365Config.Metrics.SuccessfulRequests + $global:M365Config.Metrics.FailedRequests
+    $successRate = if ($totalRequests -gt 0) { 
+        [math]::Round(($global:M365Config.Metrics.SuccessfulRequests / $totalRequests) * 100, 2) 
+    } else { 0 }
+    
+    return @{
+        TotalRequests = $totalRequests
+        SuccessfulRequests = $global:M365Config.Metrics.SuccessfulRequests
+        FailedRequests = $global:M365Config.Metrics.FailedRequests
+        SuccessRate = \"$successRate%\"
+        RetryCount = $global:M365Config.Metrics.RetryCount
+        AverageResponseTime = \"$([math]::Round($global:M365Config.Metrics.AverageResponseTime, 2))ms\"
+        ConnectionStatus = $global:M365Config.ConnectionStatus
+        LastConnectivityCheck = if ($global:M365Config.LastConnectivityCheck) {
+            $global:M365Config.LastConnectivityCheck.ToString(\"yyyy-MM-ddTHH:mm:ss.fffZ\")
+        } else { \"Never\" }
+        TokenExpiry = if ($global:M365Config.TokenExpiry) {
+            $global:M365Config.TokenExpiry.ToString(\"yyyy-MM-ddTHH:mm:ss.fffZ\")
+        } else { \"Not authenticated\" }
+        CacheSize = $global:M365Cache.Count - 1  # Exclude LastCleaned entry
+        UptimeHours = [math]::Round($uptime, 2)
+        RateLimitStatus = @{
+            Remaining = $global:M365Config.RateLimit.Remaining
+            Reset = $global:M365Config.RateLimit.Reset.ToString(\"yyyy-MM-ddTHH:mm:ss.fffZ\")
+        }
+    }
+}
+
+# Test Microsoft 365 connectivity
+function Test-M365Connectivity {
+    param(
+        [int]$TimeoutSeconds = 30
+    )
+    
+    try {
+        Write-APILog \"Testing Microsoft 365 connectivity...\" -Level \"DEBUG\"
+        
+        # Try to get a simple endpoint
+        $testResponse = Invoke-GraphAPIRequest -Endpoint \"organization\" -MaxRetries 1
+        
+        if ($testResponse -and $testResponse.value) {
+            $global:M365Config.ConnectionStatus = 'Connected'
+            $global:M365Config.LastConnectivityCheck = Get-Date
+            Write-APILog \"Microsoft 365 connectivity test successful\" -Level \"INFO\"
+            return $true
+        } else {
+            throw \"No data returned from test endpoint\"
+        }
+        
+    } catch {
+        $global:M365Config.ConnectionStatus = 'Error'
+        $global:M365Config.LastConnectivityCheck = Get-Date
+        Write-APILog \"Microsoft 365 connectivity test failed: $($_.Exception.Message)\" -Level \"ERROR\"
+        return $false
+    }
+}
+
+# Initialize tables and setup periodic cache cleanup
 Initialize-M365Tables
+
+# Setup cache cleanup timer (every 30 minutes)
+Register-EngineEvent -SourceIdentifier \"M365CacheCleanup\" -Forward
+$null = New-Object System.Timers.Timer | ForEach-Object {
+    $_.Interval = 1800000  # 30 minutes
+    $_.AutoReset = $true
+    $_.Add_Elapsed({ Clear-M365ExpiredCache })
+    $_.Start()
+    $global:M365CacheCleanupTimer = $_
+}
+
+Write-APILog \"Microsoft 365 integration initialized with enhanced error handling and rate limiting\" -Level \"INFO\""

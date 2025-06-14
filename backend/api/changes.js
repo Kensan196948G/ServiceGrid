@@ -298,6 +298,129 @@ const updateChange = (req, res) => {
 };
 
 /**
+ * 変更管理承認ワークフロー
+ */
+const approveChange = (req, res) => {
+  const { id } = req.params;
+  const { approval_comment, risk_assessment } = req.body;
+  
+  // 権限チェック（管理者・承認者のみ承認可能）
+  if (req.user && !['administrator', 'operator'].includes(req.user.role)) {
+    return res.status(403).json({ 
+      error: '変更要求を承認する権限がありません',
+      required_role: 'administrator or operator',
+      current_role: req.user.role
+    });
+  }
+  
+  const query = `
+    UPDATE changes 
+    SET status = 'Approved', approved_by = ?, approve_date = date('now'),
+        approval_comment = ?, risk_assessment = ?, updated_date = datetime('now')
+    WHERE change_id = ? AND status = 'Pending'
+  `;
+  
+  db.run(query, [req.user?.username, approval_comment, risk_assessment, id], function(err) {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'データベースエラーが発生しました' });
+    }
+    
+    if (this.changes === 0) {
+      return res.status(404).json({ error: '承認可能な変更要求が見つかりません' });
+    }
+    
+    // 監査ログ
+    const now = new Date().toISOString();
+    db.run(
+      'INSERT INTO logs (event_type, event_time, user, detail) VALUES (?, ?, ?, ?)',
+      ['CHANGE_APPROVE', now, req.user?.username || 'system', `Approved change request ID: ${id}`]
+    );
+    
+    res.json({ success: true, message: '変更要求が承認されました', change_id: id });
+  });
+};
+
+/**
+ * 変更管理却下
+ */
+const rejectChange = (req, res) => {
+  const { id } = req.params;
+  const { rejection_reason } = req.body;
+  
+  // 権限チェック（管理者・承認者のみ却下可能）
+  if (req.user && !['administrator', 'operator'].includes(req.user.role)) {
+    return res.status(403).json({ 
+      error: '変更要求を却下する権限がありません',
+      required_role: 'administrator or operator',
+      current_role: req.user.role
+    });
+  }
+  
+  const query = `
+    UPDATE changes 
+    SET status = 'Rejected', approved_by = ?, approve_date = date('now'),
+        rejection_reason = ?, updated_date = datetime('now')
+    WHERE change_id = ? AND status = 'Pending'
+  `;
+  
+  db.run(query, [req.user?.username, rejection_reason, id], function(err) {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'データベースエラーが発生しました' });
+    }
+    
+    if (this.changes === 0) {
+      return res.status(404).json({ error: '却下可能な変更要求が見つかりません' });
+    }
+    
+    // 監査ログ
+    const now = new Date().toISOString();
+    db.run(
+      'INSERT INTO logs (event_type, event_time, user, detail) VALUES (?, ?, ?, ?)',
+      ['CHANGE_REJECT', now, req.user?.username || 'system', `Rejected change request ID: ${id}`]
+    );
+    
+    res.json({ success: true, message: '変更要求が却下されました', change_id: id });
+  });
+};
+
+/**
+ * 変更管理実装完了
+ */
+const completeChange = (req, res) => {
+  const { id } = req.params;
+  const { completion_comment, implementation_date } = req.body;
+  
+  const query = `
+    UPDATE changes 
+    SET status = 'Completed', completion_comment = ?, 
+        implementation_date = ?, updated_date = datetime('now')
+    WHERE change_id = ? AND status = 'Approved'
+  `;
+  
+  db.run(query, [completion_comment, implementation_date || new Date().toISOString().split('T')[0], id], function(err) {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'データベースエラーが発生しました' });
+    }
+    
+    if (this.changes === 0) {
+      return res.status(404).json({ error: '完了可能な変更要求が見つかりません' });
+    }
+    
+    // 監査ログ
+    const now = new Date().toISOString();
+    db.run(
+      'INSERT INTO logs (event_type, event_time, user, detail) VALUES (?, ?, ?, ?)',
+      ['CHANGE_COMPLETE', now, req.user?.username || 'system', `Completed change request ID: ${id}`]
+    );
+    
+    res.json({ success: true, message: '変更要求が完了しました', change_id: id });
+  });
+};
+
+/**
  * 変更管理削除
  */
 const deleteChange = (req, res) => {
@@ -360,5 +483,8 @@ module.exports = {
   getChangeById,
   createChange,
   updateChange,
+  approveChange,
+  rejectChange,
+  completeChange,
   deleteChange
 };

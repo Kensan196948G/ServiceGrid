@@ -1,0 +1,60 @@
+# 開発用Docker Compose設定
+version: '3.8'
+
+services:
+  # 開発用バックエンド
+  backend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      target: base
+    container_name: servicegrid-backend-dev
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./data/db:/app/db
+      - ./data/logs:/app/logs
+    environment:
+      - NODE_ENV=development
+      - PORT=8082
+      - DB_PATH=/app/db/itsm.sqlite
+      - JWT_SECRET=dev_jwt_secret
+    ports:
+      - "8082:8082"
+    networks:
+      - servicegrid-dev-network
+    command: ["npm", "run", "dev"]
+
+  # 開発用フロントエンド
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      target: builder
+    container_name: servicegrid-frontend-dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_API_BASE_URL=http://localhost:8082
+    ports:
+      - "3000:3000"
+    networks:
+      - servicegrid-dev-network
+    command: ["npm", "run", "dev"]
+    depends_on:
+      - backend-dev
+
+  # 開発用Redis
+  redis-dev:
+    image: redis:7-alpine
+    container_name: servicegrid-redis-dev
+    ports:
+      - "6379:6379"
+    networks:
+      - servicegrid-dev-network
+
+networks:
+  servicegrid-dev-network:
+    driver: bridge

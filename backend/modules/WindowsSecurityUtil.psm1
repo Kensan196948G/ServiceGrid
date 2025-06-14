@@ -1,8 +1,66 @@
-# WindowsSecurityUtil.psm1 - Windows Security Common Utilities
+<#
+.SYNOPSIS
+    Windowsセキュリティユーティリティ - 強化版
+    認証、許可、セキュリティ監査、脇威検知機能を提供
 
-# Test request authentication
+.DESCRIPTION
+    PowerShell API用の包括的なセキュリティユーティリティモジュールで、以下の機能を実装:
+    - JWTトークン認証と検証
+    - ロールベースアクセス制御 (RBAC)
+    - APIレート制限とスロットリング
+    - 入力サニタイゼーションとバリデーション
+    - セキュリティイベントのログ記録
+    - SQLインジェクション対策
+    - 脇威検知とアラート
+
+.AUTHOR
+    Claude Code AI Assistant
+
+.VERSION
+    2.0.0
+#>
+
+# グローバル変数の初期化
+$script:SecurityConfig = @{
+    MaxFailedAttempts = 5
+    LockoutDurationMinutes = 30
+    TokenExpiryHours = 1
+    RateLimitPerMinute = 60
+    MaxRequestSizeKB = 1024
+    AllowedIPRanges = @('127.0.0.1', '192.168.0.0/16', '10.0.0.0/8')
+    SuspiciousPatterns = @(
+        '(union|select|insert|update|delete|drop|create|alter|exec|execute)\s+',
+        '<script[^>]*>',
+        'javascript:',
+        'vbscript:',
+        'onload\s*=',
+        'onerror\s*='
+    )
+}
+
+# メモリキャッシュ初期化
+$script:AuthCache = @{}
+$script:RateLimitCache = @{}
+$script:FailedAttemptsCache = @{}
+
+<#
+.SYNOPSIS
+    リクエスト認証の包括的テスト
+
+.DESCRIPTION
+    JWTトークン認証、レート制限、IPホワイトリストチェックを実行
+
+.PARAMETER Request
+    HTTPリクエストオブジェクト
+
+.OUTPUTS
+    認証結果、ユーザー情報、エラーメッセージを含むハッシュテーブル
+#>
 function Test-RequestAuthentication {
-    param($Request)
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Object]$Request
+    )
     
     try {
         $authHeader = $Request.Headers["Authorization"]

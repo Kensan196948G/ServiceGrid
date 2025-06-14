@@ -1,6 +1,10 @@
-// 資産管理APIとの連携サービス
+/**
+ * 資産管理APIとの連携サービス
+ * エラーハンドリング・リトライ機能を含む包括的なAPIクライアント
+ */
 import { Asset, ItemStatus } from '../types';
 import { apiGet, apiPost, apiPut, apiDelete, ApiError } from './apiUtils';
+import { handleApiError } from '../utils/errorHandler';
 
 // API レスポンス型定義
 interface ApiResponse<T> {

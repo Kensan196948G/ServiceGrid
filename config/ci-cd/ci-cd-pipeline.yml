@@ -1,0 +1,530 @@
+# ServiceGrid ITSM Platform CI/CD Pipeline
+# GitHub Actions & Azure DevOps対応の包括的なパイプライン設定
+
+name: ServiceGrid CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # 毎日午前2時に自動実行
+    - cron: '0 2 * * *'
+
+env:
+  NODE_VERSION: '18.x'
+  POWERSHELL_VERSION: '7.x'
+  DATABASE_PATH: './backend/db/itsm.sqlite'
+  FRONTEND_PORT: 3001
+  BACKEND_PORT: 8082
+
+jobs:
+  # =====================================================
+  # セットアップとビルド
+  # =====================================================
+  setup-and-build:
+    name: Setup and Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+          
+    - name: Install dependencies
+      run: |
+        npm ci
+        npm audit fix --audit-level moderate
+        
+    - name: Build application
+      run: |
+        npm run build
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-artifacts-${{ matrix.node-version }}
+        path: |
+          dist/
+          build/
+        retention-days: 7
+
+  # =====================================================
+  # 静的解析とコード品質
+  # =====================================================
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    needs: setup-and-build
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: TypeScript type checking
+      run: npm run typecheck
+      
+    - name: ESLint analysis
+      run: |
+        npm run lint
+        npm run lint -- --format json --output-file eslint-report.json
+        
+    - name: Upload ESLint report
+      uses: actions/upload-artifact@v3
+      with:
+        name: eslint-report
+        path: eslint-report.json
+        
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # =====================================================
+  # 単体テストとカバレッジ
+  # =====================================================
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: setup-and-build
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run unit tests
+      run: |
+        npm run test -- --coverage --watchAll=false --maxWorkers=2
+        
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results
+        path: |
+          coverage/
+          test-results.xml
+
+  # =====================================================
+  # 統合テスト
+  # =====================================================
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [setup-and-build]
+    timeout-minutes: 20
+    
+    services:
+      sqlite:
+        image: sqlite:latest
+        options: >-
+          --health-cmd "sqlite3 --version"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Initialize database
+      run: |
+        node backend/scripts/init-database.js
+        node backend/scripts/init-assets-db.js
+        
+    - name: Start backend server
+      run: |
+        PORT=${{ env.BACKEND_PORT }} node backend/start-server.js &
+        sleep 10
+        
+    - name: Run API tests
+      run: |
+        npm run test:api
+        
+    - name: Health check
+      run: |
+        curl -f http://localhost:${{ env.BACKEND_PORT }}/api/health || exit 1
+        
+    - name: Stop servers
+      run: |
+        pkill -f "node backend"
+
+  # =====================================================
+  # パフォーマンステスト
+  # =====================================================
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [setup-and-build]
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Initialize database
+      run: |
+        node backend/scripts/init-database.js
+        node backend/scripts/create-test-data.js
+        
+    - name: Start servers
+      run: |
+        PORT=${{ env.BACKEND_PORT }} node backend/start-server.js &
+        npm run dev &
+        sleep 15
+        
+    - name: Run performance tests
+      run: |
+        node performance-test-enhanced.cjs
+        
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: performance-report-enhanced-*.json
+        
+    - name: Stop servers
+      run: |
+        pkill -f "node backend"
+        pkill -f "npm run dev"
+
+  # =====================================================
+  # セキュリティテスト
+  # =====================================================
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    needs: [setup-and-build]
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: NPM Security Audit
+      run: |
+        npm audit --audit-level moderate
+        
+    - name: Snyk Security Scan
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=medium
+        
+    - name: Start servers for security testing
+      run: |
+        PORT=${{ env.BACKEND_PORT }} node backend/start-server.js &
+        sleep 10
+        
+    - name: Run security audit
+      run: |
+        node security-audit-enhanced.cjs
+        
+    - name: Upload security results
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-results
+        path: security-audit-report-*.json
+        
+    - name: Stop servers
+      run: |
+        pkill -f "node backend"
+
+  # =====================================================
+  # PowerShell テスト（Windows環境）
+  # =====================================================
+  powershell-tests:
+    name: PowerShell Tests
+    runs-on: windows-latest
+    needs: [setup-and-build]
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup PowerShell
+      shell: pwsh
+      run: |
+        $PSVersionTable
+        Install-Module -Name Pester -Force -SkipPublisherCheck
+        
+    - name: Test PowerShell modules
+      shell: pwsh
+      run: |
+        Import-Module .\backend\modules\DBUtil.psm1 -Force
+        Import-Module .\backend\modules\AuthUtil.psm1 -Force
+        Import-Module .\backend\modules\LogUtil.psm1 -Force
+        
+    - name: Run PowerShell tests
+      shell: pwsh
+      run: |
+        Invoke-Pester -Path .\backend\test\ -OutputFile TestResults.xml -OutputFormat NUnitXml
+        
+    - name: Upload PowerShell test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: powershell-test-results
+        path: TestResults.xml
+
+  # =====================================================
+  # E2Eテスト
+  # =====================================================
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    needs: [integration-tests]
+    timeout-minutes: 25
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Playwright
+      run: |
+        npx playwright install --with-deps chromium
+        
+    - name: Initialize database
+      run: |
+        node backend/scripts/init-database.js
+        node backend/scripts/create-test-data.js
+        
+    - name: Start application
+      run: |
+        PORT=${{ env.BACKEND_PORT }} node backend/start-server.js &
+        npm run dev &
+        sleep 20
+        
+    - name: Run E2E tests
+      run: |
+        npx playwright test
+        
+    - name: Upload E2E results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: e2e-results
+        path: |
+          test-results/
+          playwright-report/
+          
+    - name: Stop application
+      run: |
+        pkill -f "node backend"
+        pkill -f "npm run dev"
+
+  # =====================================================
+  # デプロイメント（Staging）
+  # =====================================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [code-quality, unit-tests, integration-tests, security-tests]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-artifacts-18.x
+        
+    - name: Deploy to staging
+      run: |
+        echo "Deploying to staging environment..."
+        # 実際のデプロイメントコマンドをここに配置
+        
+    - name: Run smoke tests
+      run: |
+        echo "Running smoke tests on staging..."
+        curl -f https://staging.servicegrid.example.com/api/health
+        
+    - name: Notify deployment
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+  # =====================================================
+  # デプロイメント（Production）
+  # =====================================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, e2e-tests, performance-tests]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-artifacts-18.x
+        
+    - name: Blue-Green deployment preparation
+      run: |
+        echo "Preparing blue-green deployment..."
+        
+    - name: Deploy to production
+      run: |
+        echo "Deploying to production environment..."
+        # 実際のデプロイメントコマンドをここに配置
+        
+    - name: Health check
+      run: |
+        echo "Production health check..."
+        curl -f https://servicegrid.example.com/api/health
+        
+    - name: Rollback on failure
+      if: failure()
+      run: |
+        echo "Rolling back deployment..."
+        # ロールバックコマンドをここに配置
+        
+    - name: Notify production deployment
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#production'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+  # =====================================================
+  # 監視とアラート
+  # =====================================================
+  post-deployment-monitoring:
+    name: Post-Deployment Monitoring
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: always()
+    timeout-minutes: 10
+    
+    steps:
+    - name: Setup monitoring
+      run: |
+        echo "Setting up post-deployment monitoring..."
+        
+    - name: Performance baseline check
+      run: |
+        echo "Checking performance baseline..."
+        
+    - name: Security baseline check
+      run: |
+        echo "Checking security baseline..."
+        
+    - name: Generate deployment report
+      run: |
+        echo "Generating deployment report..."
+        
+    - name: Upload monitoring results
+      uses: actions/upload-artifact@v3
+      with:
+        name: monitoring-results
+        path: monitoring-report.json
+
+# =====================================================
+# 共通設定とマトリクス
+# =====================================================
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ジョブ間の依存関係可視化
+# setup-and-build → [code-quality, unit-tests, integration-tests, performance-tests, security-tests, powershell-tests]
+# integration-tests → e2e-tests
+# [code-quality, unit-tests, integration-tests, security-tests] → deploy-staging
+# [deploy-staging, e2e-tests, performance-tests] → deploy-production
+# deploy-production → post-deployment-monitoring

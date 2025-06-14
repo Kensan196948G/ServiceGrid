@@ -9,6 +9,25 @@ PROJECT_ROOT="/mnt/e/ServiceGrid"
 FEATURE_NAME="Feature-C: API開発"
 BACKEND_DIR="$PROJECT_ROOT/backend"
 
+# Claude自動起動設定
+setup_claude() {
+    echo "🤖 Claude自動起動設定中..."
+    
+    # .envからAPIキー読み込み
+    if [ -f "$PROJECT_ROOT/.env" ]; then
+        export $(grep -v '^#' "$PROJECT_ROOT/.env" | xargs)
+    fi
+    
+    # Claude起動
+    if command -v claude &> /dev/null; then
+        echo "🔧 Feature-C専用Claude起動中..."
+        echo "✅ Claude起動完了"
+        exec claude
+    else
+        echo "⚠️ claudeコマンドが見つかりません"
+    fi
+}
+
 # 色付きメッセージ関数
 print_header() {
     echo -e "\033[1;33m========================================\033[0m"
@@ -106,7 +125,7 @@ run_api_tests() {
     # APIサーバー稼働確認
     if ! pgrep -f "node.*8082" > /dev/null; then
         print_warning "APIサーバーが起動していません"
-        print_info "APIサーバーを起動しますか？ (y/n)"
+        print_info "APIサーバーを起動しますか？ y/n"
         read -r response
         if [[ "$response" =~ ^[Yy]$ ]]; then
             start_api_server
@@ -153,7 +172,7 @@ run_api_tests() {
     
     if [ "$test_files_found" = false ]; then
         print_warning "テストファイルが見つかりません"
-        print_info "基本的なAPIテストを生成しますか？ (y/n)"
+        print_info "基本的なAPIテストを生成しますか？ y/n"
         read -r response
         if [[ "$response" =~ ^[Yy]$ ]]; then
             generate_basic_api_tests
@@ -372,7 +391,7 @@ generate_api_endpoints() {
     fi
     
     print_info "不足しているAPI: ${missing_apis[*]}"
-    print_info "基本的なAPIテンプレートを生成しますか？ (y/n)"
+    print_info "基本的なAPIテンプレートを生成しますか？ y/n"
     read -r response
     
     if [[ "$response" =~ ^[Yy]$ ]]; then
@@ -712,7 +731,7 @@ run_full_auto_mode() {
     
     echo ""
     print_success "全自動開発モード完了"
-    print_info "継続監視を開始しますか？ (y/n)"
+    print_info "継続監視を開始しますか？ y/n"
     read -r response
     if [[ "$response" =~ ^[Yy]$ ]]; then
         continuous_api_monitoring
@@ -895,4 +914,6 @@ main_loop() {
 }
 
 # スクリプト開始
+print_header
+setup_claude
 main_loop

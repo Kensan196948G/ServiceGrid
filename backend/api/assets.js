@@ -1,4 +1,7 @@
-// 資産管理API実装
+/**
+ * 資産管理API実装 - 強化版
+ * CRUD操作、バリデーション、統計情報、サーチ機能を含む包括的なAPI
+ */
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const {
@@ -19,13 +22,90 @@ const {
 
 const DB_PATH = path.join(__dirname, '..', 'db', 'itsm.sqlite');
 
+// キャッシュ管理用のメモリストア
+const cache = {
+  assets: new Map(),
+  stats: null,
+  lastUpdated: null
+};
+
+const CACHE_TTL = 5 * 60 * 1000; // 5分間
+
 // データベース接続取得
 function getDbConnection() {
-  return new sqlite3.Database(DB_PATH);
+  return new sqlite3.Database(DB_PATH, (err) => {
+    if (err) {
+      console.error('データベース接続エラー:', err.message);
+    }
+  });
 }
 
-// 資産タグ生成関数
-function generateAssetTag(type) {
+/**
+ * 資産バリデーションルール
+ */
+const ASSET_VALIDATION_RULES = {
+  name: { required: true, maxLength: 200 },
+  type: { required: true, enum: ['Server', 'Desktop', 'Laptop', 'Tablet', 'Phone', 'Network Equipment', 'Storage', 'Printer', 'Monitor', 'Peripheral', 'Software', 'License', 'Virtual Machine', 'Cloud Service', 'Other'] },
+  status: { required: true, enum: ['Active', 'Inactive', 'Maintenance', 'Retired'] },
+  asset_tag: { required: true, pattern: /^[A-Z]{2,4}-\d{3,4}$/ },
+  purchase_cost: { type: 'number', min: 0 },
+  ip_address: { pattern: /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/ },
+  mac_address: { pattern: /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/ },
+  email: { pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ }
+};
+
+/**
+ * 資産データのバリデーション
+ */
+function validateAssetData(data, isUpdate = false) {
+  const errors = [];
+  
+  Object.keys(ASSET_VALIDATION_RULES).forEach(field => {
+    const rule = ASSET_VALIDATION_RULES[field];
+    const value = data[field];
+    
+    // 更新時は必須チェックをスキップ
+    if (rule.required && !isUpdate && (!value || value.toString().trim() === '')) {
+      errors.push(`${field}は必須項目です`);
+      return;
+    }
+    
+    if (value) {
+      // 最大長チェック
+      if (rule.maxLength && value.toString().length > rule.maxLength) {
+        errors.push(`${field}は${rule.maxLength}文字以内で入力してください`);
+      }
+      
+      // 列挙型チェック
+      if (rule.enum && !rule.enum.includes(value)) {
+        errors.push(`${field}の値が無効です: ${value}`);
+      }
+      
+      // パターンチェック
+      if (rule.pattern && !rule.pattern.test(value)) {
+        errors.push(`${field}の形式が正しくありません`);
+      }
+      
+      // 数値チェック
+      if (rule.type === 'number') {
+        const num = Number(value);
+        if (isNaN(num)) {
+          errors.push(`${field}は数値で入力してください`);
+        } else if (rule.min !== undefined && num < rule.min) {
+          errors.push(`${field}は${rule.min}以上で入力してください`);
+        }
+      }
+    }
+  });
+  
+  return errors;
+}
+
+/**
+ * 資産タグ生成関数 - 順番ベースで管理
+ * タイプ別に順番を管理して一意なタグを生成
+ */
+async function generateAssetTag(type) {
   const tagPrefixes = {
     'Server': 'SRV',
     'Desktop': 'DSK', 
@@ -45,7 +125,23 @@ function generateAssetTag(type) {
   };
   
   const prefix = tagPrefixes[type] || 'AST';
-  return `${prefix}-${String(Date.now()).slice(-6)}`;
+  
+  // タイプ別の最大順番を取得
+  const db = getDbConnection();
+  return new Promise((resolve, reject) => {
+    const query = 'SELECT MAX(CAST(SUBSTR(asset_tag, INSTR(asset_tag, "-") + 1) AS INTEGER)) as max_num FROM assets WHERE asset_tag LIKE ?';
+    db.get(query, [`${prefix}-%`], (err, row) => {
+      db.close();
+      if (err) {
+        reject(err);
+        return;
+      }
+      
+      const nextNum = (row?.max_num || 0) + 1;
+      const tag = `${prefix}-${String(nextNum).padStart(3, '0')}`;
+      resolve(tag);
+    });
+  });
 }
 
 // 次の連番資産タグ生成関数

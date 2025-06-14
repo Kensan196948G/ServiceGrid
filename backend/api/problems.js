@@ -3,6 +3,21 @@ const path = require('path');
 const bcrypt = require('bcrypt');
 require('dotenv').config();
 
+// 統一レスポンスハンドラー
+const {
+  sendPaginatedSuccess,
+  sendStatsSuccess,
+  sendSuccess,
+  sendCreatedSuccess,
+  sendUpdatedSuccess,
+  sendDeletedSuccess,
+  sendError,
+  sendValidationError,
+  sendAuthorizationError,
+  sendNotFoundError,
+  sendDatabaseError
+} = require('../middleware/responseHandler');
+
 // データベース接続
 const dbPath = path.join(__dirname, '..', process.env.DB_PATH || 'db/itsm.sqlite');
 const db = new sqlite3.Database(dbPath);
@@ -146,7 +161,7 @@ const getProblemStats = (req, res) => {
     });
   }))
   .then(([totalResult, statusResult, priorityResult, categoryResult, dailyResult, ackTimeResult, resolutionTimeResult, closureTimeResult, knownErrorsResult, overdueResult]) => {
-    res.json({
+    const stats = {
       total: totalResult[0].total,
       by_status: statusResult.reduce((acc, row) => {
         acc[row.status] = row.count;
@@ -168,7 +183,9 @@ const getProblemStats = (req, res) => {
         known_errors: knownErrorsResult[0].known_errors || 0,
         overdue_problems: overdueResult[0].overdue_problems || 0
       }
-    });
+    };
+    
+    return sendStatsSuccess(res, stats, '問題管理統計を正常に取得しました');
   })
   .catch(err => {
     console.error('Database error:', err);
@@ -700,17 +717,17 @@ const resolveProblem = (req, res) => {
 };
 
 /**
- * インシデントと問題の関連付け
+ * インシデントと問題の関連付け（強化版）
  */
 const linkIncident = (req, res) => {
   const { id } = req.params;
-  const { incident_id, relationship_type = 'Caused By' } = req.body;
+  const { incident_id, relationship_type = 'Caused By', impact_assessment, resolution_notes } = req.body;
   
   if (!incident_id) {
     return res.status(400).json({ error: 'インシデントIDは必須です' });
   }
   
-  const validRelationships = ['Caused By', 'Related To', 'Duplicate Of'];
+  const validRelationships = ['Caused By', 'Related To', 'Duplicate Of', 'Root Cause', 'Workaround'];
   if (!validRelationships.includes(relationship_type)) {
     return res.status(400).json({ 
       error: '無効な関連タイプです',
@@ -718,24 +735,27 @@ const linkIncident = (req, res) => {
     });
   }
   
-  // 問題とインシデントの存在確認
+  // 問題とインシデントの詳細確認
   const checkQuery = `
     SELECT 
-      (SELECT COUNT(*) FROM problems WHERE problem_id = ?) as problem_exists,
-      (SELECT COUNT(*) FROM incidents WHERE incident_id = ?) as incident_exists
+      p.problem_id, p.title as problem_title, p.status as problem_status, p.priority as problem_priority,
+      i.incident_id, i.title as incident_title, i.status as incident_status, i.priority as incident_priority
+    FROM problems p
+    CROSS JOIN incidents i
+    WHERE p.problem_id = ? AND i.incident_id = ?
   `;
   
-  db.get(checkQuery, [id, incident_id], (err, counts) => {
+  db.get(checkQuery, [id, incident_id], (err, data) => {
     if (err) {
       console.error('Database error:', err);
       return res.status(500).json({ error: 'データベースエラーが発生しました' });
     }
     
-    if (counts.problem_exists === 0) {
+    if (!data || !data.problem_id) {
       return res.status(404).json({ error: '問題が見つかりません' });
     }
     
-    if (counts.incident_exists === 0) {
+    if (!data.incident_id) {
       return res.status(404).json({ error: 'インシデントが見つかりません' });
     }
     
@@ -753,42 +773,65 @@ const linkIncident = (req, res) => {
           return res.status(400).json({ error: '既に同じ関連が存在します' });
         }
         
-        // 関連付け実行
+        // 拡張関連付け実行
         const insertQuery = `
-          INSERT INTO incident_problem_relationships (incident_id, problem_id, relationship_type, created_by_user_id)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO incident_problem_relationships (
+            incident_id, problem_id, relationship_type, impact_assessment, 
+            resolution_notes, created_by_user_id, created_date
+          )
+          VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
         `;
         
-        db.run(insertQuery, [incident_id, id, relationship_type, req.user?.user_id], function(err) {
+        db.run(insertQuery, [
+          incident_id, id, relationship_type, impact_assessment, 
+          resolution_notes, req.user?.user_id
+        ], function(err) {
           if (err) {
             console.error('Database error:', err);
             return res.status(500).json({ error: 'データベースエラーが発生しました' });
           }
           
+          // 優先度自動調整（高優先度のインシデントが関連する場合）
+          if (data.incident_priority === 'Critical' && data.problem_priority !== 'Critical') {
+            db.run(
+              'UPDATE problems SET priority = ?, updated_date = datetime(\'now\'), updated_by_user_id = ? WHERE problem_id = ?',
+              ['Critical', req.user?.user_id, id]
+            );
+          }
+          
           // 監査ログ記録
           const logData = {
-            event_type: 'Data Modification',
-            event_subtype: 'Problem Incident Link',
+            event_type: 'Problem Management',
+            event_subtype: 'Incident Link Enhanced',
             user_id: req.user?.user_id,
             username: req.user?.username || 'system',
             action: 'Create',
             target_table: 'incident_problem_relationships',
             target_record_id: this.lastID,
-            details: `Linked incident ${incident_id} to problem ${id} (${relationship_type})`
+            new_values: JSON.stringify({
+              incident_id, problem_id: id, relationship_type, impact_assessment
+            }),
+            details: `Enhanced link: ${data.incident_title} (${relationship_type}) → ${data.problem_title}`
           };
           
           db.run(
             `INSERT INTO logs (
               event_type, event_subtype, user_id, username, action, 
-              target_table, target_record_id, details
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              target_table, target_record_id, new_values, details
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             Object.values(logData)
           );
           
           res.json({
             success: true,
             message: 'インシデントと問題が正常に関連付けられました',
-            relationship_id: this.lastID
+            relationship_id: this.lastID,
+            relationship_details: {
+              incident: { id: data.incident_id, title: data.incident_title, priority: data.incident_priority },
+              problem: { id: data.problem_id, title: data.problem_title, priority: data.problem_priority },
+              relationship_type,
+              impact_assessment
+            }
           });
         });
       }
@@ -1034,6 +1077,113 @@ const deleteProblem = (req, res) => {
   );
 };
 
+/**
+ * インシデント関連の問題を一括取得
+ */
+const getProblemsForIncident = (req, res) => {
+  const { incident_id } = req.params;
+  
+  const query = `
+    SELECT 
+      p.problem_id, p.problem_number, p.title, p.description, p.status, 
+      p.priority, p.category, p.root_cause, p.workaround,
+      ipr.relationship_type, ipr.impact_assessment, ipr.created_date as linked_date,
+      u_reporter.username as reporter_username, u_reporter.display_name as reporter_name
+    FROM incident_problem_relationships ipr
+    JOIN problems p ON ipr.problem_id = p.problem_id
+    LEFT JOIN users u_reporter ON p.reporter_user_id = u_reporter.user_id
+    WHERE ipr.incident_id = ?
+    ORDER BY ipr.created_date DESC, p.priority DESC
+  `;
+  
+  db.all(query, [incident_id], (err, rows) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'データベースエラーが発生しました' });
+    }
+    
+    res.json({
+      success: true,
+      incident_id,
+      related_problems: rows,
+      total_count: rows.length
+    });
+  });
+};
+
+/**
+ * 問題の解決状況に基づくインシデント推奨アクション
+ */
+const getIncidentRecommendations = (req, res) => {
+  const { id } = req.params;
+  
+  const query = `
+    SELECT 
+      p.problem_id, p.title, p.status, p.priority, p.root_cause, p.workaround, p.permanent_solution,
+      COUNT(ipr.incident_id) as related_incident_count,
+      GROUP_CONCAT(DISTINCT i.status) as incident_statuses,
+      GROUP_CONCAT(DISTINCT ipr.relationship_type) as relationship_types
+    FROM problems p
+    LEFT JOIN incident_problem_relationships ipr ON p.problem_id = ipr.problem_id
+    LEFT JOIN incidents i ON ipr.incident_id = i.incident_id
+    WHERE p.problem_id = ?
+    GROUP BY p.problem_id
+  `;
+  
+  db.get(query, [id], (err, problem) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'データベースエラーが発生しました' });
+    }
+    
+    if (!problem) {
+      return res.status(404).json({ error: '問題が見つかりません' });
+    }
+    
+    // 推奨アクション生成
+    const recommendations = [];
+    
+    if (problem.status === 'Known Error' && problem.workaround) {
+      recommendations.push({
+        action: 'apply_workaround',
+        priority: 'high',
+        description: '既知のエラーの回避策を関連インシデントに適用',
+        details: problem.workaround
+      });
+    }
+    
+    if (problem.status === 'Resolved' && problem.permanent_solution) {
+      recommendations.push({
+        action: 'close_related_incidents',
+        priority: 'high',
+        description: '問題解決済みのため関連インシデントを終了',
+        details: problem.permanent_solution
+      });
+    }
+    
+    if (problem.priority === 'Critical' && problem.related_incident_count > 3) {
+      recommendations.push({
+        action: 'escalate_problem',
+        priority: 'critical',
+        description: '複数の重要インシデントに影響する問題のエスカレーション',
+        details: `${problem.related_incident_count}件の関連インシデントが存在`
+      });
+    }
+    
+    res.json({
+      success: true,
+      problem: {
+        id: problem.problem_id,
+        title: problem.title,
+        status: problem.status,
+        priority: problem.priority,
+        related_incident_count: problem.related_incident_count
+      },
+      recommendations
+    });
+  });
+};
+
 module.exports = {
   getProblems,
   getProblemStats,
@@ -1044,5 +1194,7 @@ module.exports = {
   markAsKnownError,
   resolveProblem,
   linkIncident,
+  getProblemsForIncident,
+  getIncidentRecommendations,
   deleteProblem
 };

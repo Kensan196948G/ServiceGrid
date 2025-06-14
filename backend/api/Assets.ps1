@@ -1,9 +1,58 @@
-# Assets.ps1 - 資産管理API
+<#
+.SYNOPSIS
+    資産管理API - PowerShell強化版
+    企業レベルのCMDB機能、自動タグ生成、統計情報、セキュリティ機能を実装
 
-Import-Module "$PSScriptRoot/../modules/DBUtil.psm1"
-Import-Module "$PSScriptRoot/../modules/AuthUtil.psm1"
-Import-Module "$PSScriptRoot/../modules/LogUtil.psm1"
-Import-Module "$PSScriptRoot/../modules/Config.psm1"
+.DESCRIPTION
+    ITSM準拠の資産管理システムで、以下の機能を提供:
+    - CRUD操作とバリデーション
+    - 自動資産タグ生成
+    - 高度なフィルタリングと検索
+    - CSVインポート/エクスポート
+    - 統計情報とレポート生成
+    - セキュリティ監査ログ
+
+.AUTHOR
+    Claude Code AI Assistant
+
+.VERSION
+    2.0.0
+#>
+
+# 必要なモジュールのインポート
+try {
+    Import-Module "$PSScriptRoot/../modules/DBUtil.psm1" -ErrorAction Stop
+    Import-Module "$PSScriptRoot/../modules/AuthUtil.psm1" -ErrorAction Stop
+    Import-Module "$PSScriptRoot/../modules/LogUtil.psm1" -ErrorAction Stop
+    Import-Module "$PSScriptRoot/../modules/Config.psm1" -ErrorAction Stop
+    Import-Module "$PSScriptRoot/../modules/WindowsSecurityUtil.psm1" -ErrorAction Stop
+} catch {
+    Write-Error "モジュールのインポートに失敗しました: $($_.Exception.Message)"
+    exit 1
+}
+
+# グローバル変数の初期化
+$script:AssetTypeMapping = @{
+    'Server' = 'SRV'
+    'Desktop' = 'DSK'
+    'Laptop' = 'LAP'
+    'Tablet' = 'TAB'
+    'Phone' = 'PHN'
+    'Network Equipment' = 'NET'
+    'Storage' = 'STG'
+    'Printer' = 'PRT'
+    'Monitor' = 'MON'
+    'Peripheral' = 'PER'
+    'Software' = 'SFT'
+    'License' = 'LIC'
+    'Virtual Machine' = 'VM'
+    'Cloud Service' = 'CLD'
+    'Other' = 'OTH'
+}
+
+$script:AssetStatuses = @('Active', 'Inactive', 'Maintenance', 'Retired')
+$script:RequiredFields = @('name', 'type', 'status')
+$script:MaxRecordsPerRequest = 1000
 
 function Get-Assets {
     param(

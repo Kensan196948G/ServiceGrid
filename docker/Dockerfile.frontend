@@ -1,0 +1,56 @@
+# フロントエンド用Dockerfile
+# マルチステージビルドでサイズ最適化
+FROM node:20-alpine AS builder
+
+# 作業ディレクトリを設定
+WORKDIR /app
+
+# package.jsonとpackage-lock.jsonをコピー
+COPY package*.json ./
+
+# 依存関係をインストール
+RUN npm ci --only=production
+
+# ソースコードをコピー
+COPY . .
+
+# TypeScript型チェック
+RUN npm run typecheck
+
+# プロダクションビルド
+RUN npm run build
+
+# Nginxを使用した本番環境
+FROM nginx:alpine AS production
+
+# セキュリティ設定
+RUN apk add --no-cache \
+    curl \
+    && rm -rf /var/cache/apk/*
+
+# ビルド結果をコピー
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Nginx設定ファイルをコピー
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY docker/default.conf /etc/nginx/conf.d/default.conf
+
+# ヘルスチェック設定
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:80/health || exit 1
+
+# ポート開放
+EXPOSE 80
+
+# 非rootユーザーで実行
+RUN addgroup -g 1001 -S nginx && \
+    adduser -S -D -H -u 1001 -h /var/cache/nginx -s /sbin/nologin -G nginx nginx && \
+    chown -R nginx:nginx /usr/share/nginx/html && \
+    chown -R nginx:nginx /var/cache/nginx && \
+    chown -R nginx:nginx /var/log/nginx && \
+    chmod -R 755 /usr/share/nginx/html
+
+USER nginx
+
+# Nginxを起動
+CMD ["nginx", "-g", "daemon off;"]

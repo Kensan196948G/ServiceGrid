@@ -411,6 +411,199 @@ const updateRelease = (req, res) => {
 };
 
 /**
+ * リリース承認ワークフロー
+ */
+const approveRelease = (req, res) => {
+  const { id } = req.params;
+  const { approval_comment, go_live_date } = req.body;
+  
+  // 権限チェック（管理者・オペレータのみ承認可能）
+  if (!req.user || !['administrator', 'operator'].includes(req.user.role)) {
+    return res.status(403).json({ 
+      error: 'リリースを承認する権限がありません',
+      required_role: ['administrator', 'operator'],
+      current_role: req.user?.role
+    });
+  }
+  
+  const query = `
+    UPDATE releases 
+    SET status = 'Approved', approval_comment = ?, go_live_date = ?, 
+        updated_date = datetime('now'), updated_by_user_id = ?
+    WHERE release_id = ? AND status = 'Ready for Approval'
+  `;
+  
+  db.run(query, [approval_comment, go_live_date, req.user.userId, id], function(err) {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'データベースエラーが発生しました' });
+    }
+    
+    if (this.changes === 0) {
+      return res.status(404).json({ error: '承認可能なリリースが見つかりません' });
+    }
+    
+    // 監査ログ
+    const now = new Date().toISOString();
+    db.run(
+      'INSERT INTO logs (event_type, event_time, username, action, details) VALUES (?, ?, ?, ?, ?)',
+      ['Release Management', now, req.user.username, 'Approve Release', `Approved release ID: ${id}`]
+    );
+    
+    res.json({ 
+      success: true, 
+      message: 'リリースが承認されました',
+      go_live_date
+    });
+  });
+};
+
+/**
+ * リリースデプロイ開始
+ */
+const deployRelease = (req, res) => {
+  const { id } = req.params;
+  const { deployment_comment, actual_start_date } = req.body;
+  
+  // 権限チェック（管理者・オペレータのみデプロイ可能）
+  if (!req.user || !['administrator', 'operator'].includes(req.user.role)) {
+    return res.status(403).json({ 
+      error: 'リリースをデプロイする権限がありません',
+      required_role: ['administrator', 'operator'],
+      current_role: req.user?.role
+    });
+  }
+  
+  const query = `
+    UPDATE releases 
+    SET status = 'In Progress', deployment_comment = ?, actual_start_date = ?, 
+        updated_date = datetime('now'), updated_by_user_id = ?
+    WHERE release_id = ? AND status = 'Approved'
+  `;
+  
+  const startDate = actual_start_date || new Date().toISOString().split('T')[0];
+  
+  db.run(query, [deployment_comment, startDate, req.user.userId, id], function(err) {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'データベースエラーが発生しました' });
+    }
+    
+    if (this.changes === 0) {
+      return res.status(404).json({ error: 'デプロイ可能なリリースが見つかりません' });
+    }
+    
+    // 監査ログ
+    const now = new Date().toISOString();
+    db.run(
+      'INSERT INTO logs (event_type, event_time, username, action, details) VALUES (?, ?, ?, ?, ?)',
+      ['Release Management', now, req.user.username, 'Deploy Release', `Started deployment for release ID: ${id}`]
+    );
+    
+    res.json({ 
+      success: true, 
+      message: 'リリースデプロイが開始されました',
+      actual_start_date: startDate
+    });
+  });
+};
+
+/**
+ * リリースデプロイ完了
+ */
+const completeRelease = (req, res) => {
+  const { id } = req.params;
+  const { completion_comment, actual_end_date, success_criteria_met } = req.body;
+  
+  const query = `
+    UPDATE releases 
+    SET status = 'Deployed', completion_comment = ?, actual_end_date = ?, 
+        success_criteria_met = ?, updated_date = datetime('now'), updated_by_user_id = ?
+    WHERE release_id = ? AND status = 'In Progress'
+  `;
+  
+  const endDate = actual_end_date || new Date().toISOString().split('T')[0];
+  
+  db.run(query, [completion_comment, endDate, success_criteria_met, req.user?.userId, id], function(err) {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'データベースエラーが発生しました' });
+    }
+    
+    if (this.changes === 0) {
+      return res.status(404).json({ error: '完了可能なリリースが見つかりません' });
+    }
+    
+    // 監査ログ
+    const now = new Date().toISOString();
+    db.run(
+      'INSERT INTO logs (event_type, event_time, username, action, details) VALUES (?, ?, ?, ?, ?)',
+      ['Release Management', now, req.user?.username || 'system', 'Complete Release', `Completed release ID: ${id}`]
+    );
+    
+    res.json({ 
+      success: true, 
+      message: 'リリースが完了しました',
+      actual_end_date: endDate
+    });
+  });
+};
+
+/**
+ * リリースロールバック
+ */
+const rollbackRelease = (req, res) => {
+  const { id } = req.params;
+  const { rollback_reason, rollback_date } = req.body;
+  
+  // 権限チェック（管理者・オペレータのみロールバック可能）
+  if (!req.user || !['administrator', 'operator'].includes(req.user.role)) {
+    return res.status(403).json({ 
+      error: 'リリースをロールバックする権限がありません',
+      required_role: ['administrator', 'operator'],
+      current_role: req.user?.role
+    });
+  }
+  
+  if (!rollback_reason) {
+    return res.status(400).json({ error: 'ロールバック理由は必須です' });
+  }
+  
+  const query = `
+    UPDATE releases 
+    SET status = 'Rolled Back', rollback_reason = ?, rollback_date = ?, 
+        updated_date = datetime('now'), updated_by_user_id = ?
+    WHERE release_id = ? AND status IN ('In Progress', 'Deployed')
+  `;
+  
+  const rbDate = rollback_date || new Date().toISOString().split('T')[0];
+  
+  db.run(query, [rollback_reason, rbDate, req.user.userId, id], function(err) {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'データベースエラーが発生しました' });
+    }
+    
+    if (this.changes === 0) {
+      return res.status(404).json({ error: 'ロールバック可能なリリースが見つかりません' });
+    }
+    
+    // 監査ログ
+    const now = new Date().toISOString();
+    db.run(
+      'INSERT INTO logs (event_type, event_time, username, action, details) VALUES (?, ?, ?, ?, ?)',
+      ['Release Management', now, req.user.username, 'Rollback Release', `Rolled back release ID: ${id} - ${rollback_reason}`]
+    );
+    
+    res.json({ 
+      success: true, 
+      message: 'リリースがロールバックされました',
+      rollback_date: rbDate
+    });
+  });
+};
+
+/**
  * リリース削除
  */
 const deleteRelease = (req, res) => {
@@ -467,11 +660,290 @@ const deleteRelease = (req, res) => {
   );
 };
 
+/**
+ * リリースと変更管理の連携 - 関連変更要求取得
+ */
+const getRelatedChanges = (req, res) => {
+  const { id } = req.params;
+  
+  const query = `
+    SELECT 
+      c.change_id, c.change_number, c.subject, c.detail, c.status, c.priority,
+      c.requested_by, c.requested_date, c.planned_start_date, c.planned_end_date,
+      c.actual_start_date, c.actual_end_date, c.impact_assessment,
+      rcr.relationship_type, rcr.dependency_type, rcr.created_date as linked_date
+    FROM release_change_relationships rcr
+    JOIN changes c ON rcr.change_id = c.change_id
+    WHERE rcr.release_id = ?
+    ORDER BY rcr.created_date DESC, c.priority DESC
+  `;
+  
+  db.all(query, [id], (err, rows) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'データベースエラーが発生しました' });
+    }
+    
+    res.json({
+      success: true,
+      release_id: id,
+      related_changes: rows,
+      total_count: rows.length
+    });
+  });
+};
+
+/**
+ * リリースと変更要求の関連付け
+ */
+const linkChangeRequest = (req, res) => {
+  const { id } = req.params;
+  const { change_id, relationship_type = 'Includes', dependency_type = 'Mandatory' } = req.body;
+  
+  if (!change_id) {
+    return res.status(400).json({ error: '変更要求IDは必須です' });
+  }
+  
+  const validRelationships = ['Includes', 'Depends On', 'Blocks', 'Related To'];
+  const validDependencies = ['Mandatory', 'Optional', 'Conditional'];
+  
+  if (!validRelationships.includes(relationship_type)) {
+    return res.status(400).json({ 
+      error: '無効な関連タイプです',
+      valid_relationships: validRelationships
+    });
+  }
+  
+  if (!validDependencies.includes(dependency_type)) {
+    return res.status(400).json({ 
+      error: '無効な依存タイプです',
+      valid_dependencies: validDependencies
+    });
+  }
+  
+  // リリースと変更要求の存在確認
+  const checkQuery = `
+    SELECT 
+      r.release_id, r.title as release_title, r.status as release_status,
+      c.change_id, c.subject as change_subject, c.status as change_status
+    FROM releases r
+    CROSS JOIN changes c
+    WHERE r.release_id = ? AND c.change_id = ?
+  `;
+  
+  db.get(checkQuery, [id, change_id], (err, data) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'データベースエラーが発生しました' });
+    }
+    
+    if (!data || !data.release_id) {
+      return res.status(404).json({ error: 'リリースが見つかりません' });
+    }
+    
+    if (!data.change_id) {
+      return res.status(404).json({ error: '変更要求が見つかりません' });
+    }
+    
+    // 重複チェック
+    db.get(
+      'SELECT id FROM release_change_relationships WHERE release_id = ? AND change_id = ?',
+      [id, change_id],
+      (err, existing) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'データベースエラーが発生しました' });
+        }
+        
+        if (existing) {
+          return res.status(400).json({ error: '既に同じ関連が存在します' });
+        }
+        
+        // 関連付け実行
+        const insertQuery = `
+          INSERT INTO release_change_relationships (
+            release_id, change_id, relationship_type, dependency_type,
+            created_by_user_id, created_date
+          )
+          VALUES (?, ?, ?, ?, ?, datetime('now'))
+        `;
+        
+        db.run(insertQuery, [id, change_id, relationship_type, dependency_type, req.user?.user_id], function(err) {
+          if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: 'データベースエラーが発生しました' });
+          }
+          
+          // 監査ログ記録
+          const logData = {
+            event_type: 'Release Management',
+            event_subtype: 'Change Link',
+            user_id: req.user?.user_id,
+            username: req.user?.username || 'system',
+            action: 'Create',
+            target_table: 'release_change_relationships',
+            target_record_id: this.lastID,
+            details: `Linked change ${data.change_subject} (${relationship_type}/${dependency_type}) to release ${data.release_title}`
+          };
+          
+          db.run(
+            `INSERT INTO logs (
+              event_type, event_subtype, user_id, username, action, 
+              target_table, target_record_id, details
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            Object.values(logData)
+          );
+          
+          res.json({
+            success: true,
+            message: 'リリースと変更要求が正常に関連付けられました',
+            relationship_id: this.lastID,
+            relationship_details: {
+              release: { id: data.release_id, title: data.release_title },
+              change: { id: data.change_id, subject: data.change_subject },
+              relationship_type,
+              dependency_type
+            }
+          });
+        });
+      }
+    );
+  });
+};
+
+/**
+ * リリース依存関係分析
+ */
+const analyzeDependencies = (req, res) => {
+  const { id } = req.params;
+  
+  const query = `
+    SELECT 
+      r.release_id, r.title, r.status, r.go_live_date,
+      mandatory_changes.count as mandatory_changes_count,
+      optional_changes.count as optional_changes_count,
+      blocked_changes.count as blocked_changes_count,
+      pending_changes.count as pending_changes_count
+    FROM releases r
+    LEFT JOIN (
+      SELECT rcr.release_id, COUNT(*) as count
+      FROM release_change_relationships rcr
+      JOIN changes c ON rcr.change_id = c.change_id
+      WHERE rcr.dependency_type = 'Mandatory' AND c.status NOT IN ('Implemented', 'Closed')
+      GROUP BY rcr.release_id
+    ) mandatory_changes ON r.release_id = mandatory_changes.release_id
+    LEFT JOIN (
+      SELECT rcr.release_id, COUNT(*) as count
+      FROM release_change_relationships rcr
+      JOIN changes c ON rcr.change_id = c.change_id
+      WHERE rcr.dependency_type = 'Optional' AND c.status NOT IN ('Implemented', 'Closed')
+      GROUP BY rcr.release_id
+    ) optional_changes ON r.release_id = optional_changes.release_id
+    LEFT JOIN (
+      SELECT rcr.release_id, COUNT(*) as count
+      FROM release_change_relationships rcr
+      JOIN changes c ON rcr.change_id = c.change_id
+      WHERE rcr.relationship_type = 'Blocks' AND c.status NOT IN ('Implemented', 'Closed')
+      GROUP BY rcr.release_id
+    ) blocked_changes ON r.release_id = blocked_changes.release_id
+    LEFT JOIN (
+      SELECT rcr.release_id, COUNT(*) as count
+      FROM release_change_relationships rcr
+      JOIN changes c ON rcr.change_id = c.change_id
+      WHERE c.status IN ('Logged', 'In Progress', 'Approved')
+      GROUP BY rcr.release_id
+    ) pending_changes ON r.release_id = pending_changes.release_id
+    WHERE r.release_id = ?
+  `;
+  
+  db.get(query, [id], (err, analysis) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'データベースエラーが発生しました' });
+    }
+    
+    if (!analysis) {
+      return res.status(404).json({ error: 'リリースが見つかりません' });
+    }
+    
+    // リスク評価
+    const risks = [];
+    const recommendations = [];
+    
+    if (analysis.mandatory_changes_count > 0) {
+      risks.push({
+        level: 'high',
+        description: '必須変更要求が未完了',
+        details: `${analysis.mandatory_changes_count}件の必須変更要求が未完了です`
+      });
+      recommendations.push({
+        priority: 'critical',
+        action: 'complete_mandatory_changes',
+        description: '必須変更要求を完了してからリリースを実行してください'
+      });
+    }
+    
+    if (analysis.blocked_changes_count > 0) {
+      risks.push({
+        level: 'critical',
+        description: 'ブロック要因が存在',
+        details: `${analysis.blocked_changes_count}件の変更要求がリリースをブロックしています`
+      });
+      recommendations.push({
+        priority: 'critical',
+        action: 'resolve_blocking_changes',
+        description: 'ブロック要因を解決してからリリースを進めてください'
+      });
+    }
+    
+    if (analysis.optional_changes_count > 5) {
+      risks.push({
+        level: 'medium',
+        description: 'オプション変更要求が多数',
+        details: `${analysis.optional_changes_count}件のオプション変更要求があります`
+      });
+      recommendations.push({
+        priority: 'medium',
+        action: 'review_optional_changes',
+        description: 'オプション変更要求の必要性を再評価してください'
+      });
+    }
+    
+    const readiness_score = Math.max(0, 100 - (analysis.mandatory_changes_count * 30) - (analysis.blocked_changes_count * 40) - (analysis.optional_changes_count * 5));
+    
+    res.json({
+      success: true,
+      release: {
+        id: analysis.release_id,
+        title: analysis.title,
+        status: analysis.status,
+        go_live_date: analysis.go_live_date
+      },
+      dependency_analysis: {
+        mandatory_changes_count: analysis.mandatory_changes_count || 0,
+        optional_changes_count: analysis.optional_changes_count || 0,
+        blocked_changes_count: analysis.blocked_changes_count || 0,
+        pending_changes_count: analysis.pending_changes_count || 0
+      },
+      readiness_score,
+      risks,
+      recommendations
+    });
+  });
+};
+
 module.exports = {
   getReleases,
   getReleaseStats,
   getReleaseById,
   createRelease,
   updateRelease,
-  deleteRelease
+  approveRelease,
+  deployRelease,
+  completeRelease,
+  rollbackRelease,
+  deleteRelease,
+  getRelatedChanges,
+  linkChangeRequest,
+  analyzeDependencies
 };

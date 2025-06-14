@@ -1,0 +1,71 @@
+{
+  "timestamp": "2025-06-14T13:14:42.814Z",
+  "security_assessment": {
+    "authentication": {
+      "status": "implemented",
+      "features": [
+        "JWT tokens",
+        "bcrypt password hashing",
+        "role-based access control"
+      ],
+      "score": 85
+    },
+    "authorization": {
+      "status": "implemented",
+      "features": [
+        "Role-based permissions",
+        "API endpoint protection",
+        "Admin-only operations"
+      ],
+      "score": 80
+    },
+    "encryption": {
+      "status": "partial",
+      "features": [
+        "Password hashing",
+        "JWT signing"
+      ],
+      "missing": [
+        "HTTPS enforcement",
+        "Data encryption at rest"
+      ],
+      "score": 65
+    },
+    "vulnerability_protection": {
+      "status": "implemented",
+      "features": [
+        "SQL injection prevention",
+        "XSS protection",
+        "CSRF protection",
+        "Rate limiting"
+      ],
+      "score": 90
+    },
+    "security_headers": {
+      "status": "implemented",
+      "features": [
+        "Helmet security headers",
+        "CORS protection",
+        "Content Security Policy"
+      ],
+      "score": 85
+    },
+    "audit_logging": {
+      "status": "implemented",
+      "features": [
+        "Authentication logs",
+        "Authorization logs",
+        "API access logs"
+      ],
+      "score": 80
+    }
+  },
+  "overall_security_score": 81,
+  "recommendations": [
+    "HTTPS実装の強化",
+    "データベース暗号化の実装",
+    "セキュリティ監査の自動化",
+    "ペネトレーションテストの実施",
+    "セキュリティインシデント対応計画の策定"
+  ]
+}

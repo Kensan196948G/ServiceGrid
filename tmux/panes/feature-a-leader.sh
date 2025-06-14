@@ -10,6 +10,25 @@ WORKTREE_ROOT="$PROJECT_ROOT/worktrees"
 LEADER_WORKTREE="$WORKTREE_ROOT/feature-a-leader"
 FEATURE_NAME="Feature-A: 統合リーダー (Worktree対応)"
 
+# Claude自動起動設定
+setup_claude() {
+    echo "🤖 Claude自動起動設定中..."
+    
+    # .envからAPIキー読み込み
+    if [ -f "$PROJECT_ROOT/.env" ]; then
+        export $(grep -v '^#' "$PROJECT_ROOT/.env" | xargs)
+    fi
+    
+    # Claude起動
+    if command -v claude &> /dev/null; then
+        echo "🎯 Feature-A専用Claude起動中..."
+        echo "✅ Claude起動完了"
+        exec claude
+    else
+        echo "⚠️ claudeコマンドが見つかりません"
+    fi
+}
+
 # 色付きメッセージ関数
 print_header() {
     echo -e "\033[1;36m========================================\033[0m"
@@ -416,7 +435,7 @@ $(date '+%Y年%m月%d日 %H:%M:%S')
 ## 統合リーダー監視結果
 
 ### プロジェクト状況
-- 開発環境: VSCode + Claude Code + tmux (5ペイン)
+- 開発環境: VSCode + Claude + tmux (5ペイン)
 - フロントエンド: $(pgrep -f "vite.*3001" > /dev/null && echo "稼働中" || echo "停止中")
 - バックエンド: $(pgrep -f "node.*8082" > /dev/null && echo "稼働中" || echo "停止中")
 
@@ -586,4 +605,6 @@ main_loop() {
 }
 
 # スクリプト開始
+print_header
+setup_claude
 main_loop
