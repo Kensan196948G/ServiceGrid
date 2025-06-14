@@ -1,0 +1,104 @@
+{
+  "timestamp": "2025-06-14T07:03:12.101Z",
+  "buildPerformance": {
+    "buildTime": 0,
+    "error": "Command failed: npm run build\nsh: 1: tsc: not found\n",
+    "success": false
+  },
+  "bundleAnalysis": {
+    "error": "dist ディレクトリが見つかりません。先にビルドを実行してください。"
+  },
+  "staticAnalysis": {
+    "sourceCode": {
+      "totalSize": 890890,
+      "totalSizeFormatted": "870.01 KB",
+      "fileCount": 75,
+      "fileTypes": {
+        ".tsx": {
+          "count": 31,
+          "size": 603822
+        },
+        ".ts": {
+          "count": 44,
+          "size": 287068
+        }
+      },
+      "largestFiles": [
+        {
+          "name": "src/pages/SecurityManagementPage.tsx",
+          "size": 120316,
+          "sizeFormatted": "117.5 KB"
+        },
+        {
+          "name": "src/services/mockItsmService.ts",
+          "size": 102378,
+          "sizeFormatted": "99.98 KB"
+        },
+        {
+          "name": "src/pages/AvailabilityManagementPage.tsx",
+          "size": 74972,
+          "sizeFormatted": "73.21 KB"
+        },
+        {
+          "name": "src/pages/KnowledgePage.tsx",
+          "size": 42160,
+          "sizeFormatted": "41.17 KB"
+        },
+        {
+          "name": "src/pages/ServiceLevelManagementPage.tsx",
+          "size": 31469,
+          "sizeFormatted": "30.73 KB"
+        },
+        {
+          "name": "src/pages/AssetPage.tsx",
+          "size": 30686,
+          "sizeFormatted": "29.97 KB"
+        },
+        {
+          "name": "src/pages/ProblemManagementPage.tsx",
+          "size": 29189,
+          "sizeFormatted": "28.5 KB"
+        },
+        {
+          "name": "src/pages/DashboardPage.tsx",
+          "size": 28233,
+          "sizeFormatted": "27.57 KB"
+        },
+        {
+          "name": "src/pages/ComplianceManagementPage.tsx",
+          "size": 26486,
+          "sizeFormatted": "25.87 KB"
+        },
+        {
+          "name": "src/pages/CapacityManagementPage.tsx",
+          "size": 25914,
+          "sizeFormatted": "25.31 KB"
+        }
+      ]
+    },
+    "dependencies": {
+      "totalDependencies": 18,
+      "productionDependencies": 5,
+      "developmentDependencies": 13,
+      "heavyDependencies": [
+        "react",
+        "react-dom",
+        "recharts",
+        "@google/genai"
+      ]
+    }
+  },
+  "typeScriptPerformance": {
+    "compileTime": 0,
+    "error": "Command failed: npm run typecheck\nsh: 1: tsc: not found\n",
+    "success": false
+  },
+  "recommendations": [
+    {
+      "category": "General Optimization",
+      "severity": "Low",
+      "issue": "フロントエンドパフォーマンス継続改善",
+      "recommendation": "Bundle Analyzer の定期実行、Core Web Vitals の監視、PWA 対応の検討をお勧めします"
+    }
+  ]
+}

@@ -145,6 +145,20 @@ $global:APIEndpoints = @{
     "GET:/api/integration/ad/users" = { param($Request) Invoke-ADUsersGet $Request }
     "GET:/api/integration/ad/computers" = { param($Request) Invoke-ADComputersGet $Request }
     "GET:/api/integration/ad/groups" = { param($Request) Invoke-ADGroupsGet $Request }
+    "GET:/api/integration/ad/ous" = { param($Request) Invoke-ADOUsGet $Request }
+    "GET:/api/integration/ad/audit-logs" = { param($Request) Invoke-ADAuditLogsGet $Request }
+    "POST:/api/integration/ad/sync" = { param($Request) Invoke-ADSyncData $Request }
+    
+    # Windows Security Analysis endpoints
+    "POST:/api/security/analyze-logs" = { param($Request) Invoke-SecurityLogAnalysis $Request }
+    "POST:/api/security/disable-account" = { param($Request) Invoke-DisableSuspiciousAccount $Request }
+    "GET:/api/security/system-info" = { param($Request) Invoke-GetSystemInfo $Request }
+    
+    # File System Monitoring endpoints
+    "POST:/api/filesystem/start-monitoring" = { param($Request) Invoke-StartFileSystemMonitoring $Request }
+    "POST:/api/filesystem/stop-monitoring" = { param($Request) Invoke-StopFileSystemMonitoring $Request }
+    "GET:/api/filesystem/monitoring-status" = { param($Request) Invoke-GetFileSystemMonitoringStatus $Request }
+    "GET:/api/filesystem/security-report" = { param($Request) Invoke-GetFileSystemSecurityReport $Request }
 }
 
 # Main HTTP server function

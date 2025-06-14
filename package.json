@@ -17,7 +17,11 @@
     "start:all": "./start-all.sh",
     "stop:all": "./stop-all.sh",
     "backend": "cd backend && npm start",
-    "frontend": "npm run dev"
+    "frontend": "npm run dev",
+    "perf:test": "node performance-test.cjs",
+    "perf:frontend": "node frontend-performance-test.cjs",
+    "perf:quick": "node quick-performance-test.cjs",
+    "health": "curl -s http://localhost:8082/api/health"
   },
   "dependencies": {
     "react-router-dom": "^6.28.0",

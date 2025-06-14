@@ -8,6 +8,7 @@ const assetsApi = require('./api/assets');
 const serviceRequestsApi = require('./api/service-requests-simple');
 const complianceApi = require('./api/compliance');
 const changesApi = require('./api/changes-enhanced');
+const dashboardApi = require('./api/dashboard');
 const authMiddleware = require('./middleware/auth');
 
 const app = express();
@@ -55,7 +56,10 @@ app.get('/', (req, res) => {
       'GET /api/incidents - Incidents API',
       'GET /api/assets - Assets API',
       'GET /api/compliance - Compliance API',
-      'GET /api/changes - Change Management API'
+      'GET /api/changes - Change Management API',
+      'GET /api/dashboard - Dashboard Data API',
+      'GET /api/dashboard/activity - User Activity API',
+      'GET /api/dashboard/stats - Quick Stats API'
     ]
   });
 });
@@ -257,6 +261,40 @@ app.get('/api/compliance-management', (req, res) => {
   res.json({ data: [], compliance_status: { overall_score: 92, passed: 18, failed: 2 } });
 });
 
+// ダッシュボードAPI（認証必要）
+app.get('/api/dashboard', (req, res) => {
+  // 簡易モック認証
+  const mockUser = {
+    user_id: 1,
+    username: 'admin',
+    role: 'administrator'
+  };
+  req.user = mockUser;
+  dashboardApi.getDashboardData(req, res);
+});
+
+app.get('/api/dashboard/activity', (req, res) => {
+  // 簡易モック認証
+  const mockUser = {
+    user_id: 1,
+    username: 'admin',
+    role: 'administrator'
+  };
+  req.user = mockUser;
+  dashboardApi.getUserActivity(req, res);
+});
+
+app.get('/api/dashboard/stats', (req, res) => {
+  // 簡易モック認証
+  const mockUser = {
+    user_id: 1,
+    username: 'admin',
+    role: 'administrator'
+  };
+  req.user = mockUser;
+  dashboardApi.getQuickStats(req, res);
+});
+
 // エラーハンドリング
 app.use((err, req, res, next) => {
   console.error('Server Error:', err);
@@ -304,7 +342,10 @@ app.use((req, res) => {
       'POST /api/changes',
       'PUT /api/changes/:id',
       'DELETE /api/changes/:id',
-      'POST /api/changes/:id/approve'
+      'POST /api/changes/:id/approve',
+      'GET /api/dashboard',
+      'GET /api/dashboard/activity',
+      'GET /api/dashboard/stats'
     ]
   });
 });
