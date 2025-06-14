@@ -44,6 +44,7 @@ cleanup_existing_session() {
     if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
         print_warning "既存セッション '$SESSION_NAME' を終了します"
         tmux kill-session -t "$SESSION_NAME"
+        sleep 1  # セッション終了の待機時間
     fi
 }
 
@@ -172,44 +173,90 @@ create_pane_layout() {
     # 新しいセッション作成（最初のウィンドウを作成）
     tmux new-session -d -s "$SESSION_NAME" -c "$PROJECT_ROOT"
     
-    # ペイン分割
-    # 上段3ペイン（Feature-A, Feature-B, Feature-C）
-    tmux split-window -h -t "$SESSION_NAME:0" -c "$PROJECT_ROOT"
-    tmux split-window -h -t "$SESSION_NAME:0.1" -c "$PROJECT_ROOT"
+    # セッション作成確認
+    if ! tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+        print_error "tmuxセッションの作成に失敗しました"
+        exit 1
+    fi
     
-    # 下段2ペイン（Feature-D, Feature-E）
+    # ペイン分割（シンプルで確実な方法）
+    print_info "ペイン分割中..."
+    
+    # 水平分割で2つのペインに分割
+    tmux split-window -h -t "$SESSION_NAME:0" -c "$PROJECT_ROOT"
+    
+    # 左ペインを垂直分割（上下2つ）
     tmux split-window -v -t "$SESSION_NAME:0.0" -c "$PROJECT_ROOT"
-    tmux split-window -v -t "$SESSION_NAME:0.2" -c "$PROJECT_ROOT"
+    
+    # 右ペインを垂直分割（上下2つ）
+    tmux split-window -v -t "$SESSION_NAME:0.1" -c "$PROJECT_ROOT"
+    
+    # 右下ペインを水平分割（5つ目のペイン作成）
+    tmux split-window -h -t "$SESSION_NAME:0.3" -c "$PROJECT_ROOT"
     
     # レイアウト調整
     tmux select-layout -t "$SESSION_NAME:0" tiled
     
-    print_success "ペインレイアウト作成完了"
+    # ペイン番号確認
+    local pane_count=$(tmux list-panes -t "$SESSION_NAME:0" | wc -l)
+    print_info "作成されたペイン数: $pane_count"
+    
+    if [ "$pane_count" -eq 5 ]; then
+        print_success "5ペインレイアウト作成完了"
+    else
+        print_warning "期待される5ペインではなく${pane_count}ペインが作成されました"
+    fi
 }
 
 # 各ペインに初期コマンド設定
 setup_pane_commands() {
     print_info "各ペインにコマンドを設定中..."
     
-    # Feature-A: 統合リーダー (ペイン 0)
-    tmux send-keys -t "$SESSION_NAME:0.0" "cd $TMUX_DIR && echo '=== Feature-A: 統合リーダー ===' && echo '設計統一・アーキテクチャ管理・調整'" Enter
-    tmux send-keys -t "$SESSION_NAME:0.0" "./panes/feature-a-leader.sh" Enter
+    # ペイン数確認
+    local pane_count=$(tmux list-panes -t "$SESSION_NAME:0" | wc -l)
+    print_info "利用可能ペイン数: $pane_count"
     
-    # Feature-B: UI/テスト (ペイン 1)
-    tmux send-keys -t "$SESSION_NAME:0.1" "cd $TMUX_DIR && echo '=== Feature-B: UI/テスト自動修復 ===' && echo 'React/TypeScript・Jest/RTL・ESLint'" Enter
-    tmux send-keys -t "$SESSION_NAME:0.1" "./panes/feature-b-ui.sh" Enter
+    # 各ペインにコマンド設定（存在確認付き）
+    local pane_configs=(
+        "0:Feature-A:統合リーダー:feature-a-leader.sh:設計統一・アーキテクチャ管理・調整"
+        "1:Feature-B:UI/テスト自動修復:feature-b-ui.sh:React/TypeScript・Jest/RTL・ESLint"
+        "2:Feature-C:API開発:feature-c-api.sh:Node.js・Express・テスト通過ループ"
+        "3:Feature-D:PowerShell API:feature-d-powershell.sh:PowerShell・run-tests.sh・Windows対応"
+        "4:Feature-E:非機能要件:feature-e-nonfunc.sh:SLA・ログ・セキュリティ・監視"
+    )
     
-    # Feature-C: API開発 (ペイン 2)
-    tmux send-keys -t "$SESSION_NAME:0.2" "cd $TMUX_DIR && echo '=== Feature-C: API開発 ===' && echo 'Node.js・Express・テスト通過ループ'" Enter
-    tmux send-keys -t "$SESSION_NAME:0.2" "./panes/feature-c-api.sh" Enter
-    
-    # Feature-D: PowerShell (ペイン 3)
-    tmux send-keys -t "$SESSION_NAME:0.3" "cd $TMUX_DIR && echo '=== Feature-D: PowerShell API ===' && echo 'PowerShell・run-tests.sh・Windows対応'" Enter
-    tmux send-keys -t "$SESSION_NAME:0.3" "./panes/feature-d-powershell.sh" Enter
-    
-    # Feature-E: 非機能要件 (ペイン 4)
-    tmux send-keys -t "$SESSION_NAME:0.4" "cd $TMUX_DIR && echo '=== Feature-E: 非機能要件 ===' && echo 'SLA・ログ・セキュリティ・監視'" Enter
-    tmux send-keys -t "$SESSION_NAME:0.4" "./panes/feature-e-nonfunc.sh" Enter
+    for config in "${pane_configs[@]}"; do
+        IFS=':' read -r pane_num feature_name description script_name details <<< "$config"
+        
+        # ペイン存在確認（範囲チェック付き）
+        if [ "$pane_num" -lt "$pane_count" ]; then
+            print_info "ペイン$pane_num: $feature_name を設定中..."
+            
+            # 基本情報表示
+            tmux send-keys -t "$SESSION_NAME:0.$pane_num" "clear" C-m
+            tmux send-keys -t "$SESSION_NAME:0.$pane_num" "cd $TMUX_DIR" C-m
+            tmux send-keys -t "$SESSION_NAME:0.$pane_num" "echo '=== $feature_name ==='" C-m
+            tmux send-keys -t "$SESSION_NAME:0.$pane_num" "echo '$details'" C-m
+            tmux send-keys -t "$SESSION_NAME:0.$pane_num" "echo ''" C-m
+            
+            # スクリプト実行権限確認
+            chmod +x "$TMUX_DIR/panes/$script_name" 2>/dev/null || true
+            
+            # スクリプト実行
+            if [ -f "$TMUX_DIR/panes/$script_name" ]; then
+                tmux send-keys -t "$SESSION_NAME:0.$pane_num" "./panes/$script_name" C-m
+                print_success "ペイン$pane_num: $script_name 起動完了"
+            else
+                tmux send-keys -t "$SESSION_NAME:0.$pane_num" "echo 'ERROR: $script_name が見つかりません'" C-m
+                tmux send-keys -t "$SESSION_NAME:0.$pane_num" "echo 'Press Enter to show menu...'" C-m
+                print_error "ペイン$pane_num: $script_name が見つかりません"
+            fi
+        else
+            print_warning "ペイン$pane_num が存在しません - $feature_name をスキップ"
+        fi
+        
+        sleep 0.5  # ペイン間の処理間隔
+    done
     
     print_success "ペインコマンド設定完了"
 }

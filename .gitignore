@@ -32,7 +32,21 @@ dist-ssr
 *.backup
 *~
 
-# Environment variables
+# Environment variables (セキュリティ重要ファイル)
 .env
 .env.local
 .env.production
+.env.development
+.env.test
+
+# API Keys & Secrets (Claude Code関連)
+**/ANTHROPIC_API_KEY*
+**/CLAUDE_API_KEY*
+**/.anthropic*
+**/.claude*
+**/api-keys.*
+**/secrets.*
+
+# tmux session files
+**/tmux-session-*
+**/session-backup.*

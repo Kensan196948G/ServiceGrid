@@ -38,12 +38,24 @@ init_ui_worktree() {
     print_info "UI/テスト用Worktreeを初期化中..."
     
     if [ ! -d "$UI_WORKTREE" ]; then
-        print_warning "UI Worktreeが未作成です。作成を要求します..."
-        bash "$PROJECT_ROOT/tmux/tools/worktree-manager.sh" init
+        print_warning "UI Worktreeが未作成です。"
         
-        if [ ! -d "$UI_WORKTREE" ]; then
-            print_error "UI Worktreeの作成に失敗しました"
-            return 1
+        # Worktree管理ツールが存在するかチェック
+        if [ -f "$PROJECT_ROOT/tmux/tools/worktree-manager.sh" ]; then
+            print_info "Worktree管理ツールで作成を試行します..."
+            bash "$PROJECT_ROOT/tmux/tools/worktree-manager.sh" init
+            
+            if [ ! -d "$UI_WORKTREE" ]; then
+                print_warning "UI Worktreeの作成に失敗しました"
+                print_info "メインプロジェクトディレクトリで作業を続行します"
+                cd "$PROJECT_ROOT"
+                return
+            fi
+        else
+            print_warning "Worktree管理ツールが見つかりません"
+            print_info "メインプロジェクトディレクトリで作業を続行します"
+            cd "$PROJECT_ROOT"
+            return
         fi
     fi
     

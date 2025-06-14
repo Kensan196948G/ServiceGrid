@@ -38,8 +38,18 @@ init_worktree() {
     print_info "統合リーダー用Worktreeを初期化中..."
     
     if [ ! -d "$LEADER_WORKTREE" ]; then
-        print_warning "Worktreeが未作成です。Worktree管理ツールを起動します..."
-        bash "$PROJECT_ROOT/tmux/tools/worktree-manager.sh" init
+        print_warning "Worktreeが未作成です。"
+        
+        # Worktree管理ツールが存在するかチェック
+        if [ -f "$PROJECT_ROOT/tmux/tools/worktree-manager.sh" ]; then
+            print_info "Worktree管理ツールを起動します..."
+            bash "$PROJECT_ROOT/tmux/tools/worktree-manager.sh" init
+        else
+            print_warning "Worktree管理ツールが見つかりません"
+            print_info "メインプロジェクトディレクトリで作業を続行します"
+            cd "$PROJECT_ROOT"
+            return
+        fi
     else
         cd "$LEADER_WORKTREE"
         print_success "統合リーダーWorktreeに移動しました: $LEADER_WORKTREE"
