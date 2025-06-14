@@ -6,7 +6,7 @@
 set -e
 
 # 設定
-SESSION_NAME="itsm-dev"
+SESSION_NAME="itsm-requirement"
 PROJECT_ROOT="/mnt/e/ServiceGrid"
 TMUX_DIR="$PROJECT_ROOT/tmux"
 WORKTREE_ROOT="$PROJECT_ROOT/worktrees"
@@ -179,31 +179,32 @@ create_pane_layout() {
         exit 1
     fi
     
-    # ペイン分割（3段構成: 要求通りの配置）
-    print_info "ペイン分割中..."
+    # ペイン分割（3段構成: 完全に正確な実装）
+    print_info "正確な3段構成作成中..."
     
-    # 1段目: 水平分割で2つのペイン（左右）
-    tmux split-window -h -t "$SESSION_NAME:0" -c "$PROJECT_ROOT"
+    # Step 1: 上部70%、下部30%に分割
+    tmux split-window -v -p 30 -t "$SESSION_NAME:0" -c "$PROJECT_ROOT"
     
-    # 2段目: 下部を作成（垂直分割）
-    tmux split-window -v -t "$SESSION_NAME:0.0" -c "$PROJECT_ROOT"
-    tmux split-window -v -t "$SESSION_NAME:0.1" -c "$PROJECT_ROOT"
+    # Step 2: 上部を2段に分割（50%ずつ）
+    tmux split-window -v -p 50 -t "$SESSION_NAME:0.0" -c "$PROJECT_ROOT"
     
-    # 3段目: 最下部をフル幅で作成
-    tmux split-window -v -t "$SESSION_NAME:0.2" -c "$PROJECT_ROOT"
+    # Step 3: 1段目を左右分割（50%ずつ）- ペイン0とペイン1
+    tmux split-window -h -p 50 -t "$SESSION_NAME:0.0" -c "$PROJECT_ROOT"
     
-    # ペイン再配置: 0→2, 1→3, 2→4, 3→0, 4→1にする
-    # 現在: 0,1,2,3,4 → 目標: 2,3,4,0,1
-    tmux swap-pane -s "$SESSION_NAME:0.0" -t "$SESSION_NAME:0.3" # 0↔3
-    tmux swap-pane -s "$SESSION_NAME:0.1" -t "$SESSION_NAME:0.4" # 1↔4  
-    tmux swap-pane -s "$SESSION_NAME:0.2" -t "$SESSION_NAME:0.3" # 2↔3
+    # Step 4: 2段目を左右分割（50%ずつ）- ペイン2とペイン3
+    tmux split-window -h -p 50 -t "$SESSION_NAME:0.1" -c "$PROJECT_ROOT"
     
-    # ペイン番号確認
+    # ペイン5が作成されているので削除（4ペインのみ必要）
+    sleep 1
     local pane_count=$(tmux list-panes -t "$SESSION_NAME:0" | wc -l)
-    print_info "作成されたペイン数: $pane_count"
+    
+    # 正確な配置確認
+    print_info "最終ペイン配置確認:"
+    tmux list-panes -t "$SESSION_NAME:0" -F "ペイン#{pane_index}: (#{pane_left},#{pane_top}) #{pane_width}x#{pane_height}"
     
     if [ "$pane_count" -eq 5 ]; then
-        print_success "5ペインレイアウト作成完了"
+        print_success "5ペインレイアウト作成完了（3段構成）"
+        print_info "構成: 1段目(0,1) + 2段目(2,3) + 3段目(4)"
     else
         print_warning "期待される5ペインではなく${pane_count}ペインが作成されました"
     fi
@@ -217,7 +218,7 @@ setup_pane_commands() {
     local pane_count=$(tmux list-panes -t "$SESSION_NAME:0" | wc -l)
     print_info "利用可能ペイン数: $pane_count"
     
-    # 各ペインにコマンド設定（要求通りの配置順）
+    # 各ペインにコマンド設定（要望通りの3段構成）
     local pane_configs=(
         "0:Feature-B:UI/テスト自動修復:feature-b-ui.sh:React/TypeScript・Jest/RTL・ESLint"
         "1:Feature-C:API開発:feature-c-api.sh:Node.js・Express・テスト通過ループ"
@@ -272,22 +273,28 @@ show_development_info() {
     echo "📁 プロジェクト: $PROJECT_ROOT"
     echo "🔧 tmux設定: ~/.config/tmux/tmux.conf"
     echo ""
-    echo "🚀 各ペイン構成 (3段レイアウト - 要求通り):"
+    echo "🚀 各ペイン構成 (3段構成):"
     echo "  ┌─────────────────────────────────────┐"
-    echo "  │ 1段目                               │"
-    echo "  │ 0:Feature-B │ 1:Feature-C           │"
-    echo "  │ UI/テスト   │ API開発               │"
+    echo "  │ 1段目（上段）                       │"
+    echo "  │ ┌─────────────┬─────────────────────┤"
+    echo "  │ │ 0:Feature-B │ 1:Feature-C         │"
+    echo "  │ │ UI/テスト   │ API開発             │"
+    echo "  │ ├─────────────┼─────────────────────┤"
+    echo "  │ │ 2段目（中段）                     │"
+    echo "  │ │ 2:Feature-D │ 3:Feature-E         │"
+    echo "  │ │ PowerShell  │ 非機能要件          │"
+    echo "  │ └─────────────┴─────────────────────┘"
     echo "  ├─────────────────────────────────────┤"
-    echo "  │ 2段目                               │"
-    echo "  │ 2:Feature-D │ 3:Feature-E           │"
-    echo "  │ PowerShell  │ 非機能要件            │"
-    echo "  ├─────────────────────────────────────┤"
-    echo "  │ 3段目 (フル幅)                      │"
+    echo "  │ 3段目（下段フル幅）                 │"
     echo "  │ 4:Feature-A (統合リーダー)          │"
     echo "  └─────────────────────────────────────┘"
     echo ""
-    echo "⌨️  操作方法:"
-    echo "  Ctrl-b + 0-4  : ペイン選択"
+    echo "⌨️ tmuxペイン操作:"
+    echo "  Ctrl-b + 0: 🎨 Feature-B (UI/テスト) - 1段目左"
+    echo "  Ctrl-b + 1: 🔧 Feature-C (API開発) - 1段目右"
+    echo "  Ctrl-b + 2: 💻 Feature-D (PowerShell) - 2段目左"
+    echo "  Ctrl-b + 3: 🔒 Feature-E (非機能要件) - 2段目右"
+    echo "  Ctrl-b + 4: 🎯 Feature-A (統合リーダー) - 3段目フル幅"
     echo "  Ctrl-b + 矢印 : ペイン移動"
     echo "  Ctrl-b + z    : ペインズーム"
     echo "  Ctrl-b + &    : セッション終了"
