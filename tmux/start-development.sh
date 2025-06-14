@@ -220,11 +220,11 @@ setup_pane_commands() {
     
     # 各ペインにコマンド設定（要望通りの3段構成）
     local pane_configs=(
-        "0:Feature-B:UI/テスト自動修復:feature-b-ui.sh:React/TypeScript・Jest/RTL・ESLint"
-        "1:Feature-C:API開発:feature-c-api.sh:Node.js・Express・テスト通過ループ"
-        "2:Feature-D:PowerShell API:feature-d-powershell.sh:PowerShell・run-tests.sh・Windows対応"
-        "3:Feature-E:非機能要件:feature-e-nonfunc.sh:SLA・ログ・セキュリティ・監視"
-        "4:Feature-A:統合リーダー:feature-a-leader.sh:設計統一・アーキテクチャ管理・調整"
+        "0:Feature-B-UI:UI/テスト自動修復:feature-b-ui.sh:React/TypeScript・Jest/RTL・ESLint"
+        "1:Feature-C-API:API開発:feature-c-api.sh:Node.js・Express・テスト通過ループ"
+        "2:Feature-D-PowerShell:PowerShell API:feature-d-powershell.sh:PowerShell・run-tests.sh・Windows対応"
+        "3:Feature-E-NonFunc:非機能要件:feature-e-nonfunc.sh:SLA・ログ・セキュリティ・監視"
+        "4:Feature-A-Leader:統合リーダー:feature-a-leader.sh:設計統一・アーキテクチャ管理・調整"
     )
     
     for config in "${pane_configs[@]}"; do
@@ -234,12 +234,16 @@ setup_pane_commands() {
         if [ "$pane_num" -lt "$pane_count" ]; then
             print_info "ペイン$pane_num: $feature_name を設定中..."
             
-            # 基本情報表示
+            # 基本情報表示とプロンプト設定
             tmux send-keys -t "$SESSION_NAME:0.$pane_num" "clear" C-m
             tmux send-keys -t "$SESSION_NAME:0.$pane_num" "cd $TMUX_DIR" C-m
+            tmux send-keys -t "$SESSION_NAME:0.$pane_num" "export PS1='[$feature_name] \\w$ '" C-m
             tmux send-keys -t "$SESSION_NAME:0.$pane_num" "echo '=== $feature_name ==='" C-m
             tmux send-keys -t "$SESSION_NAME:0.$pane_num" "echo '$details'" C-m
             tmux send-keys -t "$SESSION_NAME:0.$pane_num" "echo ''" C-m
+            
+            # ペインタイトル設定
+            tmux select-pane -t "$SESSION_NAME:0.$pane_num" -T "$feature_name"
             
             # スクリプト実行権限確認
             chmod +x "$TMUX_DIR/panes/$script_name" 2>/dev/null || true
@@ -290,11 +294,11 @@ show_development_info() {
     echo "  └─────────────────────────────────────┘"
     echo ""
     echo "⌨️ tmuxペイン操作:"
-    echo "  Ctrl-b + 0: 🎨 Feature-B (UI/テスト) - 1段目左"
-    echo "  Ctrl-b + 1: 🔧 Feature-C (API開発) - 1段目右"
-    echo "  Ctrl-b + 2: 💻 Feature-D (PowerShell) - 2段目左"
-    echo "  Ctrl-b + 3: 🔒 Feature-E (非機能要件) - 2段目右"
-    echo "  Ctrl-b + 4: 🎯 Feature-A (統合リーダー) - 3段目フル幅"
+    echo "  Ctrl-b + 0: 🎨 Feature-B-UI - 1段目左"
+    echo "  Ctrl-b + 1: 🔧 Feature-C-API - 1段目右"
+    echo "  Ctrl-b + 2: 💻 Feature-D-PowerShell - 2段目左"
+    echo "  Ctrl-b + 3: 🔒 Feature-E-NonFunc - 2段目右"
+    echo "  Ctrl-b + 4: 🎯 Feature-A-Leader - 3段目フル幅"
     echo "  Ctrl-b + 矢印 : ペイン移動"
     echo "  Ctrl-b + z    : ペインズーム"
     echo "  Ctrl-b + &    : セッション終了"
@@ -324,12 +328,21 @@ main() {
     create_pane_layout
     setup_pane_commands
     
+    # Claude Code環境設定 (非対話型)
+    print_info "Claude Code環境を設定中..."
+    bash "$TMUX_DIR/setup-claude-noninteractive.sh" both
+    
+    # tmux hook設定 (attach時自動起動)
+    print_info "tmux hook設定中..."
+    bash "$TMUX_DIR/auto-claude-hook.sh" setup
+    
     # 情報表示
     show_development_info
     
     # セッションにアタッチ
     print_info "tmuxセッションにアタッチします..."
     print_info "終了するには: Ctrl-b & (確認後 y)"
+    print_success "Claude Codeが各ペインで自動起動されました！"
     
     # セッションアタッチ
     tmux attach-session -t "$SESSION_NAME"

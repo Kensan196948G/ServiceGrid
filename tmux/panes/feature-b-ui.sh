@@ -7,22 +7,32 @@ set -e
 
 PROJECT_ROOT="/mnt/e/ServiceGrid"
 
-# Claude自動起動設定
+# Claude Code自動起動設定
 setup_claude() {
-    echo "🤖 Claude自動起動設定中..."
+    echo "🤖 Claude Code自動起動中..."
     
     # .envからAPIキー読み込み
     if [ -f "$PROJECT_ROOT/.env" ]; then
         export $(grep -v '^#' "$PROJECT_ROOT/.env" | xargs)
     fi
     
-    # Claude起動
+    # プロンプト設定
+    export PS1='[Feature-B-UI] \w$ '
+    echo "\033]0;Feature-B-UI\007"
+    
+    # Claude Code環境確認
     if command -v claude &> /dev/null; then
-        echo "🎨 Feature-B専用Claude起動中..."
-        echo "✅ Claude起動完了"
-        exec claude
+        echo "✅ Claude Codeが利用可能です"
+        echo "🎨 Feature-B-UI: フロントエンド開発アシスタントとして動作中"
+        echo ""
+        echo "💡 使用例:"
+        echo "  claude 'コンポーネントのテストを作成してください'"
+        echo "  claude 'コードレビューをお願いします'"
+        echo "  claude 'ESLintエラーを修正してください'"
+        echo ""
     else
-        echo "⚠️ claudeコマンドが見つかりません"
+        echo "⚠️ Claude Codeが見つかりません"
+        echo "💡 インストール方法: pip install claude-code"
     fi
 }
 
@@ -137,6 +147,9 @@ main_loop() {
 }
 
 # スクリプト開始
-print_header
 setup_claude
+print_header
+print_success "Feature-B-UI: UI/テスト環境準備完了！"
+print_success "Claude Code: フロントエンド開発アシスタント準備完了！"
+echo ""
 main_loop

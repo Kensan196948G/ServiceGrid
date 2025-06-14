@@ -10,13 +10,32 @@ WORKTREE_ROOT="$PROJECT_ROOT/worktrees"
 LEADER_WORKTREE="$WORKTREE_ROOT/feature-a-leader"
 FEATURE_NAME="Feature-A: 統合リーダー (Worktree対応)"
 
-# Claude自動起動設定
+# Claude Code自動起動設定
 setup_claude() {
-    echo "🤖 Claude自動起動設定中..."
+    echo "🤖 Claude Code自動起動中..."
     
     # .envからAPIキー読み込み
     if [ -f "$PROJECT_ROOT/.env" ]; then
         export $(grep -v '^#' "$PROJECT_ROOT/.env" | xargs)
+    fi
+    
+    # プロンプト設定
+    export PS1='[Feature-A-Leader] \w$ '
+    echo "\033]0;Feature-A-Leader\007"
+    
+    # Claude Code環境確認
+    if command -v claude &> /dev/null; then
+        echo "✅ Claude Codeが利用可能です"
+        echo "🎯 Feature-A-Leader: 統合リーダーアシスタントとして動作中"
+        echo ""
+        echo "💡 使用例:"
+        echo "  claude 'プロジェクトの全体状況を確認してください'"
+        echo "  claude 'アーキテクチャの一貫性をチェックしてください'"
+        echo "  claude '他のペインとの統合プランを作成してください'"
+        echo ""
+    else
+        echo "⚠️ Claude Codeが見つかりません"
+        echo "💡 インストール方法: pip install claude-code"
     fi
     
     # Claude起動

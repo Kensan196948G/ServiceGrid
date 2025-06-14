@@ -9,22 +9,32 @@ PROJECT_ROOT="/mnt/e/ServiceGrid"
 FEATURE_NAME="Feature-E: 非機能要件実装"
 BACKEND_DIR="$PROJECT_ROOT/backend"
 
-# Claude自動起動設定
+# Claude Code自動起動設定
 setup_claude() {
-    echo "🤖 Claude自動起動設定中..."
+    echo "🤖 Claude Code自動起動中..."
     
     # .envからAPIキー読み込み
     if [ -f "$PROJECT_ROOT/.env" ]; then
         export $(grep -v '^#' "$PROJECT_ROOT/.env" | xargs)
     fi
     
-    # Claude起動
+    # プロンプト設定
+    export PS1='[Feature-E-NonFunc] \w$ '
+    echo "\033]0;Feature-E-NonFunc\007"
+    
+    # Claude Code環境確認
     if command -v claude &> /dev/null; then
-        echo "🔒 Feature-E専用Claude起動中..."
-        echo "✅ Claude起動完了"
-        exec claude
+        echo "✅ Claude Codeが利用可能です"
+        echo "🔒 Feature-E-NonFunc: 非機能要件アシスタントとして動作中"
+        echo ""
+        echo "💡 使用例:"
+        echo "  claude 'セキュリティ監査を実行してください'"
+        echo "  claude 'ログ管理システムを確認してください'"
+        echo "  claude 'SLA監視設定をチェックしてください'"
+        echo ""
     else
-        echo "⚠️ claudeコマンドが見つかりません"
+        echo "⚠️ Claude Codeが見つかりません"
+        echo "💡 インストール方法: pip install claude-code"
     fi
 }
 

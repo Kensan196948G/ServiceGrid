@@ -42,11 +42,11 @@ ITSM準拠IT運用システムプラットフォームの**tmux 3段レイアウ
 
 | ペイン | Feature | 位置 | サイズ | 担当領域 | 技術スタック |
 |--------|---------|------|--------|----------|-------------|
-| **0** | Feature-B | (0,1) | 40x5 | UI/テスト | React・TypeScript・Jest・RTL・ESLint |
-| **1** | Feature-C | (41,1) | 39x5 | API開発 | Node.js・Express・SQLite・テスト |
-| **2** | Feature-D | (0,7) | 40x5 | PowerShell | PowerShell・Windows API・run-tests.sh |
-| **3** | Feature-E | (41,7) | 39x5 | 非機能要件 | SLA・ログ・セキュリティ・監視 |
-| **4** | Feature-A | (0,13) | 80x11 | 統合リーダー | 設計統一・アーキテクチャ管理・調整 |
+| **0** | Feature-B-UI | (0,1) | 40x5 | UI/テスト | React・TypeScript・Jest・RTL・ESLint |
+| **1** | Feature-C-API | (41,1) | 39x5 | API開発 | Node.js・Express・SQLite・テスト |
+| **2** | Feature-D-PowerShell | (0,7) | 40x5 | PowerShell | PowerShell・Windows API・run-tests.sh |
+| **3** | Feature-E-NonFunc | (41,7) | 39x5 | 非機能要件 | SLA・ログ・セキュリティ・監視 |
+| **4** | Feature-A-Leader | (0,13) | 80x11 | 統合リーダー | 設計統一・アーキテクチャ管理・調整 |
 
 ## 🔧 技術実装
 
@@ -89,11 +89,11 @@ tmux list-panes -t itsm-requirement -F "ペイン#{pane_index}: 位置(#{pane_le
 
 | キー操作 | 機能 | 対象ペイン |
 |----------|------|-----------|
-| `Ctrl+b + 0` | 1段目左に移動 | ペイン0: Feature-B (UI/テスト) |
-| `Ctrl+b + 1` | 1段目右に移動 | ペイン1: Feature-C (API開発) |
-| `Ctrl+b + 2` | 2段目左に移動 | ペイン2: Feature-D (PowerShell) |
-| `Ctrl+b + 3` | 2段目右に移動 | ペイン3: Feature-E (非機能要件) |
-| `Ctrl+b + 4` | 3段目に移動 | ペイン4: Feature-A (統合リーダー) |
+| `Ctrl+b + 0` | 1段目左に移動 | ペイン0: Feature-B-UI |
+| `Ctrl+b + 1` | 1段目右に移動 | ペイン1: Feature-C-API |
+| `Ctrl+b + 2` | 2段目左に移動 | ペイン2: Feature-D-PowerShell |
+| `Ctrl+b + 3` | 2段目右に移動 | ペイン3: Feature-E-NonFunc |
+| `Ctrl+b + 4` | 3段目に移動 | ペイン4: Feature-A-Leader |
 | `Ctrl+b + 矢印` | ペイン間を矢印で移動 | 全ペイン |
 | `Ctrl+b + z` | ペインをズーム/復元 | アクティブペイン |
 | `Ctrl+b + &` | セッション終了 | 全体 |
@@ -101,40 +101,61 @@ tmux list-panes -t itsm-requirement -F "ペイン#{pane_index}: 位置(#{pane_le
 ### ペイン設定コマンド
 
 ```bash
-# Feature-B (UI/テスト)
-tmux send-keys -t itsm-requirement:0.0 "echo '=== ペイン0: Feature-B (UI/テスト) - 1段目左 ==='" C-m
+# Feature-B-UI
+tmux send-keys -t itsm-requirement:0.0 "export PS1='[Feature-B-UI] \\w$ '" C-m
+tmux select-pane -t itsm-requirement:0.0 -T "Feature-B-UI"
 
-# Feature-C (API開発)
-tmux send-keys -t itsm-requirement:0.1 "echo '=== ペイン1: Feature-C (API開発) - 1段目右 ==='" C-m
+# Feature-C-API
+tmux send-keys -t itsm-requirement:0.1 "export PS1='[Feature-C-API] \\w$ '" C-m
+tmux select-pane -t itsm-requirement:0.1 -T "Feature-C-API"
 
-# Feature-D (PowerShell)
-tmux send-keys -t itsm-requirement:0.2 "echo '=== ペイン2: Feature-D (PowerShell) - 2段目左 ==='" C-m
+# Feature-D-PowerShell
+tmux send-keys -t itsm-requirement:0.2 "export PS1='[Feature-D-PowerShell] \\w$ '" C-m
+tmux select-pane -t itsm-requirement:0.2 -T "Feature-D-PowerShell"
 
-# Feature-E (非機能要件)
-tmux send-keys -t itsm-requirement:0.3 "echo '=== ペイン3: Feature-E (非機能要件) - 2段目右 ==='" C-m
+# Feature-E-NonFunc
+tmux send-keys -t itsm-requirement:0.3 "export PS1='[Feature-E-NonFunc] \\w$ '" C-m
+tmux select-pane -t itsm-requirement:0.3 -T "Feature-E-NonFunc"
 
-# Feature-A (統合リーダー)
-tmux send-keys -t itsm-requirement:0.4 "echo '=== ペイン4: Feature-A (統合リーダー) - 3段目フル幅 ==='" C-m
+# Feature-A-Leader
+tmux send-keys -t itsm-requirement:0.4 "export PS1='[Feature-A-Leader] \\w$ '" C-m
+tmux select-pane -t itsm-requirement:0.4 -T "Feature-A-Leader"
 ```
 
 ## 🚀 自動化スクリプト
 
 ### 実装済みスクリプト
 
-1. **start-development.sh**: メインの開発環境起動スクリプト
-2. **quick-connect.sh**: 統合起動・接続スクリプト
-3. **setup-all-panes-claude.sh**: Claude Code自動設定
+1. **start-development.sh**: メインの開発環境起動スクリプト + Claude Code自動起動
+2. **quick-connect.sh**: 統合起動・接続スクリプト + Claude Code自動起動
+3. **setup-all-panes-claude.sh**: Claude Code環境自動設定
+4. **auto-claude-hook.sh**: tmux hook設定 (attach時自動起動)
+
+### Claude Code自動起動機能
+
+✨ **tmux起動時自動起動**: 初回セッション作成時にClaude Codeが全ペインで自動起動
+✨ **tmux attach時自動起動**: セッション再接続時にClaude Codeが自動起動
+✨ **ペイン別カスタマイズ**: 各Feature専用のアシスタントとして動作
 
 ### スクリプト実行フロー
 
 ```bash
-# 完全自動化実行
+# 完全自動化実行 (Claude Code自動起動付き)
 cd /mnt/e/ServiceGrid/tmux
 ./quick-connect.sh
 
-# 手動実行の場合
+# 手動実行の場合 (Claude Code自動起動付き)
 ./start-development.sh
+
+# 既存セッションへの接続 (自動でClaude Code起動)
 tmux attach-session -t itsm-requirement
+
+# Claude Code環境のみ手動設定
+./setup-all-panes-claude.sh
+
+# tmux hook設定/解除
+./auto-claude-hook.sh setup    # attach時自動起動を設定
+./auto-claude-hook.sh remove   # 自動起動を解除
 ```
 
 ## 📊 レイアウト最適化

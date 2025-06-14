@@ -95,7 +95,8 @@ tmux/
 ```
 - tmuxセッション確認・作成
 - 5ペイン3段レイアウト構築
-- 全ペインでClaude Code自動起動
+- 全ペインでClaude Code環境設定 + ウェルカムメッセージ実行
+- tmux hook設定 (attach時自動Claude Code起動)
 - 開発環境への自動接続
 
 ### 2. 基本コンポーネント
@@ -155,12 +156,41 @@ tmux/
 - **Feature-D**: PowerShell統合・Windows対応
 - **Feature-E**: セキュリティ・非機能要件
 
-### 3. Claude活用例
+### 3. Claude Code活用例
 ```bash
 # 各ペインで専門分野のClaude Codeが稼働
-claude "プロジェクトの現状を確認して"
-claude "この機能の実装方法を提案して"
-claude "コードレビューをお願いします"
+
+# Feature-B-UI (フロントエンド)
+claude "コンポーネントのテストを作成してください"
+claude "ReactのESLintエラーを修正してください"
+
+# Feature-C-API (バックエンド)
+claude "新しいAPIエンドポイントを作成してください"
+claude "データベーススキーマを確認してください"
+
+# Feature-D-PowerShell
+claude "PowerShellスクリプトを作成してください"
+
+# Feature-E-NonFunc (非機能要件)
+claude "セキュリティ監査を実行してください"
+
+# Feature-A-Leader (統合リーダー)
+claude "プロジェクトの全体状況を確認してください"
+```
+
+### 4. Claude Code手動起動
+```bash
+# 非対話型Claude Code環境設定
+./setup-claude-noninteractive.sh setup
+
+# Claude Codeテスト実行
+./setup-claude-noninteractive.sh test
+
+# 環境設定 + テスト実行
+./setup-claude-noninteractive.sh both
+
+# ペインリセット (問題がある場合)
+./reset-claude-panes.sh both
 ```
 
 ## ⚠️ 重要な注意事項
