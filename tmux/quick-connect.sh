@@ -16,6 +16,9 @@ fi
 echo "🔧 Claude Code環境設定実行中 (非対話型)..."
 ./setup-claude-noninteractive.sh both
 
+echo "🎯 Feature-A-Leader統合リーダー機能設定中..."
+./setup-leader-pane.sh setup
+
 echo "🔗 tmux hook設定中 (今後のattach時自動起動)..."
 ./auto-claude-hook.sh setup
 

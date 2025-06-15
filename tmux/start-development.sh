@@ -179,20 +179,36 @@ create_pane_layout() {
         exit 1
     fi
     
-    # ペイン分割（3段構成: 完全に正確な実装）
-    print_info "正確な3段構成作成中..."
+    # ペイン分割（3段構成: 2x2+1レイアウト）
+    print_info "正確な3段構成作成中: 2x2+1レイアウト"
     
-    # Step 1: 上部70%、下部30%に分割
-    tmux split-window -v -p 30 -t "$SESSION_NAME:0" -c "$PROJECT_ROOT"
+    # Step 1: 全体を上部(2x2グリッド用)と下部(Leader用)に分割
+    if ! tmux split-window -v -l 30% -t "$SESSION_NAME:0" -c "$PROJECT_ROOT"; then
+        print_error "ペイン分割Step1に失敗しました"
+        exit 1
+    fi
+    # 現在: ペイン0(上部), ペイン1(下部Leader用)
     
-    # Step 2: 上部を2段に分割（50%ずつ）
-    tmux split-window -v -p 50 -t "$SESSION_NAME:0.0" -c "$PROJECT_ROOT"
+    # Step 2: 上部を上段と下段に分割（2段作成）
+    if ! tmux split-window -v -l 50% -t "$SESSION_NAME:0.0" -c "$PROJECT_ROOT"; then
+        print_error "ペイン分割Step2に失敗しました"
+        exit 1
+    fi
+    # 現在: ペイン0(1段目), ペイン1(2段目), ペイン2(Leader)
     
-    # Step 3: 1段目を左右分割（50%ずつ）- ペイン0とペイン1
-    tmux split-window -h -p 50 -t "$SESSION_NAME:0.0" -c "$PROJECT_ROOT"
+    # Step 3: 1段目を左右分割（Feature-B, Feature-C）
+    if ! tmux split-window -h -l 50% -t "$SESSION_NAME:0.0" -c "$PROJECT_ROOT"; then
+        print_error "ペイン分割Step3に失敗しました"
+        exit 1
+    fi
+    # 現在: ペイン0(Feature-B), ペイン1(Feature-C), ペイン2(2段目), ペイン3(Leader)
     
-    # Step 4: 2段目を左右分割（50%ずつ）- ペイン2とペイン3
-    tmux split-window -h -p 50 -t "$SESSION_NAME:0.1" -c "$PROJECT_ROOT"
+    # Step 4: 2段目を左右分割（Feature-D, Feature-E）
+    if ! tmux split-window -h -l 50% -t "$SESSION_NAME:0.2" -c "$PROJECT_ROOT"; then
+        print_error "ペイン分割Step4に失敗しました"
+        exit 1
+    fi
+    # 最終: ペイン0(Feature-B), ペイン1(Feature-C), ペイン2(Feature-D), ペイン3(Feature-E), ペイン4(Leader)
     
     # ペイン5が作成されているので削除（4ペインのみ必要）
     sleep 1
@@ -331,6 +347,10 @@ main() {
     # Claude Code環境設定 (非対話型)
     print_info "Claude Code環境を設定中..."
     bash "$TMUX_DIR/setup-claude-noninteractive.sh" both
+    
+    # Feature-A-Leader統合リーダー機能設定
+    print_info "Feature-A-Leader統合リーダー機能設定中..."
+    bash "$TMUX_DIR/setup-leader-pane.sh" setup
     
     # tmux hook設定 (attach時自動起動)
     print_info "tmux hook設定中..."

@@ -216,24 +216,26 @@ created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
 4つのFeatureチームが同時並行で開発を進め、Feature-A統合リーダーが全体を統括する協調開発を実現します。
 
-### アーキテクチャ
+### アーキテクチャ（2x2+1 レイアウト）
 
 ```
 ┌─────────────────────────────────────┐
-│ Feature-A (統合リーダー)             │
-│ VSCode + Claude                     │
-│ ↓ 統合指示・品質監視                │
-├─────────────────────────────────────┤
-│ tmux 4ペイン並列開発環境             │
+│ tmux 5ペイン 3段並列開発環境         │
 │ ┌─────────────┬─────────────────────┤
-│ │ Pane 0      │ Pane 1              │
+│ │ 1段目（上段）                     │
+│ │ ペイン0     │ ペイン1             │
 │ │ 🎨 Feature-B │ 🔧 Feature-C        │
 │ │ UI/テスト    │ API開発             │
 │ ├─────────────┼─────────────────────┤
-│ │ Pane 2      │ Pane 3              │
+│ │ 2段目（中段）                     │
+│ │ ペイン2     │ ペイン3             │
 │ │ 💻 Feature-D │ 🔒 Feature-E        │
 │ │ PowerShell   │ 非機能要件          │
-│ └─────────────┴─────────────────────┘
+│ ├─────────────┴─────────────────────┤
+│ │ 3段目（下段フル幅）               │
+│ │ ペイン4: Feature-A-Leader         │
+│ │ 🎯 統合リーダー・指示送信         │
+│ └─────────────────────────────────────┘
 └─────────────────────────────────────┘
 ```
 
@@ -241,7 +243,7 @@ created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
 | Feature | 担当領域 | 技術スタック | 主な作業内容 |
 |---------|----------|-------------|-------------|
-| **Feature-A** | 統合リーダー | VSCode + Claude | プロジェクト統括、品質監視、指示送信 |
+| **Feature-A** | 統合リーダー | tmuxペイン4 + Claude | プロジェクト統括、品質監視、指示送信 |
 | **Feature-B** | UI/テスト | React + TypeScript + Jest | フロントエンド開発、UIテスト自動化 |
 | **Feature-C** | API開発 | Node.js + Express + SQLite | バックエンドAPI、データベース管理 |
 | **Feature-D** | PowerShell | PowerShell + Windows API | Windows統合、PowerShell API実装 |
@@ -253,31 +255,40 @@ created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
 ```bash
 cd /mnt/e/ServiceGrid/tmux
-./start-development.sh  # 4ペイン並列開発環境起動
-tmux attach-session -t itsm-dev  # セッション接続
+./start-development.sh  # 5ペイン並列開発環境起動（3段構成）
+tmux attach-session -t itsm-requirement  # セッション接続
 ```
 
 #### 2. 統合指示システム
 
-**基本指示送信:**
+**基本指示送信（Feature-A-Leaderペイン4から）:**
 ```bash
-cd tmux/coordination
-./send-to-all-fixed.sh "全チーム状況報告お願いします"
+# leader統合コマンド（推奨）
+leader all "全チーム状況報告お願いします"
+
+# 直接実行（従来方式）
+./coordination/send-to-all-fixed.sh "全チーム状況報告お願いします"
 ```
 
 **高度なオプション活用:**
 ```bash
 # ファイル参照付き指示
-./send-to-all-fixed.sh --files "package.json,tsconfig.json" "設定確認お願いします"
+leader all --files "package.json,tsconfig.json" "設定確認お願いします"
 
 # 自動承認モード
-./send-to-all-fixed.sh --auto-approve "lintエラーを修正してください"
+leader all --auto-approve "lintエラーを修正してください"
 
-# モデル指定
-./send-to-all-fixed.sh --model claude-3-5-sonnet "詳細分析をお願いします"
+# @claude形式指示
+leader all --at-claude "UIテストを実行してください"
+
+# 個別ペイン指示
+leader ui "Reactコンポーネントを最適化してください"
+leader api "APIエンドポイントを強化してください"
+leader ps "PowerShell APIを堅牢化してください"
+leader sec "セキュリティ監査を実行してください"
 
 # 統合オプション
-./send-to-all-fixed.sh \
+leader all \
   --files "src/**/*.tsx,backend/**/*.js" \
   --auto-approve \
   --model claude-3-5-sonnet \
@@ -287,9 +298,9 @@ cd tmux/coordination
 #### 3. 開発ワークフロー
 
 1. **環境起動**: `./start-development.sh`
-2. **セッション接続**: `tmux attach-session -t itsm-dev`
-3. **各ペインでClaude起動**: 自動起動済み
-4. **統合指示**: 別ターミナルから統合指示送信
+2. **セッション接続**: `tmux attach-session -t itsm-requirement`
+3. **各ペインでClaude起動**: 自動起動済み（非対話型）
+4. **統合指示**: Feature-A-Leaderペイン4から`leader`コマンドで指示送信
 5. **並列開発**: 各ペインで同時作業実行
 6. **品質チェック**: 自動lint + テスト実行
 7. **統合テスト**: エンドツーエンドテスト

@@ -1,4 +1,4 @@
-# DBUtil.psm1 - SQLiteデータベース操作共通モジュール
+# DBUtil.psm1 - SQLiteデータベース操作共通モジュール - Enhanced with error resilience and connection pooling
 
 function Initialize-Database {
     param(

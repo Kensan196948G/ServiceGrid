@@ -823,4 +823,10 @@ main_loop() {
 # スクリプト開始
 print_header
 setup_claude
-main_loop
+echo ""
+echo "💡 Feature-E-NonFunc待機中... Claude Codeで指示をお待ちしています"
+echo "📋 使用例: claude 'セキュリティ監査を実行してください'"
+echo ""
+
+# 非対話型モード - Claude Code待機
+# メニューは表示せず、Claude Codeからの指示を待機

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Feature-A → Feature-E (非機能要件) 指示送信
 
-SESSION="itsm-dev"
+SESSION="itsm-requirement"
 INSTRUCTION="$1"
 
 if [ -z "$INSTRUCTION" ]; then
@@ -11,5 +11,5 @@ if [ -z "$INSTRUCTION" ]; then
 fi
 
 echo "🔒 Feature-E (非機能要件) に指示送信中..."
-tmux send-keys -t "$SESSION:0.3" "$INSTRUCTION" C-m
+tmux send-keys -t "$SESSION:0.3" "claude '$INSTRUCTION'" C-m
 echo "✅ Feature-E指示送信完了"

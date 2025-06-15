@@ -1,4 +1,4 @@
-// Comprehensive error handling utilities for backend APIs
+// Comprehensive error handling utilities for backend APIs - Enhanced version with performance monitoring
 const fs = require('fs');
 const path = require('path');
 

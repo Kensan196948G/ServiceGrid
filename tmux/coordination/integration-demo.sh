@@ -1,7 +1,7 @@
 #!/bin/bash
 # Feature-A統合リーダー連携デモ
 
-SESSION="itsm-dev"
+SESSION="itsm-requirement"
 
 echo "🎯 Feature-A統合リーダー連携デモ開始"
 echo "========================================"

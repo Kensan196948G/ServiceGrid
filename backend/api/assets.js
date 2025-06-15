@@ -22,14 +22,24 @@ const {
 
 const DB_PATH = path.join(__dirname, '..', 'db', 'itsm.sqlite');
 
-// キャッシュ管理用のメモリストア
+// キャッシュ管理用のメモリストア（強化版）
 const cache = {
   assets: new Map(),
   stats: null,
-  lastUpdated: null
+  lastUpdated: null,
+  queries: new Map() // クエリ結果キャッシュ
 };
 
 const CACHE_TTL = 5 * 60 * 1000; // 5分間
+
+// キャッシュ無効化機能
+function invalidateCache() {
+  cache.assets.clear();
+  cache.stats = null;
+  cache.queries.clear();
+  cache.lastUpdated = null;
+  console.log('Asset cache invalidated');
+}
 
 // データベース接続取得
 function getDbConnection() {
@@ -196,9 +206,8 @@ function generateNextAssetTag(type, callback) {
   );
 }
 
-// バリデーション関数
 // 強化されたバリデーション関数
-function validateAssetData(data, isUpdate = false) {
+function validateAssetDataEnhanced(data, isUpdate = false) {
   try {
     // データの正規化
     const sanitizedData = sanitizeInput(data);

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, ReactNode, useMemo, useRef } f
 import { Asset, UserRole } from '../types';
 import { getAssets as getAssetsApi, createAsset as addAsset, updateAsset, deleteAsset, getErrorMessage, generateAssetTag } from '../services/assetApiService';
 import { Button, Table, Modal, Input, Select, Spinner, Card, Notification, NotificationType } from '../components/CommonUI';
-import { useAuth }from '../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { assetTypeToJapanese, assetStatusToJapanese } from '../localization';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from '../components/ChartPlaceholder';
 import { exportToCsv, importFromCsv, ASSET_CSV_HEADERS, CsvValidationError } from '../utils/csvUtils';
@@ -435,32 +435,45 @@ const AssetPage: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 space-y-6">
       {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
-      <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-semibold text-slate-800">資産管理 (CMDB)</h2>
-        <div className="flex space-x-2">
-          <Button onClick={handleExport} variant="secondary">CSVエクスポート</Button>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white rounded-xl shadow-sm p-6">
+        <div>
+          <h2 className="text-3xl font-bold text-slate-800 mb-2">資産管理 (CMDB)</h2>
+          <p className="text-slate-600">IT資産の一元管理とライフサイクル追跡</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={handleExport} variant="secondary" className="flex items-center gap-2 shadow-sm hover:shadow-md transition-shadow">
+            <span className="text-lg">📤</span>
+            CSVエクスポート
+          </Button>
           {user?.role === UserRole.ADMIN && (
             <>
-              <Button onClick={handleImport} variant="secondary">CSVインポート</Button>
-              <Button onClick={() => handleOpenModal()}>新規資産追加</Button>
+              <Button onClick={handleImport} variant="secondary" className="flex items-center gap-2 shadow-sm hover:shadow-md transition-shadow">
+                <span className="text-lg">📥</span>
+                CSVインポート
+              </Button>
+              <Button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transition-all">
+                <span className="text-lg">➕</span>
+                新規資産追加
+              </Button>
             </>
           )}
         </div>
       </div>
 
-      {/* Asset Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card title="総資産数" className="md:col-span-1 text-center">
+      {/* Enhanced Asset Dashboard */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <Card title="総資産数" className="text-center bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-shadow">
           {isLoading ? <Spinner /> : (
             <>
-              <div className="text-5xl mb-1 text-slate-500" aria-hidden="true">🗄️</div>
-              <p className="text-4xl font-bold text-blue-600">{totalAssetsCount}</p>
+              <div className="text-6xl mb-3 animate-pulse" aria-hidden="true">🗄️</div>
+              <p className="text-5xl font-bold text-blue-600 mb-2">{totalAssetsCount}</p>
+              <p className="text-sm text-blue-700 font-medium">件の資産を管理中</p>
             </>
           )}
         </Card>
-        <Card title="資産タイプ別分布" className="md:col-span-2">
+        <Card title="資産タイプ別分布" className="lg:col-span-3 bg-white border-slate-200 hover:shadow-lg transition-shadow">
           {isLoading ? <Spinner /> : assetTypeDistribution.length > 0 ? (
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
@@ -493,50 +506,159 @@ const AssetPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* Asset Filters */}
-      <Card title="資産フィルター">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 p-4">
-          <Select label="種類" value={typeFilter} onChange={e => {setTypeFilter(e.target.value); setCurrentPage(1);}} options={typeOptions} />
-          <Select label="ステータス" value={statusFilter} onChange={e => {setStatusFilter(e.target.value); setCurrentPage(1);}} options={statusOptions} />
-          <Select label="所有者" value={ownerFilter} onChange={e => {setOwnerFilter(e.target.value); setCurrentPage(1);}} options={ownerOptions} />
-          <Select label="場所" value={locationFilter} onChange={e => {setLocationFilter(e.target.value); setCurrentPage(1);}} options={locationOptions} />
-          <div className="flex items-end">
-            <Button onClick={clearFilters} variant="secondary" className="w-full">フィルタークリア</Button>
+      {/* Enhanced Asset Filters */}
+      <Card title="🔍 資産フィルター" className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+        <div className="p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+            <div className="space-y-2">
+              <Select 
+                label="種類" 
+                value={typeFilter} 
+                onChange={e => {setTypeFilter(e.target.value); setCurrentPage(1);}} 
+                options={typeOptions} 
+                className="bg-slate-50 border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
+            <div className="space-y-2">
+              <Select 
+                label="ステータス" 
+                value={statusFilter} 
+                onChange={e => {setStatusFilter(e.target.value); setCurrentPage(1);}} 
+                options={statusOptions} 
+                className="bg-slate-50 border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
+            <div className="space-y-2">
+              <Select 
+                label="所有者" 
+                value={ownerFilter} 
+                onChange={e => {setOwnerFilter(e.target.value); setCurrentPage(1);}} 
+                options={ownerOptions} 
+                className="bg-slate-50 border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
+            <div className="space-y-2">
+              <Select 
+                label="場所" 
+                value={locationFilter} 
+                onChange={e => {setLocationFilter(e.target.value); setCurrentPage(1);}} 
+                options={locationOptions} 
+                className="bg-slate-50 border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button onClick={clearFilters} variant="secondary" className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300 transition-colors">
+                <span className="mr-2">🗑️</span>
+                フィルタークリア
+              </Button>
+            </div>
           </div>
+          
+          {/* Filter Summary */}
+          {(typeFilter || statusFilter || ownerFilter || locationFilter) && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-sm font-medium text-blue-800">適用中のフィルター:</span>
+                {typeFilter && (
+                  <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                    種類: {assetTypeToJapanese(typeFilter)}
+                  </span>
+                )}
+                {statusFilter && (
+                  <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                    ステータス: {assetStatusToJapanese(statusFilter)}
+                  </span>
+                )}
+                {ownerFilter && (
+                  <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">
+                    所有者: {ownerFilter}
+                  </span>
+                )}
+                {locationFilter && (
+                  <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">
+                    場所: {locationFilter}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </Card>
 
-      <Card title="IT資産一覧">
+      <Card title="📋 IT資産一覧" className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-shadow">
         {isLoading ? (
             <div className="flex justify-center p-8"><Spinner size="lg" /></div>
          ) : (
             <>
-                <div className="overflow-x-auto">
-                  <Table<Asset> columns={columns} data={paginatedAssets} onRowClick={handleOpenModal}/>
+                <div className="overflow-x-auto bg-white rounded-lg">
+                  <Table<Asset> 
+                    columns={columns} 
+                    data={paginatedAssets} 
+                    onRowClick={handleOpenModal}
+                    className="w-full border-collapse"
+                  />
                 </div>
                 {filteredAssets.length > 0 && (
-                    <div className="flex flex-col md:flex-row justify-between items-center p-4 border-t border-slate-200">
-                        <div className="mb-2 md:mb-0">
-                        <Select
-                            label="表示件数:"
-                            value={itemsPerPage}
-                            onChange={handleItemsPerPageChange}
-                            options={itemsPerPageOptions}
-                            className="inline-block w-auto"
-                        />
-                        <span className="ml-2 text-sm text-slate-600">
-                            {filteredAssets.length}件中 {Math.min((currentPage - 1) * itemsPerPage + 1, filteredAssets.length)}-{Math.min(currentPage * itemsPerPage, filteredAssets.length)}件表示
-                        </span>
+                    <div className="bg-slate-50 border-t border-slate-200 px-6 py-4">
+                      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-slate-700">表示件数:</span>
+                            <Select
+                                value={itemsPerPage}
+                                onChange={handleItemsPerPageChange}
+                                options={itemsPerPageOptions}
+                                className="w-20 text-sm bg-white border-slate-300"
+                            />
+                          </div>
+                          <div className="text-sm text-slate-600 bg-white px-3 py-1 rounded-full border border-slate-200">
+                              📊 {filteredAssets.length}件中 {Math.min((currentPage - 1) * itemsPerPage + 1, filteredAssets.length)}-{Math.min(currentPage * itemsPerPage, filteredAssets.length)}件表示
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                        <Button onClick={handlePrevPage} disabled={currentPage === 1} size="sm">前へ</Button>
-                        <span className="text-sm text-slate-700">ページ {currentPage} / {totalPages || 1}</span>
-                        <Button onClick={handleNextPage} disabled={currentPage === totalPages || totalPages === 0} size="sm">次へ</Button>
+                        <div className="flex items-center gap-3">
+                          <Button 
+                            onClick={handlePrevPage} 
+                            disabled={currentPage === 1} 
+                            size="sm" 
+                            variant="secondary"
+                            className="bg-white border-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            ← 前へ
+                          </Button>
+                          <div className="flex items-center gap-2 px-3 py-1 bg-white border border-slate-300 rounded-md">
+                            <span className="text-sm font-medium text-slate-700">ページ</span>
+                            <span className="text-sm font-bold text-blue-600">{currentPage}</span>
+                            <span className="text-sm text-slate-500">/</span>
+                            <span className="text-sm text-slate-700">{totalPages || 1}</span>
+                          </div>
+                          <Button 
+                            onClick={handleNextPage} 
+                            disabled={currentPage === totalPages || totalPages === 0} 
+                            size="sm" 
+                            variant="secondary"
+                            className="bg-white border-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            次へ →
+                          </Button>
                         </div>
+                      </div>
                     </div>
                 )}
                 {filteredAssets.length === 0 && !isLoading && (
-                    <p className="p-4 text-slate-500 italic">条件に一致する資産はありません。</p>
+                    <div className="text-center py-12">
+                      <div className="text-6xl mb-4 opacity-50">📦</div>
+                      <p className="text-lg text-slate-500 mb-2">条件に一致する資産はありません</p>
+                      <p className="text-sm text-slate-400">フィルター条件を変更するか、新しい資産を追加してください</p>
+                      {user?.role === UserRole.ADMIN && (
+                        <Button 
+                          onClick={() => handleOpenModal()} 
+                          className="mt-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+                        >
+                          <span className="mr-2">➕</span>
+                          最初の資産を追加
+                        </Button>
+                      )}
+                    </div>
                 )}
             </>
          )

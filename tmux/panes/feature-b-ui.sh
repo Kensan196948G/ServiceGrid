@@ -152,4 +152,9 @@ print_header
 print_success "Feature-B-UI: UI/テスト環境準備完了！"
 print_success "Claude Code: フロントエンド開発アシスタント準備完了！"
 echo ""
-main_loop
+echo "💡 Feature-B-UI待機中... Claude Codeで指示をお待ちしています"
+echo "📋 使用例: claude 'Reactコンポーネントを最適化してください'"
+echo ""
+
+# 非対話型モード - Claude Code待機
+# メニューは表示せず、Claude Codeからの指示を待機

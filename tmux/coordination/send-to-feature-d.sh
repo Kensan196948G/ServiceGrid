@@ -1,7 +1,7 @@
 #!/bin/bash
 # Feature-A → Feature-D (PowerShell) 指示送信
 
-SESSION="itsm-dev"
+SESSION="itsm-requirement"
 INSTRUCTION="$1"
 
 if [ -z "$INSTRUCTION" ]; then
@@ -11,5 +11,5 @@ if [ -z "$INSTRUCTION" ]; then
 fi
 
 echo "💻 Feature-D (PowerShell) に指示送信中..."
-tmux send-keys -t "$SESSION:0.2" "$INSTRUCTION" C-m
+tmux send-keys -t "$SESSION:0.2" "claude '$INSTRUCTION'" C-m
 echo "✅ Feature-D指示送信完了"

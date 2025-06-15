@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-    資産管理API - PowerShell強化版
-    企業レベルのCMDB機能、自動タグ生成、統計情報、セキュリティ機能を実装
+    資産管理API - PowerShell強化版 v2.1
+    企業レベルのCMDB機能、自動タグ生成、統計情報、セキュリティ機能、エラー耐性を実装
 
 .DESCRIPTION
     ITSM準拠の資産管理システムで、以下の機能を提供:

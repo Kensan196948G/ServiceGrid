@@ -3,7 +3,7 @@
 # Feature-A統合リーダーから全ペインに指示送信（拡張版）
 # Claude Code ランチャーオプション対応
 
-SESSION="itsm-dev"
+SESSION="itsm-requirement"
 
 # デフォルト値
 INSTRUCTION=""
@@ -11,6 +11,7 @@ CLAUDE_OPTIONS=""
 FILES=""
 MODEL=""
 AUTO_APPROVE=false
+USE_AT_CLAUDE=false
 
 # 使用方法表示
 show_usage() {
@@ -25,6 +26,7 @@ show_usage() {
     echo "  --files 'PATTERN'            参照ファイルパターン"
     echo "  --model 'MODEL_NAME'         使用モデル指定"
     echo "  --auto-approve               自動承認モード"
+    echo "  --at-claude                  @claude指示形式を使用"
     echo "  --help                       このヘルプを表示"
     echo ""
     echo "例:"
@@ -32,6 +34,7 @@ show_usage() {
     echo "  $0 --files 'package.json,src/**/*.tsx' 'レビューしてください'"
     echo "  $0 --auto-approve 'lintエラーを修正してください'"
     echo "  $0 --model claude-3-5-sonnet '詳細分析をお願いします'"
+    echo "  $0 --at-claude 'UIテストを実行してください'"
     echo "  $0 --claude-options '--memory \"UI開発担当\"' 'React開発支援お願いします'"
 }
 
@@ -52,6 +55,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --auto-approve)
             AUTO_APPROVE=true
+            shift
+            ;;
+        --at-claude)
+            USE_AT_CLAUDE=true
             shift
             ;;
         --help)
@@ -79,36 +86,43 @@ fi
 
 # Claude Codeコマンド構築
 build_claude_command() {
-    local cmd="claude"
+    local cmd
     
-    # モデル指定
-    if [ -n "$MODEL" ]; then
-        cmd="$cmd --model '$MODEL'"
+    # @claude形式 vs claude形式の選択
+    if [ "$USE_AT_CLAUDE" = true ]; then
+        cmd="@claude $INSTRUCTION"
+    else
+        cmd="claude"
+        
+        # モデル指定
+        if [ -n "$MODEL" ]; then
+            cmd="$cmd --model '$MODEL'"
+        fi
+        
+        # 自動承認モード
+        if [ "$AUTO_APPROVE" = true ]; then
+            cmd="$cmd --auto-approve"
+        fi
+        
+        # ファイル指定
+        if [ -n "$FILES" ]; then
+            # カンマ区切りのファイルパターンを処理
+            IFS=',' read -ra FILE_ARRAY <<< "$FILES"
+            for file_pattern in "${FILE_ARRAY[@]}"; do
+                # 先頭・末尾の空白を削除
+                file_pattern=$(echo "$file_pattern" | xargs)
+                cmd="$cmd --file '$file_pattern'"
+            done
+        fi
+        
+        # 追加のClaude Codeオプション
+        if [ -n "$CLAUDE_OPTIONS" ]; then
+            cmd="$cmd $CLAUDE_OPTIONS"
+        fi
+        
+        # 指示内容を追加
+        cmd="$cmd '$INSTRUCTION'"
     fi
-    
-    # 自動承認モード
-    if [ "$AUTO_APPROVE" = true ]; then
-        cmd="$cmd --auto-approve"
-    fi
-    
-    # ファイル指定
-    if [ -n "$FILES" ]; then
-        # カンマ区切りのファイルパターンを処理
-        IFS=',' read -ra FILE_ARRAY <<< "$FILES"
-        for file_pattern in "${FILE_ARRAY[@]}"; do
-            # 先頭・末尾の空白を削除
-            file_pattern=$(echo "$file_pattern" | xargs)
-            cmd="$cmd --file '$file_pattern'"
-        done
-    fi
-    
-    # 追加のClaude Codeオプション
-    if [ -n "$CLAUDE_OPTIONS" ]; then
-        cmd="$cmd $CLAUDE_OPTIONS"
-    fi
-    
-    # 指示内容を追加
-    cmd="$cmd '$INSTRUCTION'"
     
     echo "$cmd"
 }
@@ -119,6 +133,12 @@ echo "指示内容: $INSTRUCTION"
 
 if [ -n "$MODEL" ]; then
     echo "🤖 使用モデル: $MODEL"
+fi
+
+if [ "$USE_AT_CLAUDE" = true ]; then
+    echo "🔀 実行形式: @claude指示形式"
+else
+    echo "🔀 実行形式: claude コマンド形式"
 fi
 
 if [ "$AUTO_APPROVE" = true ]; then

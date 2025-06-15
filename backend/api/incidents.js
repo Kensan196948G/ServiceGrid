@@ -1,6 +1,6 @@
 /**
  * インシデント管理API実装 - 強化版
- * 優先度管理、SLA連携、エスカレーション機能を含む包括的なAPI
+ * 優先度管理、SLA連携、エスカレーション機能、自動通知、監査ログを含む包括的なAPI
  */
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
