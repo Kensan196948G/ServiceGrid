@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import * as React from 'react';
+const { createContext, useContext, useState, useEffect } = React;
+type ReactNode = React.ReactNode;
 
 // Simple routing context
 interface RouterContextType {

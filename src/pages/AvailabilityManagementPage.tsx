@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import * as React from 'react';
+const { useState, useEffect, useCallback, useMemo } = React;
 import { 
     AvailabilityRecord, UserRole, ServiceImportance, CurrentServiceStatus,
     AvailabilityQuickActionFormData

@@ -1,5 +1,6 @@
 
-import React, { useEffect, useState, useCallback } from 'react';
+import * as React from 'react';
+const { useEffect, useState, useCallback } = React;
 import { Link, useNavigate } from '../components/RouterPlaceholder';
 import { Card, Spinner, Button, Notification, NotificationType, Modal, Table } from '../components/CommonUI';
 import { 

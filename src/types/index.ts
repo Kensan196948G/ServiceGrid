@@ -13,10 +13,10 @@ export * from './compliance';
 export * from './availability';
 export * from './release';
 export * from './change';
-export * from './problem';
+export { Problem, ProblemStatus, ProblemCategory } from './problem';
 export * from './sla';
 export * from './capacity';
-export * from './audit';
+export { AuditLog as ProblemAuditLog } from './audit';
 
 // Service types
 export * from './gemini';

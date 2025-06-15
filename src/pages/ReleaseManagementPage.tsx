@@ -1,5 +1,7 @@
 
-import React, { useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
+import * as React from 'react';
+const { useState, useEffect, useCallback, useMemo } = React;
+type ReactNode = React.ReactNode;
 import { Release, ItemStatus, UserRole, ReleaseType } from '../types';
 import { getReleases, createRelease, updateRelease, deleteRelease as deleteReleaseAPI } from '../services/releaseApiService';
 import { Button, Table, Modal, Input, Textarea, Select, Spinner, Card, Notification, NotificationType } from '../components/CommonUI';

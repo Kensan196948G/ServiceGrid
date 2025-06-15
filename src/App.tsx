@@ -1,5 +1,5 @@
 
-import React from 'react';
+import * as React from 'react';
 import { HashRouter, Routes, Route, Navigate } from './components/RouterPlaceholder';
 import { useAuth } from './contexts/AuthContext';
 import { MainLayout } from './components/Layout';

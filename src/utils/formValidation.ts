@@ -2,7 +2,8 @@
  * フォームバリデーション ユーティリティ
  * 包括的なバリデーション機能を提供
  */
-import React from 'react';
+import * as React from 'react';
+const { useState } = React;
 
 export interface ValidationRule {
   required?: boolean;
@@ -322,9 +323,9 @@ function getPatternErrorMessage(fieldName: string, pattern: RegExp): string {
 
 // Real-time validation hook for React forms
 export function useFormValidation(initialData: Record<string, any>, validationRules: Record<string, ValidationRule>) {
-  const [data, setData] = React.useState(initialData);
-  const [errors, setErrors] = React.useState<Record<string, string>>({});
-  const [touched, setTouched] = React.useState<Record<string, boolean>>({});
+  const [data, setData] = useState(initialData);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const validateSingleField = (fieldName: string, value: any) => {
     const rules = validationRules[fieldName];
@@ -386,8 +387,6 @@ export function useFormValidation(initialData: Record<string, any>, validationRu
     isValid: Object.values(errors).every(error => !error)
   };
 }
-
-import React from 'react';
 
 // Export commonly used validation rule sets
 export const ASSET_VALIDATION_RULES = {

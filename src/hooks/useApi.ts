@@ -2,7 +2,8 @@
  * 汎用API呼び出し用カスタムフック
  * ローディング状態、エラーハンドリング、自動リトライ機能を提供
  */
-import { useState, useCallback, useRef, useEffect } from 'react';
+import * as React from 'react';
+const { useState, useCallback, useRef, useEffect } = React;
 import { handleApiError, logError } from '../utils/errorHandler';
 
 interface UseApiState<T> {

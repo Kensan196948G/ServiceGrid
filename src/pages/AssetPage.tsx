@@ -1,5 +1,7 @@
 
-import React, { useState, useEffect, useCallback, ReactNode, useMemo, useRef } from 'react';
+import * as React from 'react';
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
+type ReactNode = React.ReactNode;
 import { Asset, UserRole } from '../types';
 import { getAssets as getAssetsApi, createAsset as addAsset, updateAsset, deleteAsset, getErrorMessage, generateAssetTag } from '../services/assetApiService';
 import { Button, Table, Modal, Input, Select, Spinner, Card, Notification, NotificationType } from '../components/CommonUI';

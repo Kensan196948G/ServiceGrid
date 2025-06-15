@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import * as React from 'react';
+const { useEffect, useState } = React;
 import { Card, Button } from '../components/CommonUI';
 
 interface MaintenanceInfo {

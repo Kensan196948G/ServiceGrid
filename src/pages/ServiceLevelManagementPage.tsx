@@ -1,5 +1,7 @@
 
-import React, { useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
+import * as React from 'react';
+const { useState, useEffect, useCallback, useMemo } = React;
+type ReactNode = React.ReactNode;
 import { ServiceLevelAgreement, UserRole } from '../types';
 import { getSLAs, createSLA, updateSLA, deleteSLA } from '../services/slaApiService';
 import { addAuditLog } from '../services/mockItsmService';

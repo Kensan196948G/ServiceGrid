@@ -1,5 +1,6 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import * as React from 'react';
+const { useState, useCallback, useEffect } = React;
 import { useAuth } from '../contexts/AuthContext';
 import { Button, Card, Notification, NotificationType, Modal, Input } from '../components/CommonUI';
 import { AuditLog, UserRole } from '../types';

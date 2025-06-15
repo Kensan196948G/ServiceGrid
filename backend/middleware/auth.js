@@ -57,6 +57,43 @@ const authenticateToken = (req, res, next) => {
       });
     }
 
+    // トークン無効化チェック
+    if (user.jti && isTokenRevoked(user.jti)) {
+      logActivity(req, 'AUTHENTICATION_FAILED', 'Token revoked');
+      return res.status(401).json({
+        success: false,
+        error: {
+          type: 'AUTHENTICATION_ERROR',
+          message: 'トークンが無効化されています',
+          code: 'TOKEN_REVOKED',
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
+
+    // セッション有効性チェック
+    if (user.sessionId && activeSessions.has(user.userId)) {
+      const userSessions = activeSessions.get(user.userId);
+      if (userSessions.has(user.sessionId)) {
+        const session = userSessions.get(user.sessionId);
+        if (!session.isActive) {
+          logActivity(req, 'AUTHENTICATION_FAILED', 'Session inactive');
+          return res.status(401).json({
+            success: false,
+            error: {
+              type: 'AUTHENTICATION_ERROR',
+              message: 'セッションが無効です',
+              code: 'SESSION_INACTIVE',
+              timestamp: new Date().toISOString()
+            }
+          });
+        }
+        
+        // セッション活動を更新
+        updateSessionActivity(user.userId, user.sessionId);
+      }
+    }
+
     req.user = user;
     logActivity(req, 'AUTHENTICATION_SUCCESS', `User authenticated: ${user.username}`);
     next();
@@ -124,15 +161,17 @@ const verifyPassword = async (password, hashedPassword) => {
 /**
  * JWTトークン生成（強化版）
  */
-const generateToken = (user) => {
+const generateToken = (user, sessionId = null) => {
   const now = Math.floor(Date.now() / 1000);
   const payload = {
     userId: user.user_id,
     username: user.username,
     role: user.role,
     email: user.email,
+    sessionId: sessionId || require('crypto').randomUUID(),
     iat: now,
-    jti: require('crypto').randomBytes(16).toString('hex') // JWT ID for token revocation
+    jti: require('crypto').randomBytes(16).toString('hex'), // JWT ID for token revocation
+    deviceFingerprint: require('crypto').createHash('sha256').update(user.username + Date.now()).digest('hex').substring(0, 16)
   };
 
   return jwt.sign(payload, process.env.JWT_SECRET, {
@@ -227,6 +266,80 @@ const sanitizeInput = (req, res, next) => {
 };
 
 /**
+ * トークン無効化リスト（メモリベース - 本格実装ではRedisを推奨）
+ */
+const revokedTokens = new Set();
+
+/**
+ * トークン無効化
+ */
+const revokeToken = (jti) => {
+  revokedTokens.add(jti);
+  // 定期的にクリーンアップ（24時間後）
+  setTimeout(() => {
+    revokedTokens.delete(jti);
+  }, 24 * 60 * 60 * 1000);
+};
+
+/**
+ * トークン無効化チェック
+ */
+const isTokenRevoked = (jti) => {
+  return revokedTokens.has(jti);
+};
+
+/**
+ * セッション管理（メモリベース）
+ */
+const activeSessions = new Map();
+
+/**
+ * セッション作成
+ */
+const createSession = (userId, sessionId, userAgent, ipAddress) => {
+  const sessionData = {
+    userId,
+    sessionId,
+    userAgent,
+    ipAddress,
+    createdAt: new Date(),
+    lastActivity: new Date(),
+    isActive: true
+  };
+  
+  if (!activeSessions.has(userId)) {
+    activeSessions.set(userId, new Map());
+  }
+  
+  activeSessions.get(userId).set(sessionId, sessionData);
+  return sessionData;
+};
+
+/**
+ * セッション更新
+ */
+const updateSessionActivity = (userId, sessionId) => {
+  if (activeSessions.has(userId)) {
+    const userSessions = activeSessions.get(userId);
+    if (userSessions.has(sessionId)) {
+      userSessions.get(sessionId).lastActivity = new Date();
+    }
+  }
+};
+
+/**
+ * セッション無効化
+ */
+const revokeSession = (userId, sessionId) => {
+  if (activeSessions.has(userId)) {
+    const userSessions = activeSessions.get(userId);
+    if (userSessions.has(sessionId)) {
+      userSessions.get(sessionId).isActive = false;
+    }
+  }
+};
+
+/**
  * レート制限チェック（簡易版）
  */
 const requests = new Map();
@@ -286,5 +399,11 @@ module.exports = {
   rateLimit,
   validateApiRequest,
   sanitizeInput,
-  logActivity
+  logActivity,
+  revokeToken,
+  isTokenRevoked,
+  createSession,
+  updateSessionActivity,
+  revokeSession,
+  activeSessions
 };

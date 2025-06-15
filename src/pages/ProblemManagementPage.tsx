@@ -1,5 +1,7 @@
 
-import React, { useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
+import * as React from 'react';
+const { useState, useEffect, useCallback, useMemo } = React;
+type ReactNode = React.ReactNode;
 import { Problem, ProblemStatus, Priority, UserRole } from '../types';
 import { getProblems, createProblem, updateProblem, deleteProblem } from '../services/problemApiService';
 import { getIncidents } from '../services/mockItsmService'; // Still using mock for incidents until implemented

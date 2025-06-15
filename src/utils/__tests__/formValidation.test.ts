@@ -1,5 +1,5 @@
 // Comprehensive tests for form validation utilities
-import React from 'react';
+import * as React from 'react';
 import { 
   validateField, 
   validateForm, 

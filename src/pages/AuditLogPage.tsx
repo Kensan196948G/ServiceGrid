@@ -1,5 +1,7 @@
 
-import React, { useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
+import * as React from 'react';
+const { useState, useEffect, useCallback, useMemo } = React;
+type ReactNode = React.ReactNode;
 import { AuditLog, LogSourceStatus, LogStorageSummary, AuditLogQuickActionFormData } from '../types';
 import { getAuditLogs, getLogSourceStatuses, getLogStorageSummary, addAuditLog } from '../services/mockItsmService';
 import { Table, Spinner, Card, Input, Button, Modal, Notification, NotificationType, Select, Textarea } from '../components/CommonUI';

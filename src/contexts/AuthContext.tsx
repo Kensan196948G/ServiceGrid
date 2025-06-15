@@ -1,4 +1,6 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import * as React from 'react';
+const { createContext, useState, useContext, useEffect, useCallback } = React;
+type ReactNode = React.ReactNode;
 import { User, MicrosoftApiCredentials } from '../types';
 import { MOCK_MS_CLIENT_ID, MOCK_MS_TENANT_ID } from '../constants';
 import * as authApi from '../services/authApiService';
@@ -8,9 +10,13 @@ interface AuthContextType {
   msApiCreds: MicrosoftApiCredentials;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
+  refreshToken: () => Promise<boolean>;
   setMsClientSecret: (secret: string) => void;
   isLoading: boolean;
   error: string | null;
+  sessionId: string | null;
+  lastActivity: Date | null;
+  isSessionValid: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,6 +30,62 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [lastActivity, setLastActivity] = useState<Date | null>(null);
+  const [isSessionValid, setIsSessionValid] = useState(false);
+
+  // セッション自動延長のための活動追跡
+  const updateLastActivity = useCallback(() => {
+    setLastActivity(new Date());
+  }, []);
+
+  // セッション有効性チェック
+  const checkSessionValidity = useCallback(() => {
+    if (!user || !lastActivity) {
+      setIsSessionValid(false);
+      return false;
+    }
+
+    const sessionTimeout = 30 * 60 * 1000; // 30分
+    const timeSinceLastActivity = Date.now() - lastActivity.getTime();
+    const valid = timeSinceLastActivity < sessionTimeout;
+    
+    setIsSessionValid(valid);
+    return valid;
+  }, [user, lastActivity]);
+
+  // 定期的なセッション有効性チェック
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!checkSessionValidity()) {
+        console.warn('Session expired due to inactivity');
+        logout();
+      }
+    }, 60000); // 1分毎にチェック
+
+    return () => clearInterval(interval);
+  }, [checkSessionValidity]);
+
+  // ユーザー活動の監視
+  useEffect(() => {
+    const handleUserActivity = () => {
+      if (user) {
+        updateLastActivity();
+      }
+    };
+
+    document.addEventListener('mousedown', handleUserActivity);
+    document.addEventListener('keydown', handleUserActivity);
+    document.addEventListener('scroll', handleUserActivity);
+    document.addEventListener('touchstart', handleUserActivity);
+
+    return () => {
+      document.removeEventListener('mousedown', handleUserActivity);
+      document.removeEventListener('keydown', handleUserActivity);
+      document.removeEventListener('scroll', handleUserActivity);
+      document.removeEventListener('touchstart', handleUserActivity);
+    };
+  }, [user, updateLastActivity]);
 
   useEffect(() => {
     // セッション復元を試行 - 実API認証情報を使用
@@ -69,6 +131,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
         
         setUser(userData);
+        setSessionId(response.sessionId || crypto.randomUUID());
+        updateLastActivity();
+        setIsSessionValid(true);
+        
+        // セキュリティ監査ログ
+        console.log(`[SECURITY] User ${username} logged in successfully at ${new Date().toISOString()}`);
+        
         return true;
       } else {
         setError(response.message || 'ログインに失敗しました');
@@ -91,16 +160,47 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     
     try {
+      // セッション終了のログ記録
+      if (user) {
+        console.log(`[SECURITY] User ${user.username} logged out at ${new Date().toISOString()}`);
+      }
+      
       await authApi.logout();
     } catch (error) {
       console.error('Logout error:', error);
       // ログアウトAPIエラーでもローカル状態はクリア
     } finally {
       setUser(null);
+      setSessionId(null);
+      setLastActivity(null);
+      setIsSessionValid(false);
       setMsApiCreds(prev => ({ ...prev, clientSecret: undefined }));
       setError(null);
       setIsLoading(false);
     }
+  };
+
+  // トークンリフレッシュ機能
+  const refreshToken = async (): Promise<boolean> => {
+    if (!user || !authApi.isAuthenticated()) {
+      return false;
+    }
+
+    try {
+      const refreshed = await authApi.refreshToken();
+      if (refreshed) {
+        updateLastActivity();
+        setIsSessionValid(true);
+        console.log(`[SECURITY] Token refreshed for user ${user.username}`);
+        return true;
+      }
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      // リフレッシュに失敗した場合はログアウト
+      await logout();
+    }
+    
+    return false;
   };
 
   const setMsClientSecret = (secret: string) => {
@@ -115,7 +215,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, msApiCreds, setMsClientSecret, isLoading, error }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      logout, 
+      refreshToken,
+      msApiCreds, 
+      setMsClientSecret, 
+      isLoading, 
+      error,
+      sessionId,
+      lastActivity,
+      isSessionValid
+    }}>
       {children}
     </AuthContext.Provider>
   );

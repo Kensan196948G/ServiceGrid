@@ -1,5 +1,7 @@
 
-import React, { useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
+import * as React from 'react';
+const { useState, useEffect, useCallback, useMemo } = React;
+type ReactNode = React.ReactNode;
 import { Incident, ItemStatus, UserRole } from '../types';
 import { getIncidents as getIncidentsApi, createIncident, updateIncident as updateIncidentApi, deleteIncident as deleteIncidentApi, getErrorMessage } from '../services/incidentApiService';
 import { testApiConnection, testIncidentsApi } from '../services/testApiConnection';

@@ -1,32 +1,133 @@
-# PasswordUtil.psm1 - パスワード関連ユーティリティ
+# PasswordUtil.psm1 - Enhanced Password Security Module
+# Version: 2.0.0 - Enterprise-grade password management
+# Features: Secure hashing, password policies, breach detection, complexity validation
 
-function New-HashedPassword {
+# Import required assemblies
+try {
+    Add-Type -AssemblyName System.Security -ErrorAction Stop
+    Import-Module "$PSScriptRoot/LogUtil.psm1" -Force -ErrorAction Stop
+} catch {
+    throw "Failed to load required assemblies or modules: $($_.Exception.Message)"
+}
+
+# Password security configuration
+$script:PasswordConfig = @{
+    # Hashing configuration
+    HashAlgorithm = "SHA256"
+    SaltLength = 32
+    Iterations = 100000  # PBKDF2 iterations
+    DerivedKeyLength = 32
+    
+    # Password policy
+    MinLength = 8
+    MaxLength = 128
+    RequireUppercase = $true
+    RequireLowercase = $true
+    RequireNumbers = $true
+    RequireSpecialChars = $true
+    MaxRepeatingChars = 2
+    
+    # Security features
+    EnableBreachCheck = $true
+    EnablePasswordHistory = $true
+    PasswordHistoryCount = 12
+    EnableComplexityValidation = $true
+    
+    # Common passwords (sample - in production, use a comprehensive list)
+    CommonPasswords = @(
+        "password", "123456", "password123", "admin", "qwerty", 
+        "letmein", "welcome", "monkey", "dragon", "master"
+    )
+}
+
+function New-PasswordHash {
+    <#
+    .SYNOPSIS
+    Creates a secure password hash using PBKDF2 with SHA256
+    
+    .DESCRIPTION
+    Generates a cryptographically secure password hash with salt
+    using PBKDF2-SHA256 algorithm with configurable iterations
+    
+    .PARAMETER PlainPassword
+    The plain text password to hash
+    
+    .PARAMETER SaltBytes
+    Optional custom salt bytes (auto-generated if not provided)
+    
+    .EXAMPLE
+    $hash = New-PasswordHash -PlainPassword "MySecurePassword123!"
+    #>
     param(
-        [string]$PlainPassword
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$PlainPassword,
+        
+        [Parameter(Mandatory=$false)]
+        [byte[]]$SaltBytes = $null
     )
     
     try {
-        Add-Type -AssemblyName System.Web
+        # Input validation
+        if ([string]::IsNullOrWhiteSpace($PlainPassword)) {
+            throw "Password cannot be null or empty"
+        }
         
-        # ソルトを生成
-        $Salt = [System.Web.Security.Membership]::GeneratePassword(16, 4)
+        if ($PlainPassword.Length -gt $script:PasswordConfig.MaxLength) {
+            throw "Password exceeds maximum length of $($script:PasswordConfig.MaxLength) characters"
+        }
         
-        # パスワードとソルトを結合してハッシュ化
-        $CombinedString = $PlainPassword + $Salt
-        $Encoder = New-Object System.Text.UTF8Encoding
-        $Hasher = [System.Security.Cryptography.SHA256]::Create()
+        # Generate salt if not provided
+        if (-not $SaltBytes) {
+            $SaltBytes = New-Object byte[] $script:PasswordConfig.SaltLength
+            [System.Security.Cryptography.RNGCryptoServiceProvider]::Create().GetBytes($SaltBytes)
+        }
         
-        $Bytes = $Encoder.GetBytes($CombinedString)
-        $Hash = $Hasher.ComputeHash($Bytes)
+        # Create PBKDF2 hash
+        $pbkdf2 = New-Object System.Security.Cryptography.Rfc2898DeriveBytes(
+            $PlainPassword, 
+            $SaltBytes, 
+            $script:PasswordConfig.Iterations
+        )
         
-        $HashString = [Convert]::ToBase64String($Hash)
+        $hashBytes = $pbkdf2.GetBytes($script:PasswordConfig.DerivedKeyLength)
+        $pbkdf2.Dispose()
+        
+        # Encode to base64
+        $saltBase64 = [System.Convert]::ToBase64String($SaltBytes)
+        $hashBase64 = [System.Convert]::ToBase64String($hashBytes)
+        
+        Write-LogEntry -Level "DEBUG" -Message "Password hash generated successfully" -Category "SECURITY" -Properties @{
+            SaltLength = $SaltBytes.Length
+            HashLength = $hashBytes.Length
+            Iterations = $script:PasswordConfig.Iterations
+        }
         
         return @{
-            Hash = $HashString
-            Salt = $Salt
+            Hash = $hashBase64
+            Salt = $saltBase64
+            Algorithm = "PBKDF2-SHA256"
+            Iterations = $script:PasswordConfig.Iterations
+            Created = Get-Date
         }
+        
+    } catch {
+        Write-LogEntry -Level "ERROR" -Message "Failed to generate password hash: $($_.Exception.Message)" -Category "SECURITY" -Exception $_
+        throw
     }
-    catch {
+}
+
+# Legacy function for backward compatibility
+function New-HashedPassword {
+    param([string]$PlainPassword)
+    
+    try {
+        $result = New-PasswordHash -PlainPassword $PlainPassword
+        return @{
+            Hash = $result.Hash
+            Salt = $result.Salt
+        }
+    } catch {
         Write-Error "Failed to hash password: $($_.Exception.Message)"
         return $null
     }

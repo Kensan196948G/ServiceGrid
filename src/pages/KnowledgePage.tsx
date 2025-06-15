@@ -1,5 +1,7 @@
 
-import React, { useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import * as React from 'react';
+const { useState, useEffect, useCallback, useMemo } = React;
+type ReactNode = React.ReactNode;
 import { 
   KnowledgeArticle, 
   UserRole, 

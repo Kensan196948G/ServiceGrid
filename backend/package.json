@@ -37,7 +37,10 @@
   "devDependencies": {
     "@types/jsdom": "^21.1.7",
     "@types/supertest": "^6.0.3",
+    "@typescript-eslint/eslint-plugin": "^8.34.0",
+    "@typescript-eslint/parser": "^8.34.0",
     "@vitejs/plugin-react": "^4.5.1",
+    "eslint": "^9.29.0",
     "jsdom": "^26.1.0",
     "supertest": "^7.1.1",
     "vite": "^6.3.5"
