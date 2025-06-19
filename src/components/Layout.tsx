@@ -3,7 +3,18 @@ const { useState, memo, useCallback, useEffect, useRef } = React;
 type ReactNode = React.ReactNode;
 import { NavLink, useNavigate } from './RouterPlaceholder';
 import { useAuth } from '../contexts/AuthContext';
-import { NAVIGATION_ITEMS, APP_NAME } from '../constants';
+import { APP_NAME } from '../constants';
+
+// Enhanced navigation items with dashboard first
+const NAVIGATION_ITEMS = [
+  { path: '/dashboard', label: 'ダッシュボード', icon: '📊' },
+  { path: '/incidents', label: 'インシデント管理', icon: '🚨' },
+  { path: '/requests', label: 'サービス要求', icon: '📝' },
+  { path: '/assets', label: '資産管理', icon: '💻' },
+  { path: '/change-management', label: '変更管理', icon: '🔄' },
+  { path: '/knowledge', label: 'ナレッジ管理', icon: '📚' },
+  { path: '/settings', label: 'システム設定', icon: '⚙️' },
+];
 import { Button } from './CommonUI';
 import { userRoleToJapanese } from '../localization';
 

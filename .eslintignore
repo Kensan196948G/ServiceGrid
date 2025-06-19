@@ -1,0 +1,16 @@
+dist/
+build/
+node_modules/
+*.config.js
+*.config.ts
+*.config.cjs
+coverage/
+backend/
+worktrees/
+tmux/
+docs/
+logs/
+reports/
+templates/
+docker/
+scripts/

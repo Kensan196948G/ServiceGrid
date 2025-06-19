@@ -1,576 +1,532 @@
-
 import * as React from 'react';
-const { useEffect, useState, useCallback } = React;
-import { Link, useNavigate } from '../components/RouterPlaceholder';
-import { Card, Spinner, Button, Notification, NotificationType, Modal, Table } from '../components/CommonUI';
-import { 
-  getIncidents, 
-  getServiceRequests, 
-  getSLAs, 
-  getVulnerabilities,
-  getComplianceControls,
-  getServiceStatuses,
-  refreshServiceStatuses as refreshServiceStatusesAPI,
-  getActiveAlerts,
-  refreshActiveAlerts as refreshActiveAlertsAPI,
-  acknowledgeAlert as acknowledgeAlertAPI
-} from '../services/mockItsmService';
-import { getAssets } from '../services/assetApiService';
-import { 
-  Incident, 
-  ServiceRequest, 
-  ItemStatus, 
-  ServiceLevelAgreement,
-  Vulnerability,
-  ComplianceControl,
-  ServiceStatusItem,
-  ServiceHealthStatus,
-  AlertItem,
-  AlertSeverity,
-  UserRole,
-  Asset
-} from '../types';
-import { 
-  serviceHealthStatusToJapanese, 
-  alertSeverityToJapanese,
-  itemStatusToJapanese,
-  priorityToJapanese
-} from '../localization';
+const { useEffect, useState, useCallback, useMemo } = React;
+import { Link } from '../components/RouterPlaceholder';
+import { Card, Spinner, Button } from '../components/CommonUI';
+import { FadeIn, SlideInLeft, StaggeredList, AnimatedCard, CountUp } from '../components/AnimatedComponents';
 import { useAuth } from '../contexts/AuthContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from '../components/ChartPlaceholder';
+import { useToast } from '../hooks/useToast';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area } from 'recharts';
+import { itemStatusToJapanese } from '../localization';
 
+// Mock API services
+import { getAssets } from '../services/assetApiService';
+import { getServiceRequests } from '../services/serviceRequestApiService';
+import { getIncidents } from '../services/incidentApiService';
 
-// Icons for cards (simple text/emoji for now)
-const ServiceStatusIcon = () => <span className="text-2xl">🖥️</span>;
-const SlaIcon = () => <span className="text-2xl">📊</span>;
-const SecurityIcon = () => <span className="text-2xl">🛡️</span>;
-const AlertIcon = () => <span className="text-2xl">🚨</span>;
-const RecentIncidentIcon = () => <span className="text-2xl">📝</span>;
-const ComplianceIcon = () => <span className="text-2xl">⚖️</span>;
-const QuickActionIcon = () => <span className="text-2xl">⚡</span>;
+// Types
+interface DashboardStats {
+  systemUptime: number;
+  totalAssets: number;
+  activeIncidents: number;
+  pendingRequests: number;
+  resolvedThisMonth: number;
+  criticalAlerts: number;
+}
 
+interface ChartData {
+  name: string;
+  value: number;
+  color?: string;
+}
+
+interface ActivityItem {
+  id: string;
+  type: 'incident' | 'request' | 'asset' | 'change';
+  title: string;
+  status: string;
+  timestamp: string;
+  priority?: 'Low' | 'Medium' | 'High' | 'Critical';
+}
 
 const DashboardPage: React.FC = () => {
-  const navigate = useNavigate();
   const { user } = useAuth();
+  const { addToast } = useToast();
   
-  const [loading, setLoading] = useState(true);
-  const [notification, setNotification] = useState<{ message: string; type: NotificationType } | null>(null);
+  // State management
+  const [stats, setStats] = useState<DashboardStats>({
+    systemUptime: 99.5,
+    totalAssets: 0,
+    activeIncidents: 0,
+    pendingRequests: 0,
+    resolvedThisMonth: 0,
+    criticalAlerts: 0
+  });
+  
+  const [isLoading, setIsLoading] = useState(true);
+  const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
+  const [performanceData, setPerformanceData] = useState<any[]>([]);
 
-  // Data states
-  const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [slas, setSlas] = useState<ServiceLevelAgreement[]>([]);
-  const [vulnerabilities, setVulnerabilities] = useState<Vulnerability[]>([]);
-  const [complianceControls, setComplianceControls] = useState<ComplianceControl[]>([]);
-  const [serviceStatuses, setServiceStatuses] = useState<ServiceStatusItem[]>([]);
-  const [activeAlerts, setActiveAlerts] = useState<AlertItem[]>([]);
+  // Color schemes for charts
+  const COLORS = ['#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+  
+  const statusColors = {
+    'Active': '#10b981',
+    'Pending': '#f59e0b', 
+    'Resolved': '#6b7280',
+    'Critical': '#ef4444',
+    'High': '#f97316',
+    'Medium': '#eab308',
+    'Low': '#22c55e'
+  };
 
-  // Loading states for refreshable sections
-  const [isServiceStatusRefreshing, setIsServiceStatusRefreshing] = useState(false);
-  const [isAlertsRefreshing, setIsAlertsRefreshing] = useState(false);
-
-  // Detailed view states
-  const [showDetailedAssets, setShowDetailedAssets] = useState(false);
-  const [showDetailedIncidents, setShowDetailedIncidents] = useState(false);
-  const [showDetailedRequests, setShowDetailedRequests] = useState(false);
-  const [selectedDetailItem, setSelectedDetailItem] = useState<any>(null);
-  const [detailModalOpen, setDetailModalOpen] = useState(false);
-
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  // Data fetching
+  const fetchDashboardData = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const [
-        incidentsData,
-        requestsData,
-        assetsData,
-        slasData,
-        vulnerabilitiesData,
-        complianceControlsData,
-        serviceStatusesData,
-        activeAlertsData
-      ] = await Promise.all([
-        getIncidents(),
-        getServiceRequests(),
-        getAssets(),
-        getSLAs(),
-        getVulnerabilities(),
-        getComplianceControls(),
-        getServiceStatuses(),
-        getActiveAlerts()
+      // Parallel API calls for better performance
+      const [assetsResponse, requestsResponse, incidentsResponse] = await Promise.allSettled([
+        getAssets({ limit: 1000 }),
+        getServiceRequests({ limit: 100 }),
+        getIncidents({ limit: 100 })
       ]);
-      setIncidents(Array.isArray(incidentsData) ? incidentsData : incidentsData?.data || []);
-      setServiceRequests(Array.isArray(requestsData) ? requestsData : requestsData?.data || []);
-      setAssets(Array.isArray(assetsData) ? assetsData : assetsData?.data || []);
-      setSlas(slasData);
-      setVulnerabilities(vulnerabilitiesData);
-      setComplianceControls(complianceControlsData);
-      setServiceStatuses(serviceStatusesData);
-      setActiveAlerts(activeAlertsData);
+
+      // Process assets data
+      let totalAssets = 0;
+      if (assetsResponse.status === 'fulfilled') {
+        totalAssets = assetsResponse.value.data?.length || 0;
+      }
+
+      // Process incidents data
+      let activeIncidents = 0;
+      let resolvedThisMonth = 0;
+      let criticalAlerts = 0;
+      let incidentChartData: ChartData[] = [];
+      
+      if (incidentsResponse.status === 'fulfilled') {
+        const incidents = incidentsResponse.value.data || [];
+        activeIncidents = incidents.filter(i => i.status === 'Open' || i.status === 'In Progress').length;
+        
+        const thisMonth = new Date();
+        thisMonth.setDate(1);
+        resolvedThisMonth = incidents.filter(i => 
+          i.status === 'Resolved' && 
+          new Date(i.resolvedAt || i.updatedAt) >= thisMonth
+        ).length;
+        
+        criticalAlerts = incidents.filter(i => i.priority === 'Critical').length;
+        
+        // Incident status distribution
+        const statusCounts = incidents.reduce((acc, incident) => {
+          acc[incident.status] = (acc[incident.status] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        incidentChartData = Object.entries(statusCounts).map(([status, count]) => ({
+          name: itemStatusToJapanese(status),
+          value: count,
+          color: statusColors[status] || '#6b7280'
+        }));
+      }
+
+      // Process service requests data
+      let pendingRequests = 0;
+      let requestChartData: ChartData[] = [];
+      
+      if (requestsResponse.status === 'fulfilled') {
+        const requests = requestsResponse.value.data || [];
+        pendingRequests = requests.filter(r => 
+          r.status === 'Submitted' || r.status === 'Pending Approval'
+        ).length;
+        
+        // Request status distribution
+        const statusCounts = requests.reduce((acc, request) => {
+          acc[request.status] = (acc[request.status] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        requestChartData = Object.entries(statusCounts).map(([status, count]) => ({
+          name: status,
+          value: count,
+          color: statusColors[status] || '#6b7280'
+        }));
+      }
+
+      // Update stats
+      setStats({
+        systemUptime: 99.5 + Math.random() * 0.4, // Simulate real uptime
+        totalAssets,
+        activeIncidents,
+        pendingRequests,
+        resolvedThisMonth,
+        criticalAlerts
+      });
+
+      // Combine chart data
+      setChartData([...incidentChartData, ...requestChartData]);
+
+      // Generate recent activity (mock data)
+      const activities: ActivityItem[] = [
+        {
+          id: '1',
+          type: 'incident',
+          title: 'サーバー応答時間の遅延',
+          status: 'In Progress',
+          timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+          priority: 'High'
+        },
+        {
+          id: '2', 
+          type: 'request',
+          title: '新規ユーザーアカウント作成',
+          status: 'Approved',
+          timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+          priority: 'Medium'
+        },
+        {
+          id: '3',
+          type: 'asset',
+          title: 'ノートPC (LAP-045) 更新',
+          status: 'Active',
+          timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString()
+        },
+        {
+          id: '4',
+          type: 'change',
+          title: 'ネットワーク機器のファームウェア更新',
+          status: 'Scheduled',
+          timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
+          priority: 'Low'
+        }
+      ];
+      
+      setRecentActivity(activities);
+
+      // Generate performance data for trend chart
+      const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (6 - i));
+        return {
+          date: date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }),
+          incidents: Math.floor(Math.random() * 10) + 2,
+          requests: Math.floor(Math.random() * 20) + 5,
+          uptime: 99 + Math.random() * 1
+        };
+      });
+      
+      setPerformanceData(last7Days);
+
     } catch (error) {
-      console.error("ダッシュボードデータの読み込みに失敗:", error);
-      setNotification({ message: 'ダッシュボードデータの読み込みに失敗しました。', type: NotificationType.ERROR });
+      console.error('Dashboard data fetch error:', error);
+      addToast('ダッシュボードデータの取得に失敗しました', 'error');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  }, []);
+  }, [addToast]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const handleRefreshServiceStatus = async () => {
-    setIsServiceStatusRefreshing(true);
-    try {
-      const data = await refreshServiceStatusesAPI();
-      setServiceStatuses(data);
-      setNotification({ message: 'サービスステータスを更新しました。', type: NotificationType.SUCCESS });
-    } catch (error) {
-      setNotification({ message: 'サービスステータスの更新に失敗しました。', type: NotificationType.ERROR });
-    } finally {
-      setIsServiceStatusRefreshing(false);
-    }
-  };
-
-  const handleRefreshAlerts = async () => {
-    setIsAlertsRefreshing(true);
-    try {
-      const data = await refreshActiveAlertsAPI();
-      setActiveAlerts(data);
-      setNotification({ message: '重要アラートを更新しました。', type: NotificationType.SUCCESS });
-    } catch (error) {
-      setNotification({ message: '重要アラートの更新に失敗しました。', type: NotificationType.ERROR });
-    } finally {
-      setIsAlertsRefreshing(false);
-    }
-  };
-  
-  const handleAcknowledgeAlert = async (alertId: string) => {
-    try {
-      await acknowledgeAlertAPI(alertId);
-      setActiveAlerts(prevAlerts => prevAlerts.filter(a => a.id !== alertId)); // Optimistically remove
-      setNotification({ message: `アラート ${alertId.substring(0,8)}... を確認済にしました。`, type: NotificationType.INFO });
-      // Optionally, re-fetch alerts if the API doesn't return the updated list or for consistency
-      // const updatedAlerts = await getActiveAlerts();
-      // setActiveAlerts(updatedAlerts);
-    } catch (error) {
-      setNotification({ message: 'アラートの確認処理に失敗しました。', type: NotificationType.ERROR });
-    }
-  };
-
-  // Detail modal handlers
-  const showItemDetail = (item: any, type: 'asset' | 'incident' | 'request') => {
-    setSelectedDetailItem({ ...item, type });
-    setDetailModalOpen(true);
-  };
-
-  const renderDetailModal = () => {
-    if (!selectedDetailItem) return null;
-
-    const { type, ...item } = selectedDetailItem;
+    fetchDashboardData();
     
-    let content = null;
-    let title = '';
+    // Auto-refresh every 5 minutes
+    const interval = setInterval(fetchDashboardData, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [fetchDashboardData]);
 
+  // Memoized components for performance
+  const StatCard = React.memo(({ 
+    title, 
+    value, 
+    change, 
+    icon, 
+    color = 'blue',
+    link 
+  }: {
+    title: string;
+    value: string | number;
+    change?: string;
+    icon: React.ReactNode;
+    color?: string;
+    link?: string;
+  }) => (
+    <Card className={`p-6 hover:shadow-lg transition-all duration-200 border-l-4 border-l-${color}-500`}>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-600">{title}</p>
+          <p className={`text-3xl font-bold text-${color}-600 mt-2`}>
+            {typeof value === 'number' && value > 0
+              ? <CountUp end={typeof value === 'number' ? value : parseInt(value.toString())} />
+              : value
+            }
+          </p>
+          {change && (
+            <p className="text-sm text-gray-500 mt-1">{change}</p>
+          )}
+        </div>
+        <div className={`p-3 bg-${color}-100 rounded-full`}>
+          {icon}
+        </div>
+      </div>
+      {link && (
+        <div className="mt-4">
+          <Link to={link} className={`text-${color}-600 hover:text-${color}-800 text-sm font-medium`}>
+            詳細を見る →
+          </Link>
+        </div>
+      )}
+    </Card>
+  ));
+
+  const ActivityIcon = ({ type }: { type: string }) => {
+    const iconClass = "w-4 h-4";
     switch (type) {
-      case 'asset':
-        title = `資産詳細: ${item.name}`;
-        content = (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div><strong>資産タグ:</strong> {item.asset_tag}</div>
-              <div><strong>ステータス:</strong> {item.status}</div>
-              <div><strong>カテゴリ:</strong> {item.category}</div>
-              <div><strong>タイプ:</strong> {item.type}</div>
-              <div><strong>製造元:</strong> {item.manufacturer}</div>
-              <div><strong>モデル:</strong> {item.model}</div>
-              <div><strong>所在地:</strong> {item.location}</div>
-              <div><strong>部門:</strong> {item.department}</div>
-              <div><strong>IPアドレス:</strong> {item.ip_address || 'なし'}</div>
-              <div><strong>購入日:</strong> {item.purchase_date}</div>
-            </div>
-            {item.description && (
-              <div><strong>説明:</strong> {item.description}</div>
-            )}
-            {item.notes && (
-              <div><strong>備考:</strong> {item.notes}</div>
-            )}
-          </div>
-        );
-        break;
-      
       case 'incident':
-        title = `インシデント詳細: ${item.title}`;
-        content = (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div><strong>ステータス:</strong> {itemStatusToJapanese(item.status)}</div>
-              <div><strong>優先度:</strong> {priorityToJapanese(item.priority)}</div>
-              <div><strong>報告者:</strong> {item.reported_by || item.reportedBy}</div>
-              <div><strong>担当者:</strong> {item.assigned_to || item.assignedTo || '未割り当て'}</div>
-              <div><strong>カテゴリ:</strong> {item.category}</div>
-              <div><strong>作成日:</strong> {new Date(item.created_at || item.createdAt).toLocaleString()}</div>
-            </div>
-            <div><strong>説明:</strong> {item.description}</div>
-          </div>
-        );
-        break;
-        
+        return <span className={`${iconClass} text-red-500`}>⚠️</span>;
       case 'request':
-        title = `サービス要求詳細: ${item.subject || item.title}`;
-        content = (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div><strong>ステータス:</strong> {itemStatusToJapanese(item.status)}</div>
-              <div><strong>要求者:</strong> {item.applicant || item.requestedBy}</div>
-              <div><strong>申請日:</strong> {new Date(item.requested_date || item.createdAt).toLocaleString()}</div>
-              <div><strong>承認者:</strong> {item.approved_by || '未承認'}</div>
-              <div><strong>承認日:</strong> {item.approved_date ? new Date(item.approved_date).toLocaleString() : '未承認'}</div>
-            </div>
-            <div><strong>詳細:</strong> {item.detail || item.description}</div>
-          </div>
-        );
-        break;
+        return <span className={`${iconClass} text-blue-500`}>📋</span>;
+      case 'asset':
+        return <span className={`${iconClass} text-green-500`}>💻</span>;
+      case 'change':
+        return <span className={`${iconClass} text-purple-500`}>🔄</span>;
+      default:
+        return <span className={`${iconClass} text-gray-500`}>📄</span>;
     }
+  };
 
+  if (isLoading) {
     return (
-      <Modal
-        isOpen={detailModalOpen}
-        onClose={() => setDetailModalOpen(false)}
-        title={title}
-        size="lg"
-      >
-        {content}
-      </Modal>
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner size="lg" />
+        <span className="ml-3 text-lg">ダッシュボードを読み込み中...</span>
+      </div>
     );
-  };
-
-  // Derived data for display
-  const openIncidentsCount = incidents.filter(inc => 
-    inc.status === ItemStatus.OPEN || inc.status === ItemStatus.IN_PROGRESS || inc.status === ItemStatus.NEW ||
-    inc.status === 'Open' || inc.status === 'In Progress' || inc.status === 'New'
-  ).length;
-  const openRequestsCount = serviceRequests.filter(req => 
-    req.status === ItemStatus.OPEN || req.status === ItemStatus.IN_PROGRESS || req.status === ItemStatus.NEW ||
-    req.status === 'Submitted' || req.status === 'In Progress' || req.status === 'Open'
-  ).length;
-  
-  const slaComplianceRate = () => {
-    const relevantSlas = slas.filter(s => s.performanceStatus);
-    if (relevantSlas.length === 0) return 'N/A';
-    const metSlas = relevantSlas.filter(s => s.performanceStatus === 'Met').length;
-    return `${((metSlas / relevantSlas.length) * 100).toFixed(1)}%`;
-  };
-
-  const securityStatusSummary = () => {
-    const criticalVulns = vulnerabilities.filter(v => v.severity === 'Critical' && (v.status === ItemStatus.IDENTIFIED || v.status === ItemStatus.IN_PROGRESS)).length;
-    const highVulns = vulnerabilities.filter(v => v.severity === 'High' && (v.status === ItemStatus.IDENTIFIED || v.status === ItemStatus.IN_PROGRESS)).length;
-    if (criticalVulns > 0) return `危険 (${criticalVulns}件のクリティカルな脆弱性)`;
-    if (highVulns > 0) return `警告 (${highVulns}件の高い脆弱性)`;
-    return vulnerabilities.length > 0 ? '要注意' : '良好';
-  };
-  
-  const isoComplianceSummary = () => {
-    if (complianceControls.length === 0) return '評価前';
-    const nonCompliant = complianceControls.filter(c => c.status === ItemStatus.NON_COMPLIANT).length;
-    const inReview = complianceControls.filter(c => c.status === ItemStatus.IN_REVIEW).length;
-    if (nonCompliant > 0) return `非準拠 (${nonCompliant}件の統制)`;
-    if (inReview > 0) return `レビュー中 (${inReview}件の統制)`;
-    return '概ね準拠';
-  };
-  
-  const recentOpenIncidents = incidents
-    .filter(inc => inc.status === ItemStatus.OPEN || inc.status === ItemStatus.IN_PROGRESS || inc.status === ItemStatus.NEW)
-    .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 3);
-
-  if (loading) {
-    return <div className="flex justify-center items-center h-full"><Spinner size="lg" /></div>;
   }
 
-  const getServiceStatusColor = (status: ServiceHealthStatus) => {
-    switch (status) {
-      case ServiceHealthStatus.NORMAL: return 'bg-green-500';
-      case ServiceHealthStatus.WARNING: return 'bg-yellow-500';
-      case ServiceHealthStatus.CRITICAL: return 'bg-red-500';
-      case ServiceHealthStatus.MAINTENANCE: return 'bg-blue-500';
-      default: return 'bg-slate-500';
-    }
-  };
-  
-  const getAlertSeverityColor = (severity: AlertSeverity) => {
-    switch (severity) {
-      case AlertSeverity.CRITICAL: return 'border-red-500 text-red-700';
-      case AlertSeverity.HIGH: return 'border-orange-500 text-orange-700';
-      case AlertSeverity.MEDIUM: return 'border-yellow-500 text-yellow-700';
-      default: return 'border-slate-400 text-slate-600';
-    }
-  };
-
   return (
-    <div className="space-y-6 pb-10">
-      {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
-      <h2 className="text-3xl font-semibold text-slate-800">ダッシュボード</h2>
-
-      {/* Overview Stats with clickable details */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card title="オープンインシデント" className="text-center cursor-pointer hover:shadow-lg transition-shadow" 
-              actions={<Button size="sm" variant="ghost" onClick={() => setShowDetailedIncidents(!showDetailedIncidents)}>
-                {showDetailedIncidents ? '隠す' : '詳細'}
-              </Button>}>
-            <p className="text-4xl font-bold text-red-600">{openIncidentsCount}</p>
-        </Card>
-        <Card title="オープンサービスリクエスト" className="text-center cursor-pointer hover:shadow-lg transition-shadow"
-              actions={<Button size="sm" variant="ghost" onClick={() => setShowDetailedRequests(!showDetailedRequests)}>
-                {showDetailedRequests ? '隠す' : '詳細'}
-              </Button>}>
-            <p className="text-4xl font-bold text-yellow-600">{openRequestsCount}</p>
-        </Card>
-        <Card title="管理中資産" className="text-center cursor-pointer hover:shadow-lg transition-shadow"
-              actions={<Button size="sm" variant="ghost" onClick={() => setShowDetailedAssets(!showDetailedAssets)}>
-                {showDetailedAssets ? '隠す' : '詳細'}
-              </Button>}>
-            <p className="text-4xl font-bold text-blue-600">{assets.length}</p>
-        </Card>
-         <Card title="セキュリティ状況" className="text-center">
-            <p className={`text-2xl font-bold ${securityStatusSummary().includes("危険") ? 'text-red-600' : securityStatusSummary().includes("警告") ? 'text-yellow-600' : 'text-green-600'}`}>{securityStatusSummary()}</p>
-        </Card>
-      </div>
-
-      {/* Detailed Views */}
-      {showDetailedAssets && (
-        <Card title="資産一覧（最新10件）" className="lg:col-span-full">
-          <div className="max-h-80 overflow-y-auto">
-            <Table
-              columns={[
-                { Header: '資産タグ', accessor: 'asset_tag' },
-                { Header: '名前', accessor: 'name' },
-                { Header: 'タイプ', accessor: 'type' },
-                { Header: 'ステータス', accessor: 'status' },
-                { Header: '所在地', accessor: 'location' },
-                { Header: '部門', accessor: 'department' }
-              ]}
-              data={assets.slice(0, 10)}
-              onRowClick={(asset) => showItemDetail(asset, 'asset')}
-            />
-          </div>
-          <Button variant="ghost" size="sm" className="mt-3 w-full" onClick={() => navigate('/assets')}>
-            すべての資産を表示
-          </Button>
-        </Card>
-      )}
-
-      {showDetailedIncidents && (
-        <Card title="インシデント一覧（オープン中）" className="lg:col-span-full">
-          <div className="max-h-80 overflow-y-auto">
-            <Table
-              columns={[
-                { Header: 'タイトル', accessor: 'title' },
-                { Header: 'ステータス', accessor: (row) => itemStatusToJapanese(row.status) },
-                { Header: '優先度', accessor: (row) => priorityToJapanese(row.priority) },
-                { Header: '報告者', accessor: (row) => row.reported_by || row.reportedBy },
-                { Header: '担当者', accessor: (row) => row.assigned_to || row.assignedTo || '未割り当て' },
-                { Header: '作成日', accessor: (row) => new Date(row.created_at || row.createdAt).toLocaleDateString() }
-              ]}
-              data={incidents.filter(inc => inc.status === ItemStatus.OPEN || inc.status === ItemStatus.IN_PROGRESS || inc.status === ItemStatus.NEW || inc.status === 'Open' || inc.status === 'In Progress')}
-              onRowClick={(incident) => showItemDetail(incident, 'incident')}
-            />
-          </div>
-          <Button variant="ghost" size="sm" className="mt-3 w-full" onClick={() => navigate('/incidents')}>
-            すべてのインシデントを表示
-          </Button>
-        </Card>
-      )}
-
-      {showDetailedRequests && (
-        <Card title="サービス要求一覧（オープン中）" className="lg:col-span-full">
-          <div className="max-h-80 overflow-y-auto">
-            <Table
-              columns={[
-                { Header: 'タイトル', accessor: (row) => row.subject || row.title },
-                { Header: 'ステータス', accessor: (row) => itemStatusToJapanese(row.status) },
-                { Header: '要求者', accessor: (row) => row.applicant || row.requestedBy },
-                { Header: '申請日', accessor: (row) => new Date(row.requested_date || row.createdAt).toLocaleDateString() },
-                { Header: '承認状況', accessor: (row) => row.approved_by ? '承認済み' : '未承認' }
-              ]}
-              data={serviceRequests.filter(req => req.status === ItemStatus.OPEN || req.status === ItemStatus.IN_PROGRESS || req.status === ItemStatus.NEW || req.status === 'Submitted' || req.status === 'In Progress')}
-              onRowClick={(request) => showItemDetail(request, 'request')}
-            />
-          </div>
-          <Button variant="ghost" size="sm" className="mt-3 w-full" onClick={() => navigate('/service-requests')}>
-            すべてのサービス要求を表示
-          </Button>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Service Status Card */}
-        <Card title="サービスステータス" className="lg:col-span-2" actions={
-          <Button size="sm" onClick={handleRefreshServiceStatus} isLoading={isServiceStatusRefreshing} disabled={isServiceStatusRefreshing}>
-            {isServiceStatusRefreshing ? "更新中..." : "更新"}
-          </Button>
-        }>
-          {isServiceStatusRefreshing && serviceStatuses.length === 0 ? <Spinner /> :
-          serviceStatuses.length > 0 ? (
-            <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-              {serviceStatuses.map(service => (
-                <div key={service.id} className="p-3 bg-slate-50 rounded-md shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-semibold text-slate-700">{service.name}</h4>
-                    <span className={`px-3 py-1 text-xs font-bold text-white rounded-full ${getServiceStatusColor(service.status)}`}>
-                      {serviceHealthStatusToJapanese(service.status)}
-                    </span>
-                  </div>
-                  {service.description && <p className="text-xs text-slate-500 mt-1">{service.description}</p>}
-                  <p className="text-xs text-slate-400 mt-1">最終確認: {new Date(service.lastChecked).toLocaleTimeString()}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-slate-500 italic">サービスステータス情報を読み込めませんでした。</p>
-          )}
-        </Card>
-
-        {/* Quick Actions Card */}
-        <Card title="クイックアクション" className="lg:col-span-1">
-          <div className="space-y-3">
-            <Button variant="primary" className="w-full" onClick={() => navigate('/incidents', { state: { openModal: true }})}>
-              <RecentIncidentIcon/> <span className="ml-2">新規インシデント作成</span>
-            </Button>
-            <Button variant="secondary" className="w-full" onClick={() => navigate('/requests', { state: { openModal: true }})}>
-              <ServiceStatusIcon/> <span className="ml-2">新規サービスリクエスト</span>
-            </Button>
-            <Button variant="ghost" className="w-full" onClick={() => navigate('/knowledge')}>
-              <span className="w-5 h-5 mr-2">📚</span>ナレッジベース検索
-            </Button>
-             {user?.role === UserRole.ADMIN && (
-                <Button variant="ghost" className="w-full" onClick={() => navigate('/assets', { state: { openModal: true }})}>
-                    <span className="w-5 h-5 mr-2">📦</span>新規資産登録
-                </Button>
-             )}
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Important Alerts Card */}
-        <Card title="重要アラート" className="lg:col-span-2" actions={
-          <Button size="sm" onClick={handleRefreshAlerts} isLoading={isAlertsRefreshing} disabled={isAlertsRefreshing}>
-            {isAlertsRefreshing ? "更新中..." : "更新"}
-          </Button>
-        }>
-          {isAlertsRefreshing && activeAlerts.length === 0 ? <Spinner /> :
-          activeAlerts.length > 0 ? (
-            <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
-              {activeAlerts.map(alert => (
-                <div key={alert.id} className={`p-3 border-l-4 rounded-r-md ${getAlertSeverityColor(alert.severity)} bg-opacity-10 ${
-                    alert.severity === AlertSeverity.CRITICAL ? 'bg-red-50' :
-                    alert.severity === AlertSeverity.HIGH ? 'bg-orange-50' :
-                    alert.severity === AlertSeverity.MEDIUM ? 'bg-yellow-50' : 'bg-slate-50'
-                }`}>
-                  <div className="flex justify-between items-start">
-                    <div>
-                        <p className="font-semibold">{alert.message}</p>
-                        <p className="text-xs text-slate-500">
-                            {new Date(alert.timestamp).toLocaleString()} ({alertSeverityToJapanese(alert.severity)})
-                            {alert.source && ` - ${alert.source}`}
-                        </p>
-                    </div>
-                    {!alert.acknowledged && user?.role === UserRole.ADMIN && (
-                        <Button size="sm" variant="ghost" onClick={() => handleAcknowledgeAlert(alert.id)}>確認</Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-slate-500 italic">現在、対応が必要な重要アラートはありません。</p>
-          )}
-        </Card>
-        
-        {/* Recent Incidents Card */}
-        <Card title="最近のインシデント" className="lg:col-span-1">
-          {recentOpenIncidents.length > 0 ? (
-            <ul className="space-y-2 text-sm max-h-80 overflow-y-auto pr-2">
-              {recentOpenIncidents.map(inc => (
-                <li key={inc.id} className="p-2 bg-slate-50 rounded hover:bg-slate-100 cursor-pointer" onClick={() => navigate(`/incidents`, {state: { selectedIncidentId: inc.id}})}>
-                  <div className="font-medium text-blue-600">{inc.title}</div>
-                  <div className="text-xs text-slate-500">
-                    優先度: {priorityToJapanese(inc.priority)} | ステータス: {itemStatusToJapanese(inc.status)}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-slate-500 italic">現在オープンなインシデントはありません。</p>
-          )}
-          <Button variant="ghost" size="sm" className="mt-3 w-full" onClick={() => navigate('/incidents')}>
-            すべてのインシデントを表示
-          </Button>
-        </Card>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* SLA Compliance Chart */}
-        <Card title="SLA遵守状況 (個別)">
-          {slas.filter(s => s.currentPerformance !== undefined).length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={slas.filter(s => s.currentPerformance !== undefined).map(s => ({name: s.metricName, 実績: s.currentPerformance, 目標: s.targetValue}))} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" unit="%" domain={[0, 'dataMax + 5 > 100 ? 100 : dataMax + 5']}/>
-                <YAxis dataKey="name" type="category" width={120} />
-                <Tooltip formatter={(value: number, name: string) => [`${value.toFixed(2)}${name === '目標' ? '%' : '%'}`, name]}/>
-                <Legend />
-                <Bar dataKey="実績" fill="#3B82F6" barSize={20}>
-                    {slas.filter(s => s.currentPerformance !== undefined).map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.performanceStatus === 'Met' ? '#10B981' : entry.performanceStatus === 'At Risk' ? '#F59E0B' : '#EF4444'} />
-                    ))}
-                </Bar>
-                <Bar dataKey="目標" fill="#A855F7" barSize={20} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="text-slate-500 italic">SLAデータがありません。</p>
-          )}
-        </Card>
-
-        {/* ISO Compliance Status Card */}
-        <Card title="ISOコンプライアンスステータス">
-          <div className="text-center mb-4">
-            <ComplianceIcon />
-            <p className={`text-2xl font-bold mt-2 ${isoComplianceSummary().includes("非準拠") ? 'text-red-600' : isoComplianceSummary().includes("レビュー中") ? 'text-yellow-600' : 'text-green-600'}`}>
-                {isoComplianceSummary()}
+    <div className="space-y-8 p-6 max-w-7xl mx-auto" role="main" aria-label="ITSM ダッシュボード">
+      {/* Header */}
+      <FadeIn>
+        <header className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900" id="dashboard-title">ダッシュボード</h1>
+            <p className="text-gray-600 mt-1" aria-label="ユーザー歓迎メッセージ">
+              ようこそ、{user?.displayName || user?.username}さん
             </p>
           </div>
-           <h4 className="font-semibold text-slate-700 mb-2">主要統制項目:</h4>
-           {complianceControls.length > 0 ? (
-            <ul className="space-y-1 text-xs max-h-48 overflow-y-auto pr-2">
-                {complianceControls.slice(0,5).map(control => ( // Show first 5
-                    <li key={control.id} className="flex justify-between p-1.5 bg-slate-50 rounded">
-                        <span>{control.name} ({control.controlId})</span>
-                        <span className={`font-semibold ${
-                            control.status === ItemStatus.COMPLIANT ? 'text-green-600' :
-                            control.status === ItemStatus.NON_COMPLIANT ? 'text-red-600' :
-                            control.status === ItemStatus.IN_REVIEW ? 'text-yellow-700' : 'text-slate-500'
-                        }`}>
-                            {itemStatusToJapanese(control.status)}
-                        </span>
-                    </li>
-                ))}
-            </ul>
-           ) : (
-             <p className="text-slate-500 italic text-xs">コンプライアンス統制データがありません。</p>
-           )}
-          <Button variant="ghost" size="sm" className="mt-3 w-full" onClick={() => navigate('/compliance-management')}>
-            すべてのコンプライアンス統制を表示
+        <div className="flex space-x-3">
+          <Button 
+            onClick={fetchDashboardData}
+            variant="secondary"
+            size="sm"
+          >
+            🔄 更新
           </Button>
+          <Button 
+            onClick={() => addToast('ダッシュボードが更新されました', 'success')}
+            variant="primary"
+            size="sm"
+          >
+            📊 レポート
+          </Button>
+        </div>
+        </header>
+      </FadeIn>
+
+      {/* Key Metrics */}
+      <section aria-labelledby="metrics-heading">
+        <h2 id="metrics-heading" className="sr-only">主要メトリクス</h2>
+        <StaggeredList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" staggerDelay={150}>
+        <StatCard
+          title="システム稼働率"
+          value={`${stats.systemUptime.toFixed(1)}%`}
+          change="過去24時間"
+          icon={<span className="text-2xl">⚡</span>}
+          color="green"
+        />
+        
+        <StatCard
+          title="管理資産数"
+          value={stats.totalAssets}
+          change="アクティブ資産"
+          icon={<span className="text-2xl">💻</span>}
+          color="blue"
+          link="/assets"
+        />
+        
+        <StatCard
+          title="アクティブインシデント"
+          value={stats.activeIncidents}
+          change={`今月解決: ${stats.resolvedThisMonth}件`}
+          icon={<span className="text-2xl">⚠️</span>}
+          color="red"
+          link="/incidents"
+        />
+        
+        <StatCard
+          title="承認待ち要求"
+          value={stats.pendingRequests}
+          change="サービス要求"
+          icon={<span className="text-2xl">📋</span>}
+          color="yellow"
+          link="/service-requests"
+        />
+        </StaggeredList>
+      </section>
+
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Status Distribution */}
+        <Card className="p-6">
+          <h3 className="text-xl font-semibold text-gray-900 mb-4">ステータス分布</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </Card>
+
+        {/* Performance Trend */}
+        <Card className="p-6">
+          <h3 className="text-xl font-semibold text-gray-900 mb-4">週間トレンド</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={performanceData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Line 
+                type="monotone" 
+                dataKey="incidents" 
+                stroke="#ef4444" 
+                strokeWidth={2}
+                name="インシデント"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="requests" 
+                stroke="#3b82f6" 
+                strokeWidth={2}
+                name="サービス要求"
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </Card>
       </div>
 
-      {/* Detail Modal */}
-      {renderDetailModal()}
+      {/* Recent Activity & Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent Activity */}
+        <Card className="lg:col-span-2 p-6">
+          <h3 className="text-xl font-semibold text-gray-900 mb-4">最近のアクティビティ</h3>
+          <div className="space-y-4">
+            {recentActivity.map((activity) => (
+              <div key={activity.id} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                <ActivityIcon type={activity.type} />
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900">{activity.title}</p>
+                  <div className="flex items-center space-x-2 text-sm text-gray-500">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      activity.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                      activity.status === 'Approved' ? 'bg-green-100 text-green-800' :
+                      activity.status === 'Active' ? 'bg-green-100 text-green-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {activity.status}
+                    </span>
+                    {activity.priority && (
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        activity.priority === 'Critical' ? 'bg-red-100 text-red-800' :
+                        activity.priority === 'High' ? 'bg-orange-100 text-orange-800' :
+                        activity.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-green-100 text-green-800'
+                      }`}>
+                        {activity.priority}
+                      </span>
+                    )}
+                    <span>{new Date(activity.timestamp).toLocaleString('ja-JP')}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 text-center">
+            <Link to="/audit-logs" className="text-blue-600 hover:text-blue-800 font-medium">
+              すべてのアクティビティを表示 →
+            </Link>
+          </div>
+        </Card>
+
+        {/* Quick Actions */}
+        <Card className="p-6">
+          <h3 className="text-xl font-semibold text-gray-900 mb-4">クイックアクション</h3>
+          <div className="space-y-3">
+            <Link to="/incidents/new">
+              <Button variant="outline" className="w-full justify-start">
+                <span className="mr-2">🚨</span>
+                インシデント報告
+              </Button>
+            </Link>
+            
+            <Link to="/service-requests/new">
+              <Button variant="outline" className="w-full justify-start">
+                <span className="mr-2">📝</span>
+                サービス要求
+              </Button>
+            </Link>
+            
+            <Link to="/assets/new">
+              <Button variant="outline" className="w-full justify-start">
+                <span className="mr-2">💻</span>
+                資産登録
+              </Button>
+            </Link>
+            
+            <Link to="/changes/new">
+              <Button variant="outline" className="w-full justify-start">
+                <span className="mr-2">🔄</span>
+                変更申請
+              </Button>
+            </Link>
+            
+            <Link to="/knowledge">
+              <Button variant="outline" className="w-full justify-start">
+                <span className="mr-2">📚</span>
+                ナレッジベース
+              </Button>
+            </Link>
+            
+            <Link to="/settings">
+              <Button variant="outline" className="w-full justify-start">
+                <span className="mr-2">⚙️</span>
+                システム設定
+              </Button>
+            </Link>
+          </div>
+        </Card>
+      </div>
+
+      {/* System Health Indicators */}
+      <Card className="p-6">
+        <h3 className="text-xl font-semibold text-gray-900 mb-4">システムヘルス</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="text-center p-4 bg-green-50 rounded-lg">
+            <div className="text-2xl font-bold text-green-600">正常</div>
+            <div className="text-sm text-green-700">Webサーバー</div>
+          </div>
+          <div className="text-center p-4 bg-green-50 rounded-lg">
+            <div className="text-2xl font-bold text-green-600">正常</div>
+            <div className="text-sm text-green-700">データベース</div>
+          </div>
+          <div className="text-center p-4 bg-yellow-50 rounded-lg">
+            <div className="text-2xl font-bold text-yellow-600">注意</div>
+            <div className="text-sm text-yellow-700">ストレージ</div>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 };

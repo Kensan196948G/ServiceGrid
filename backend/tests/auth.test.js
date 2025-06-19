@@ -1,3 +1,7 @@
+// Node.js 内蔵テストランナー対応版
+const { test, describe } = require('node:test');
+const assert = require('node:assert');
+
 // TextEncoder/TextDecoder polyfill for Node.js testing
 if (typeof global.TextEncoder === 'undefined') {
   const { TextEncoder, TextDecoder } = require('util');

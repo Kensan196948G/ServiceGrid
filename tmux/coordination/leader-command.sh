@@ -21,6 +21,18 @@ show_usage() {
     echo "  demo    - 連携デモ実行"
     echo "  status  - 各ペインの状況確認"
     echo ""
+    echo "🚀 WebUI自動修復コマンド:"
+    echo "  webui-fix               - WebUI自動修復ループ統合開始"
+    echo "  webui-fix-all           - 全Feature WebUI修復同時実行"
+    echo "  webui-fix-ui            - Feature-B UI最適化ループ"
+    echo "  webui-fix-api           - Feature-C API修復ループ"
+    echo "  webui-fix-ps            - Feature-D PowerShell修復ループ"
+    echo "  webui-fix-security      - Feature-E 品質監査ループ"
+    echo "  webui-emergency         - WebUI緊急修復"
+    echo "  webui-status            - WebUI修復進捗確認"
+    echo "  webui-report            - WebUI修復レポート表示"
+    echo "  webui-monitor           - WebUI品質リアルタイム監視"
+    echo ""
     echo "Options (allコマンド用):"
     echo "  --files PATTERN       参照ファイル指定"
     echo "  --model MODEL         使用モデル指定"
@@ -34,6 +46,12 @@ show_usage() {
     echo "  $0 all --files 'package.json,*.md' 'プロジェクト概要を確認'"
     echo "  $0 all --at-claude 'UIテストを実行してください'"
     echo "  $0 demo  # 連携デモ実行"
+    echo ""
+    echo "🚀 WebUI修復例:"
+    echo "  $0 webui-fix                    # 統合WebUI修復開始"
+    echo "  $0 webui-fix-all                # 全Feature同時修復"
+    echo "  $0 webui-fix-ui                 # UI専門修復"
+    echo "  $0 webui-status                 # 修復進捗確認"
     echo ""
 }
 
@@ -115,6 +133,11 @@ case "${1:-help}" in
         check_leader_context
         setup_permissions
         "$SCRIPT_DIR/integration-demo.sh"
+        ;;
+    webui-*)
+        echo "🚀 WebUI自動修復システム実行..."
+        check_leader_context
+        "$SCRIPT_DIR/webui-leader-commands.sh" "$@"
         ;;
     status|check)
         check_pane_status

@@ -1,10 +1,11 @@
 // データベース接続プール
 const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
 const { recordDatabaseQuery, recordDatabaseConnection } = require('../middleware/metrics');
 
 class DatabasePool {
   constructor(options = {}) {
-    this.dbPath = options.dbPath || process.env.DB_PATH || './backend/db/itsm.sqlite';
+    this.dbPath = options.dbPath || process.env.DB_PATH || path.join(__dirname, '..', 'db', 'itsm.sqlite');
     this.maxConnections = options.maxConnections || 10;
     this.acquireTimeout = options.acquireTimeout || 5000;
     this.idleTimeout = options.idleTimeout || 30000;

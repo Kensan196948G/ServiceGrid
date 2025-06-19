@@ -1,3 +1,56 @@
+// Node.js 内蔵テストランナー対応版
+const { test, describe } = require('node:test');
+const assert = require('node:assert');
+
+// Jest互換のexpect実装（assert基盤）
+function expect(actual) {
+    return {
+        toBe: (expected) => assert.strictEqual(actual, expected),
+        toEqual: (expected) => assert.deepStrictEqual(actual, expected),
+        toBeInstanceOf: (expected) => assert.ok(actual instanceof expected),
+        toContain: (expected) => assert.ok(actual.includes(expected)),
+        toBeDefined: () => assert.ok(actual !== undefined),
+        toBeUndefined: () => assert.ok(actual === undefined),
+        toBeNull: () => assert.ok(actual === null),
+        toBeTruthy: () => assert.ok(actual),
+        toBeFalsy: () => assert.ok(!actual),
+        not: {
+            toThrow: (ErrorClass) => {
+                try {
+                    if (typeof actual === 'function') actual();
+                    // 例外が投げられなかった場合は成功
+                } catch (error) {
+                    assert.fail(`Expected function not to throw, but it threw: ${error.message}`);
+                }
+            }
+        },
+        rejects: {
+            toThrow: async (ErrorClass) => {
+                try {
+                    await actual;
+                    assert.fail('Expected promise to reject, but it resolved');
+                } catch (error) {
+                    if (ErrorClass) {
+                        assert.ok(error instanceof ErrorClass, `Expected error to be instance of ${ErrorClass.name}`);
+                    }
+                }
+            }
+        }
+    };
+}
+
+// toThrow専用ヘルパー
+expect.toThrow = (fn, ErrorClass) => {
+    try {
+        fn();
+        assert.fail('Expected function to throw, but it did not');
+    } catch (error) {
+        if (ErrorClass) {
+            assert.ok(error instanceof ErrorClass, `Expected error to be instance of ${ErrorClass.name}`);
+        }
+    }
+};
+
 // Comprehensive tests for backend error handling utilities
 const {
   ITSMError,
@@ -19,12 +72,12 @@ describe('Error Handler Utils', () => {
     test('should create error with default values', () => {
       const error = new ITSMError('Test error');
       
-      expect(error.message).toBe('Test error');
-      expect(error.type).toBe(ERROR_TYPES.INTERNAL_ERROR);
-      expect(error.statusCode).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
-      expect(error.details).toBeNull();
-      expect(error.timestamp).toBeDefined();
-      expect(error.name).toBe('ITSMError');
+      assert.strictEqual(error.message, 'Test error');
+      assert.strictEqual(error.type, ERROR_TYPES.INTERNAL_ERROR);
+      assert.strictEqual(error.statusCode, HTTP_STATUS.INTERNAL_SERVER_ERROR);
+      assert.strictEqual(error.details, null);
+      assert.ok(error.timestamp);
+      assert.strictEqual(error.name, 'ITSMError');
     });
 
     test('should create error with custom values', () => {
@@ -108,7 +161,8 @@ describe('Error Handler Utils', () => {
       };
       const requiredFields = ['name', 'email', 'type'];
       
-      expect(() => validateRequiredFields(data, requiredFields)).not.toThrow();
+      // 例外が投げられないことを確認
+      assert.doesNotThrow(() => validateRequiredFields(data, requiredFields));
     });
 
     test('should throw validation error for missing fields', () => {
@@ -118,7 +172,7 @@ describe('Error Handler Utils', () => {
       };
       const requiredFields = ['name', 'email', 'type'];
       
-      expect(() => validateRequiredFields(data, requiredFields)).toThrow(ITSMError);
+      assert.throws(() => validateRequiredFields(data, requiredFields), ITSMError);
       
       try {
         validateRequiredFields(data, requiredFields);
@@ -138,7 +192,7 @@ describe('Error Handler Utils', () => {
       };
       const requiredFields = ['name', 'email', 'type'];
       
-      expect(() => validateRequiredFields(data, requiredFields)).toThrow(ITSMError);
+      assert.throws(() => validateRequiredFields(data, requiredFields), ITSMError);
     });
   });
 
@@ -201,7 +255,7 @@ describe('Error Handler Utils', () => {
         callback(error);
       };
       
-      await expect(executeDbOperation(mockOperation)).rejects.toThrow(ITSMError);
+      await assert.rejects(() => executeDbOperation(mockOperation), ITSMError);
       
       try {
         await executeDbOperation(mockOperation);
@@ -216,7 +270,7 @@ describe('Error Handler Utils', () => {
         callback(new Error('Connection failed'));
       };
       
-      await expect(executeDbOperation(mockOperation, 'Custom error message')).rejects.toThrow(ITSMError);
+      await assert.rejects(() => executeDbOperation(mockOperation, 'Custom error message'), ITSMError);
       
       try {
         await executeDbOperation(mockOperation, 'Custom error message');
@@ -230,7 +284,7 @@ describe('Error Handler Utils', () => {
         throw new Error('Sync error');
       };
       
-      await expect(executeDbOperation(mockOperation)).rejects.toThrow(ITSMError);
+      await assert.rejects(() => executeDbOperation(mockOperation), ITSMError);
     });
   });
 

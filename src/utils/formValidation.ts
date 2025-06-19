@@ -412,8 +412,28 @@ export const SERVICE_REQUEST_VALIDATION_RULES = {
   subject: FIELD_VALIDATION_RULES.serviceRequestSubject,
   detail: FIELD_VALIDATION_RULES.serviceRequestDetail,
   requestor: FIELD_VALIDATION_RULES.requestor,
-  serviceType: { required: true }
+  serviceType: { required: true },
+  priority: { required: true },
+  business_justification: { maxLength: 1000 },
+  requested_item: { maxLength: 200 },
+  estimated_cost: FIELD_VALIDATION_RULES.cost,
+  requested_delivery_date: { type: 'date' as const }
 };
+
+// ServiceRequest specific validation function
+export function validateServiceRequest(data: Partial<any>): { isValid: boolean; errors: Record<string, string> } {
+  const result = validateForm(data, SERVICE_REQUEST_VALIDATION_RULES);
+  const errorMap: Record<string, string> = {};
+  
+  result.errors.forEach(error => {
+    errorMap[error.field] = error.message;
+  });
+  
+  return {
+    isValid: result.isValid,
+    errors: errorMap
+  };
+}
 
 export const USER_VALIDATION_RULES = {
   username: FIELD_VALIDATION_RULES.username,

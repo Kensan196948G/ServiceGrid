@@ -6,7 +6,11 @@
   "scripts": {
     "start": "PORT=8082 node secure-server.js",
     "dev": "PORT=8082 node secure-server.js",
-    "start:legacy": "PORT=8082 node start-server.js"
+    "start:legacy": "PORT=8082 node start-server.js",
+    "test": "node --test tests/*.test.js",
+    "test:integration": "node tests/service-requests-integration.test.js",
+    "lint": "eslint .",
+    "schema:apply": "node db/apply-schema-safe.js"
   },
   "keywords": [
     "itsm",

@@ -107,3 +107,6 @@ deprecated/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# YoYo AI version control directory
+.yoyo/

@@ -16,7 +16,7 @@
     "allowJs": true,
     "jsx": "react-jsx",
 
-    /* Linting */
+    /* Linting - 段階的導入版 */
     "strict": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
@@ -27,6 +27,8 @@
     "jsxImportSource": "react",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": false,
 
     "paths": {
       "@/*": ["../src/*"],

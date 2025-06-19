@@ -1,0 +1,48 @@
+# Build outputs
+dist/
+build/
+coverage/
+
+# Dependencies  
+node_modules/
+
+# Backend files
+backend/
+
+# Worktrees
+worktrees/
+
+# Config files (maintain existing formatting)
+*.config.js
+*.config.ts
+*.config.cjs
+
+# Generated files
+*.min.js
+*.min.css
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test files (some may have specific formatting needs)
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx

@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ITSM運用システムプラットフォーム</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useContext, createContext, useEffect } = React;
+
+    // Mock authentication context
+    const AuthContext = createContext();
+
+    const AuthProvider = ({ children }) => {
+      const [user, setUser] = useState(null);
+      const [isLoading, setIsLoading] = useState(true);
+      const [error, setError] = useState(null);
+
+      useEffect(() => {
+        // Simulate authentication check
+        const timer = setTimeout(() => {
+          setIsLoading(false);
+        }, 1000);
+        
+        return () => clearTimeout(timer);
+      }, []);
+
+      const login = async (username, password) => {
+        setError(null);
+        setIsLoading(true);
+        
+        try {
+          // Mock login - accept admin/admin123 or operator/operator123
+          if ((username === 'admin' && password === 'admin123') || 
+              (username === 'operator' && password === 'operator123')) {
+            const userData = {
+              id: '1',
+              username: username,
+              displayName: username === 'admin' ? '管理者' : 'オペレーター',
+              role: username === 'admin' ? 'administrator' : 'operator'
+            };
+            setUser(userData);
+            setIsLoading(false);
+            return true;
+          } else {
+            setError('ユーザー名またはパスワードが正しくありません');
+            setIsLoading(false);
+            return false;
+          }
+        } catch (err) {
+          setError('ログインに失敗しました');
+          setIsLoading(false);
+          return false;
+        }
+      };
+
+      const logout = () => {
+        setUser(null);
+      };
+
+      return React.createElement(AuthContext.Provider, {
+        value: { user, isLoading, error, login, logout }
+      }, children);
+    };
+
+    const useAuth = () => {
+      const context = useContext(AuthContext);
+      if (!context) {
+        throw new Error('useAuth must be used within AuthProvider');
+      }
+      return context;
+    };
+
+    // Login Page Component
+    const LoginPage = () => {
+      const [username, setUsername] = useState('');
+      const [password, setPassword] = useState('');
+      const { login, error, isLoading } = useAuth();
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        await login(username, password);
+      };
+
+      return React.createElement('div', {
+        className: 'min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8'
+      }, 
+        React.createElement('div', {
+          className: 'max-w-md w-full space-y-8'
+        },
+          React.createElement('div', null,
+            React.createElement('h2', {
+              className: 'mt-6 text-center text-3xl font-extrabold text-gray-900'
+            }, 'ITSM運用システム'),
+            React.createElement('p', {
+              className: 'mt-2 text-center text-sm text-gray-600'
+            }, 'アカウントにログインしてください')
+          ),
+          React.createElement('form', {
+            className: 'mt-8 space-y-6',
+            onSubmit: handleSubmit
+          },
+            React.createElement('div', {
+              className: 'space-y-4'
+            },
+              React.createElement('div', null,
+                React.createElement('label', {
+                  htmlFor: 'username',
+                  className: 'block text-sm font-medium text-gray-700'
+                }, 'ユーザー名'),
+                React.createElement('input', {
+                  id: 'username',
+                  name: 'username',
+                  type: 'text',
+                  required: true,
+                  className: 'mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm',
+                  placeholder: 'ユーザー名を入力',
+                  value: username,
+                  onChange: (e) => setUsername(e.target.value)
+                })
+              ),
+              React.createElement('div', null,
+                React.createElement('label', {
+                  htmlFor: 'password',
+                  className: 'block text-sm font-medium text-gray-700'
+                }, 'パスワード'),
+                React.createElement('input', {
+                  id: 'password',
+                  name: 'password',
+                  type: 'password',
+                  required: true,
+                  className: 'mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm',
+                  placeholder: 'パスワードを入力',
+                  value: password,
+                  onChange: (e) => setPassword(e.target.value)
+                })
+              )
+            ),
+            error && React.createElement('div', {
+              className: 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded'
+            }, error),
+            React.createElement('div', null,
+              React.createElement('button', {
+                type: 'submit',
+                disabled: isLoading,
+                className: 'group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50'
+              }, isLoading ? 'ログイン中...' : 'ログイン')
+            ),
+            React.createElement('div', {
+              className: 'text-sm text-gray-600 text-center mt-4'
+            },
+              React.createElement('p', null, '🔑 テスト用アカウント:'),
+              React.createElement('p', null, 'admin / admin123'),
+              React.createElement('p', null, 'operator / operator123')
+            )
+          )
+        )
+      );
+    };
+
+    // Dashboard Page Component
+    const DashboardPage = () => {
+      const { user, logout } = useAuth();
+
+      return React.createElement('div', {
+        className: 'min-h-screen bg-gray-50'
+      },
+        React.createElement('nav', {
+          className: 'bg-indigo-600 shadow-sm'
+        },
+          React.createElement('div', {
+            className: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'
+          },
+            React.createElement('div', {
+              className: 'flex justify-between h-16'
+            },
+              React.createElement('div', {
+                className: 'flex items-center'
+              },
+                React.createElement('h1', {
+                  className: 'text-xl font-semibold text-white'
+                }, 'ITSM ダッシュボード')
+              ),
+              React.createElement('div', {
+                className: 'flex items-center space-x-4'
+              },
+                React.createElement('span', {
+                  className: 'text-white'
+                }, `ようこそ、${user.displayName}さん`),
+                React.createElement('button', {
+                  onClick: logout,
+                  className: 'bg-indigo-700 hover:bg-indigo-800 text-white px-3 py-2 rounded-md text-sm font-medium'
+                }, 'ログアウト')
+              )
+            )
+          )
+        ),
+        React.createElement('main', {
+          className: 'max-w-7xl mx-auto py-6 sm:px-6 lg:px-8'
+        },
+          React.createElement('div', {
+            className: 'px-4 py-6 sm:px-0'
+          },
+            React.createElement('h2', {
+              className: 'text-2xl font-bold text-gray-900 mb-6'
+            }, 'システム概要'),
+            React.createElement('div', {
+              className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8'
+            },
+              React.createElement('div', {
+                className: 'bg-white overflow-hidden shadow rounded-lg'
+              },
+                React.createElement('div', {
+                  className: 'p-5'
+                },
+                  React.createElement('div', {
+                    className: 'flex items-center'
+                  },
+                    React.createElement('div', {
+                      className: 'flex-shrink-0'
+                    },
+                      React.createElement('div', {
+                        className: 'w-8 h-8 bg-green-500 rounded-full flex items-center justify-center'
+                      }, '⚡')
+                    ),
+                    React.createElement('div', {
+                      className: 'ml-5 w-0 flex-1'
+                    },
+                      React.createElement('dl', null,
+                        React.createElement('dt', {
+                          className: 'text-sm font-medium text-gray-500 truncate'
+                        }, 'システム稼働率'),
+                        React.createElement('dd', {
+                          className: 'text-lg font-medium text-gray-900'
+                        }, '99.8%')
+                      )
+                    )
+                  )
+                )
+              ),
+              React.createElement('div', {
+                className: 'bg-white overflow-hidden shadow rounded-lg'
+              },
+                React.createElement('div', {
+                  className: 'p-5'
+                },
+                  React.createElement('div', {
+                    className: 'flex items-center'
+                  },
+                    React.createElement('div', {
+                      className: 'flex-shrink-0'
+                    },
+                      React.createElement('div', {
+                        className: 'w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center'
+                      }, '💻')
+                    ),
+                    React.createElement('div', {
+                      className: 'ml-5 w-0 flex-1'
+                    },
+                      React.createElement('dl', null,
+                        React.createElement('dt', {
+                          className: 'text-sm font-medium text-gray-500 truncate'
+                        }, '管理資産数'),
+                        React.createElement('dd', {
+                          className: 'text-lg font-medium text-gray-900'
+                        }, '1,247')
+                      )
+                    )
+                  )
+                )
+              ),
+              React.createElement('div', {
+                className: 'bg-white overflow-hidden shadow rounded-lg'
+              },
+                React.createElement('div', {
+                  className: 'p-5'
+                },
+                  React.createElement('div', {
+                    className: 'flex items-center'
+                  },
+                    React.createElement('div', {
+                      className: 'flex-shrink-0'
+                    },
+                      React.createElement('div', {
+                        className: 'w-8 h-8 bg-red-500 rounded-full flex items-center justify-center'
+                      }, '🚨')
+                    ),
+                    React.createElement('div', {
+                      className: 'ml-5 w-0 flex-1'
+                    },
+                      React.createElement('dl', null,
+                        React.createElement('dt', {
+                          className: 'text-sm font-medium text-gray-500 truncate'
+                        }, 'アクティブインシデント'),
+                        React.createElement('dd', {
+                          className: 'text-lg font-medium text-gray-900'
+                        }, '12')
+                      )
+                    )
+                  )
+                )
+              ),
+              React.createElement('div', {
+                className: 'bg-white overflow-hidden shadow rounded-lg'
+              },
+                React.createElement('div', {
+                  className: 'p-5'
+                },
+                  React.createElement('div', {
+                    className: 'flex items-center'
+                  },
+                    React.createElement('div', {
+                      className: 'flex-shrink-0'
+                    },
+                      React.createElement('div', {
+                        className: 'w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center'
+                      }, '📋')
+                    ),
+                    React.createElement('div', {
+                      className: 'ml-5 w-0 flex-1'
+                    },
+                      React.createElement('dl', null,
+                        React.createElement('dt', {
+                          className: 'text-sm font-medium text-gray-500 truncate'
+                        }, '承認待ち要求'),
+                        React.createElement('dd', {
+                          className: 'text-lg font-medium text-gray-900'
+                        }, '8')
+                      )
+                    )
+                  )
+                )
+              )
+            ),
+            React.createElement('div', {
+              className: 'bg-white shadow rounded-lg p-6'
+            },
+              React.createElement('h3', {
+                className: 'text-lg leading-6 font-medium text-gray-900 mb-4'
+              }, 'クイックアクション'),
+              React.createElement('div', {
+                className: 'grid grid-cols-2 md:grid-cols-4 gap-4'
+              },
+                React.createElement('button', {
+                  className: 'bg-blue-50 hover:bg-blue-100 p-4 rounded-lg text-center transition-colors'
+                },
+                  React.createElement('div', {
+                    className: 'text-2xl mb-2'
+                  }, '🚨'),
+                  React.createElement('div', {
+                    className: 'text-sm font-medium text-gray-900'
+                  }, 'インシデント報告')
+                ),
+                React.createElement('button', {
+                  className: 'bg-green-50 hover:bg-green-100 p-4 rounded-lg text-center transition-colors'
+                },
+                  React.createElement('div', {
+                    className: 'text-2xl mb-2'
+                  }, '📝'),
+                  React.createElement('div', {
+                    className: 'text-sm font-medium text-gray-900'
+                  }, 'サービス要求')
+                ),
+                React.createElement('button', {
+                  className: 'bg-purple-50 hover:bg-purple-100 p-4 rounded-lg text-center transition-colors'
+                },
+                  React.createElement('div', {
+                    className: 'text-2xl mb-2'
+                  }, '💻'),
+                  React.createElement('div', {
+                    className: 'text-sm font-medium text-gray-900'
+                  }, '資産管理')
+                ),
+                React.createElement('button', {
+                  className: 'bg-orange-50 hover:bg-orange-100 p-4 rounded-lg text-center transition-colors'
+                },
+                  React.createElement('div', {
+                    className: 'text-2xl mb-2'
+                  }, '📚'),
+                  React.createElement('div', {
+                    className: 'text-sm font-medium text-gray-900'
+                  }, 'ナレッジベース')
+                )
+              )
+            )
+          )
+        )
+      );
+    };
+
+    // Main App Component
+    const App = () => {
+      const { user, isLoading } = useAuth();
+
+      if (isLoading) {
+        return React.createElement('div', {
+          className: 'min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center'
+        },
+          React.createElement('div', {
+            className: 'text-center'
+          },
+            React.createElement('div', {
+              className: 'animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600 mx-auto'
+            }),
+            React.createElement('p', {
+              className: 'mt-4 text-xl text-gray-700'
+            }, 'システム初期化中...')
+          )
+        );
+      }
+
+      return user ? React.createElement(DashboardPage) : React.createElement(LoginPage);
+    };
+
+    // Render the app
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(
+      React.createElement(AuthProvider, null,
+        React.createElement(App)
+      )
+    );
+  </script>
+</body>
+</html>

@@ -94,12 +94,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (authApi.isAuthenticated()) {
           const currentUser = authApi.getCurrentUser();
           if (currentUser) {
-            setUser(currentUser);
+            // APIでユーザー情報を検証
+            try {
+              const verifiedUser = await authApi.getMe();
+              setUser(verifiedUser);
+            } catch (apiError) {
+              // API検証に失敗した場合はローカルユーザー情報を使用（オフライン対応）
+              console.warn('API verification failed, using cached user data:', apiError);
+              setUser(currentUser);
+            }
           } else {
             // トークンがあるが、ユーザー情報取得に失敗した場合はAPIから取得
             const userData = await authApi.getMe();
             setUser(userData);
           }
+        } else {
+          // 認証情報がない場合は明示的にnullに設定
+          setUser(null);
         }
       } catch (error) {
         console.error('Failed to restore authentication:', error);

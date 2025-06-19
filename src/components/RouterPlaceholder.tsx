@@ -57,6 +57,9 @@ export const Routes: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     if (path && currentPath === path) return true;
     if (path && path.includes && path.includes('*') && currentPath.startsWith(path.replace('/*', ''))) return true;
     
+    // Exact match for dashboard route
+    if (path === '/dashboard' && currentPath === '/dashboard') return true;
+    
     return false;
   });
 
