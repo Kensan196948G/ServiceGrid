@@ -6,17 +6,19 @@ import { Asset, ItemStatus } from '../types';
 import { apiGet, apiPost, apiPut, apiDelete, ApiError } from './apiUtils';
 import { handleApiError } from '../utils/errorHandler';
 
-// API レスポンス型定義
+// Enhanced API レスポンス型定義 with strict typing
 interface ApiResponse<T> {
   data?: T;
   pagination?: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
+    readonly page: number;
+    readonly limit: number;
+    readonly total: number;
+    readonly totalPages: number;
   };
-  message?: string;
-  error?: string;
+  readonly message?: string;
+  readonly error?: string;
+  readonly timestamp?: string;
+  readonly status: 'success' | 'error';
 }
 
 interface AssetFilters {

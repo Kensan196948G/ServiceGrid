@@ -1,4 +1,4 @@
-import { lazy } from 'react';
+import React, { lazy } from 'react';
 
 // Lazy load heavy components to reduce initial bundle size
 export const LazyDashboardPage = lazy(() => import('../pages/DashboardPage'));

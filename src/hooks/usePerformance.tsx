@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 
 interface PerformanceMetrics {
   renderTime: number;
@@ -108,7 +108,7 @@ export const usePerformance = (options: UsePerformanceOptions = {}) => {
     }
   }, [componentName, logToConsole]);
 
-  const measureAsync = useCallback(async <T>(
+  const measureAsync = useCallback(async <T,>(
     markName: string,
     asyncOperation: () => Promise<T>
   ): Promise<T> => {
