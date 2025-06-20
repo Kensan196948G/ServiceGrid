@@ -34,8 +34,19 @@ readonly BOLD='\033[1m'
 readonly NC='\033[0m' # No Color
 
 # =========================
-# WebUI修復ループ開始 (統合指示)
+# WebUI自動開発・修復ループ統合システム
 # =========================
+
+webui_development_loop() {
+    echo -e "${BOLD}${BLUE}🚀 WebUI自動開発・修復ループ統合開始${NC}"
+    
+    # 安全起動ランチャー使用
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "echo '=== Feature-A統合リーダー: WebUI 4フェーズループ開始 ==='" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "cd $TOOLS_DIR" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "./webui-safe-launcher.sh development-loop" Enter
+    
+    echo -e "${GREEN}✅ WebUI自動開発・修復ループ統合開始完了${NC}"
+}
 
 webui_fix_all() {
     echo -e "${BOLD}${BLUE}🚀 WebUI自動修復ループ統合開始${NC}"
@@ -48,10 +59,10 @@ webui_fix_all() {
     tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "cd $PROJECT_ROOT/tmux" Enter
     tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "./coordination/send-to-all-fixed.sh '$integrated_instruction'" Enter
     
-    # メイン修復ループ実行
+    # 4フェーズ自動修復実行
     tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "cd $TOOLS_DIR" Enter
-    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "./auto-webui-fixer.sh &" Enter
-    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "./progress-monitor.sh monitor" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "./webui-auto-fixer.sh &" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "./webui-quality-monitor.sh &" Enter
     
     echo -e "${GREEN}✅ WebUI自動修復ループ統合開始完了${NC}"
 }
@@ -59,6 +70,16 @@ webui_fix_all() {
 # =========================
 # Feature別専門指示送信
 # =========================
+
+webui_auto_dev_feature_b() {
+    echo -e "${BOLD}${CYAN}🎨 Feature-B UI自動開発ループ開始${NC}"
+    
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_B_PANE" "echo '=== Feature-B UI自動開発ループ開始 ==='" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_B_PANE" "cd $PROJECT_ROOT/tmux/coordination" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_B_PANE" "./webui-auto-dev-feature-b.sh --loop" Enter
+    
+    echo -e "${GREEN}✅ Feature-B UI自動開発ループ開始完了${NC}"
+}
 
 webui_fix_feature_b() {
     local instruction="React 19コンポーネント自動最適化ループ（最大20回）を実行。memo化・Hook最適化・再描画削減・アクセシビリティ改善を継続実行してください。"
@@ -88,6 +109,16 @@ webui_fix_feature_b() {
     tmux send-keys -t "$TMUX_SESSION:$FEATURE_B_PANE" "$feature_b_cmd" Enter
     
     echo -e "${GREEN}✅ Feature-B UI最適化指示送信完了${NC}"
+}
+
+webui_auto_dev_feature_c() {
+    echo -e "${BOLD}${GREEN}🔧 Feature-C API自動開発ループ開始${NC}"
+    
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_C_PANE" "echo '=== Feature-C API自動開発ループ開始 ==='" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_C_PANE" "cd $PROJECT_ROOT/tmux/coordination" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_C_PANE" "./webui-auto-dev-feature-c.sh --loop" Enter
+    
+    echo -e "${GREEN}✅ Feature-C API自動開発ループ開始完了${NC}"
 }
 
 webui_fix_feature_c() {
@@ -121,6 +152,16 @@ webui_fix_feature_c() {
     echo -e "${GREEN}✅ Feature-C API修復指示送信完了${NC}"
 }
 
+webui_auto_dev_feature_d() {
+    echo -e "${BOLD}${PURPLE}💻 Feature-D PowerShell自動開発ループ開始${NC}"
+    
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_D_PANE" "echo '=== Feature-D PowerShell自動開発ループ開始 ==='" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_D_PANE" "cd $PROJECT_ROOT/tmux/coordination" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_D_PANE" "./webui-auto-dev-feature-d.sh --loop" Enter
+    
+    echo -e "${GREEN}✅ Feature-D PowerShell自動開発ループ開始完了${NC}"
+}
+
 webui_fix_feature_d() {
     local instruction="PowerShell統合自動修復ループ（最大20回）を実行。Windows API連携・セキュリティ強化・エラーハンドリング向上を継続実行してください。"
     
@@ -149,6 +190,16 @@ webui_fix_feature_d() {
     tmux send-keys -t "$TMUX_SESSION:$FEATURE_D_PANE" "$feature_d_cmd" Enter
     
     echo -e "${GREEN}✅ Feature-D PowerShell修復指示送信完了${NC}"
+}
+
+webui_auto_dev_feature_e() {
+    echo -e "${BOLD}${CYAN}🔒 Feature-E 品質保証自動開発ループ開始${NC}"
+    
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_E_PANE" "echo '=== Feature-E 品質保証自動開発ループ開始 ==='" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_E_PANE" "cd $PROJECT_ROOT/tmux/coordination" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_E_PANE" "./webui-auto-dev-feature-e.sh --loop" Enter
+    
+    echo -e "${GREEN}✅ Feature-E 品質保証自動開発ループ開始完了${NC}"
 }
 
 webui_fix_feature_e() {
@@ -183,40 +234,49 @@ webui_fix_feature_e() {
 }
 
 # =========================
-# WebUI修復状況確認
+# WebUI開発・修復状況確認
 # =========================
+
+webui_loop_status() {
+    echo -e "${BOLD}${PURPLE}📊 WebUI開発ループ進捗状況確認${NC}"
+    
+    # 安全ランチャーでステータス確認
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "cd $TOOLS_DIR" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "./webui-safe-launcher.sh status" Enter
+    
+    echo -e "${GREEN}✅ WebUI開発ループ状況確認実行${NC}"
+}
 
 webui_status() {
     echo -e "${BOLD}${PURPLE}📊 WebUI修復進捗状況確認${NC}"
     
-    # 進捗監視スクリプト実行
-    if [[ -f "$TOOLS_DIR/progress-monitor.sh" ]]; then
-        tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "cd $TOOLS_DIR" Enter
-        tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "./progress-monitor.sh status" Enter
-    else
-        echo -e "${RED}❌ 進捗監視スクリプトが見つかりません${NC}"
-    fi
+    # 品質監視状況確認
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "cd $TOOLS_DIR" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "./webui-quality-monitor.sh --status" Enter
     
     echo -e "${GREEN}✅ WebUI修復状況確認実行${NC}"
 }
 
 # =========================
-# WebUI修復レポート表示
+# WebUI開発・修復レポート表示
 # =========================
+
+webui_comprehensive_report() {
+    echo -e "${BOLD}${BLUE}📋 WebUI包括レポート生成${NC}"
+    
+    # 包括レポート生成
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "cd $TOOLS_DIR" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "./webui-loop-reporter.sh --comprehensive" Enter
+    
+    echo -e "${GREEN}✅ WebUI包括レポート生成実行${NC}"
+}
 
 webui_report() {
     echo -e "${BOLD}${BLUE}📋 WebUI修復レポート表示${NC}"
     
-    # レポート表示スクリプト実行
-    if [[ -f "$TOOLS_DIR/auto-webui-fixer.sh" ]]; then
-        tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "cd $TOOLS_DIR" Enter
-        tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "./auto-webui-fixer.sh --report" Enter
-    fi
-    
-    # 分析レポート表示
-    if [[ -f "$TOOLS_DIR/repair-analyzer.sh" ]]; then
-        tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "./repair-analyzer.sh report" Enter
-    fi
+    # HTMLレポート生成・表示
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "cd $TOOLS_DIR" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "./webui-loop-reporter.sh --all" Enter
     
     echo -e "${GREEN}✅ WebUI修復レポート表示実行${NC}"
 }
@@ -228,25 +288,50 @@ webui_report() {
 webui_monitor() {
     echo -e "${BOLD}${CYAN}📡 WebUI品質リアルタイム監視開始${NC}"
     
-    # 品質監視スクリプト実行
-    if [[ -f "$TOOLS_DIR/progress-monitor.sh" ]]; then
-        tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "cd $TOOLS_DIR" Enter
-        tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "./progress-monitor.sh monitor" Enter
-    else
-        echo -e "${RED}❌ 品質監視スクリプトが見つかりません${NC}"
-    fi
+    # 品質監視システム実行
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "cd $TOOLS_DIR" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "./webui-quality-monitor.sh" Enter
     
     echo -e "${GREEN}✅ WebUI品質監視開始完了${NC}"
 }
 
+webui_emergency_stop() {
+    echo -e "${BOLD}${RED}🚨 WebUI開発ループ緊急停止${NC}"
+    
+    # 緊急停止システム実行
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "cd $TOOLS_DIR" Enter
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "./webui-emergency-stop.sh" Enter
+    
+    echo -e "${GREEN}✅ WebUI緊急停止実行${NC}"
+}
+
 # =========================
-# 統合WebUI修復実行（全Feature同時）
+# 統合WebUI自動開発実行（全Feature同時）
 # =========================
+
+webui_auto_dev_all_features() {
+    echo -e "${BOLD}${PURPLE}⚡ 全Feature WebUI自動開発同時実行${NC}"
+    
+    # 各Feature安全起動
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_B_PANE" "cd $TOOLS_DIR && ./webui-safe-launcher.sh feature-b" Enter
+    sleep 2
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_C_PANE" "cd $TOOLS_DIR && ./webui-safe-launcher.sh feature-c" Enter
+    sleep 2  
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_D_PANE" "cd $TOOLS_DIR && ./webui-safe-launcher.sh feature-d" Enter
+    sleep 2
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_E_PANE" "cd $TOOLS_DIR && ./webui-safe-launcher.sh feature-e" Enter
+    
+    # 統合監視開始
+    sleep 5
+    tmux send-keys -t "$TMUX_SESSION:$FEATURE_A_PANE" "cd $TOOLS_DIR && ./webui-safe-launcher.sh quality-monitor" Enter
+    
+    echo -e "${GREEN}✅ 全Feature WebUI自動開発同時実行完了${NC}"
+}
 
 webui_fix_all_features() {
     echo -e "${BOLD}${PURPLE}⚡ 全Feature WebUI修復同時実行${NC}"
     
-    # 各Feature並列実行
+    # 各Feature修復並列実行
     webui_fix_feature_b &
     sleep 2
     webui_fix_feature_c &
@@ -283,30 +368,42 @@ webui_emergency_fix() {
 # =========================
 
 show_webui_help() {
-    echo -e "${BOLD}${BLUE}WebUI修復 leader コマンド拡張 v1.0${NC}"
+    echo -e "${BOLD}${BLUE}WebUI自動開発・修復ループ leader コマンド v2.0${NC}"
     echo ""
     echo -e "${YELLOW}利用可能なコマンド:${NC}"
     echo ""
-    echo -e "${GREEN}🚀 基本WebUI修復コマンド:${NC}"
+    echo -e "${GREEN}🚀 メインWebUI開発・修復コマンド:${NC}"
+    echo "  webui-development-loop         - WebUI 4フェーズ自動開発ループ（最大20回）"
     echo "  webui-fix                      - WebUI自動修復ループ統合開始"
+    echo "  webui-auto-dev-all             - 全Feature WebUI自動開発同時実行"
     echo "  webui-fix-all                  - 全Feature WebUI修復同時実行"
     echo "  webui-emergency                - WebUI緊急修復（高優先度のみ）"
     echo ""
-    echo -e "${CYAN}🎯 Feature別WebUI修復:${NC}"
+    echo -e "${CYAN}🎯 Feature別WebUI自動開発:${NC}"
+    echo "  webui-auto-dev-ui              - Feature-B UI自動開発ループ"
+    echo "  webui-auto-dev-api             - Feature-C API自動開発ループ"
+    echo "  webui-auto-dev-ps              - Feature-D PowerShell自動開発ループ"
+    echo "  webui-auto-dev-security        - Feature-E 品質保証自動開発ループ"
+    echo ""
+    echo -e "${YELLOW}🔧 Feature別WebUI修復:${NC}"
     echo "  webui-fix-ui                   - Feature-B UI最適化ループ"
     echo "  webui-fix-api                  - Feature-C API修復ループ"
     echo "  webui-fix-ps                   - Feature-D PowerShell修復ループ"
     echo "  webui-fix-security             - Feature-E 品質監査ループ"
     echo ""
     echo -e "${PURPLE}📊 監視・レポートコマンド:${NC}"
-    echo "  webui-status                   - WebUI修復進捗確認"
-    echo "  webui-report                   - WebUI修復レポート表示"
+    echo "  webui-loop-status              - WebUI開発ループ進捗確認"
+    echo "  webui-status                   - WebUI品質状況確認"
+    echo "  webui-comprehensive-report     - WebUI包括レポート生成"
+    echo "  webui-report                   - WebUI HTMLレポート表示"
     echo "  webui-monitor                  - WebUI品質リアルタイム監視"
+    echo "  webui-emergency-stop           - WebUI開発ループ緊急停止"
     echo ""
     echo -e "${YELLOW}使用例:${NC}"
-    echo "  leader all --auto-approve webui-fix"
-    echo "  leader ui webui-fix-ui"
-    echo "  leader all webui-status"
+    echo "  leader webui-development-loop          # 4フェーズ自動開発ループ開始"
+    echo "  leader webui-auto-dev-all              # 全Feature自動開発同時実行"
+    echo "  leader webui-loop-status               # 開発ループ進捗確認"
+    echo "  leader webui-emergency-stop            # 緊急停止"
 }
 
 # =========================
@@ -314,12 +411,38 @@ show_webui_help() {
 # =========================
 
 case "${1:-help}" in
+    # メイン自動開発・修復コマンド
+    "webui-development-loop"|"development-loop")
+        webui_development_loop
+        ;;
     "webui-fix"|"fix")
         webui_fix_all
+        ;;
+    "webui-auto-dev-all"|"auto-dev-all")
+        webui_auto_dev_all_features
         ;;
     "webui-fix-all"|"fix-all")
         webui_fix_all_features
         ;;
+    "webui-emergency"|"emergency")
+        webui_emergency_fix
+        ;;
+    
+    # Feature別自動開発コマンド
+    "webui-auto-dev-ui"|"auto-dev-ui")
+        webui_auto_dev_feature_b
+        ;;
+    "webui-auto-dev-api"|"auto-dev-api")
+        webui_auto_dev_feature_c
+        ;;
+    "webui-auto-dev-ps"|"auto-dev-ps")
+        webui_auto_dev_feature_d
+        ;;
+    "webui-auto-dev-security"|"auto-dev-security")
+        webui_auto_dev_feature_e
+        ;;
+    
+    # Feature別修復コマンド
     "webui-fix-ui"|"fix-ui")
         webui_fix_feature_b
         ;;
@@ -332,11 +455,16 @@ case "${1:-help}" in
     "webui-fix-security"|"fix-security")
         webui_fix_feature_e
         ;;
-    "webui-emergency"|"emergency")
-        webui_emergency_fix
+    
+    # 監視・レポートコマンド
+    "webui-loop-status"|"loop-status")
+        webui_loop_status
         ;;
     "webui-status"|"status")
         webui_status
+        ;;
+    "webui-comprehensive-report"|"comprehensive-report")
+        webui_comprehensive_report
         ;;
     "webui-report"|"report")
         webui_report
@@ -344,6 +472,11 @@ case "${1:-help}" in
     "webui-monitor"|"monitor")
         webui_monitor
         ;;
+    "webui-emergency-stop"|"emergency-stop")
+        webui_emergency_stop
+        ;;
+    
+    # ヘルプ
     "help"|"-h"|"--help")
         show_webui_help
         ;;

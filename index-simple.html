@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ServiceGrid - ITSM運用システムプラットフォーム</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gray-100">
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext } = React;
+    
+    // 認証コンテキスト
+    const AuthContext = createContext();
+    
+    const AuthProvider = ({ children }) => {
+      const [user, setUser] = useState(null);
+      const [isLoading, setIsLoading] = useState(true);
+      const [error, setError] = useState(null);
+      
+      useEffect(() => {
+        // セッション復元
+        try {
+          const savedUser = sessionStorage.getItem('servicegrid_auth');
+          if (savedUser) {
+            const authData = JSON.parse(savedUser);
+            if (authData.user && authData.timestamp) {
+              const now = Date.now();
+              const maxAge = 24 * 60 * 60 * 1000; // 24時間
+              
+              if (now - authData.timestamp < maxAge) {
+                setUser(authData.user);
+              } else {
+                sessionStorage.removeItem('servicegrid_auth');
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('セッション復元エラー:', e);
+          sessionStorage.removeItem('servicegrid_auth');
+        } finally {
+          setIsLoading(false);
+        }
+      }, []);
+      
+      const login = async (username, password) => {
+        setError(null);
+        setIsLoading(true);
+        
+        try {
+          // テスト用認証
+          const testUsers = {
+            'admin': { password: 'admin123', role: 'administrator', displayName: '管理者' },
+            'operator': { password: 'operator123', role: 'operator', displayName: 'オペレーター' },
+            'user': { password: 'user123', role: 'user', displayName: 'ユーザー' }
+          };
+          
+          const testUser = testUsers[username];
+          if (testUser && testUser.password === password) {
+            const userData = {
+              id: Date.now().toString(),
+              username,
+              displayName: testUser.displayName,
+              role: testUser.role,
+              loginTime: new Date().toISOString()
+            };
+            
+            setUser(userData);
+            
+            // セッション保存
+            const authData = {
+              user: userData,
+              timestamp: Date.now()
+            };
+            sessionStorage.setItem('servicegrid_auth', JSON.stringify(authData));
+            
+            setIsLoading(false);
+            return true;
+          } else {
+            setError('ユーザー名またはパスワードが正しくありません');
+            setIsLoading(false);
+            return false;
+          }
+        } catch (err) {
+          setError('ログインに失敗しました: ' + err.message);
+          setIsLoading(false);
+          return false;
+        }
+      };
+      
+      const logout = () => {
+        setUser(null);
+        sessionStorage.removeItem('servicegrid_auth');
+      };
+      
+      return (
+        <AuthContext.Provider value={{ user, isLoading, error, login, logout }}>
+          {children}
+        </AuthContext.Provider>
+      );
+    };
+    
+    const useAuth = () => {
+      const context = useContext(AuthContext);
+      if (!context) {
+        throw new Error('useAuth must be used within AuthProvider');
+      }
+      return context;
+    };
+    
+    // ログインページ
+    const LoginPage = () => {
+      const [username, setUsername] = useState('');
+      const [password, setPassword] = useState('');
+      const { login, error, isLoading } = useAuth();
+      
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        await login(username, password);
+      };
+      
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4">
+          <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
+            <div className="text-center mb-6">
+              <h1 className="text-3xl font-bold text-gray-900">ServiceGrid ITSM</h1>
+              <p className="text-gray-600 mt-2">アカウントにログインしてください</p>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+                  ユーザー名
+                </label>
+                <input
+                  type="text"
+                  required
+                  id="username"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="ユーザー名を入力"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                  パスワード
+                </label>
+                <input
+                  type="password"
+                  required
+                  id="password"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="パスワードを入力"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+              
+              {error && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                  {error}
+                </div>
+              )}
+              
+              <button
+                type="submit"
+                disabled={isLoading}
+                className={`w-full py-2 px-4 rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors ${
+                  isLoading
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {isLoading ? 'ログイン中...' : 'ログイン'}
+              </button>
+              
+              <div className="text-sm text-gray-600 text-center space-y-1 mt-4">
+                <p className="font-semibold">🔑 テスト用アカウント:</p>
+                <p>admin / admin123 (管理者)</p>
+                <p>operator / operator123 (オペレーター)</p>
+                <p>user / user123 (ユーザー)</p>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    };
+    
+    // ダッシュボードページ
+    const DashboardPage = () => {
+      const { user, logout } = useAuth();
+      
+      const roleToJapanese = (role) => {
+        const roleMap = {
+          'administrator': '管理者',
+          'operator': 'オペレーター',
+          'user': 'ユーザー',
+          'readonly': '閲覧専用'
+        };
+        return roleMap[role] || role;
+      };
+      
+      return (
+        <div className="min-h-screen bg-gray-100">
+          {/* ヘッダー */}
+          <header className="bg-white shadow-md">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center h-16">
+                <h1 className="text-xl font-semibold text-gray-800">
+                  ServiceGrid ITSM Platform
+                </h1>
+                <div className="flex items-center space-x-4">
+                  <span className="text-gray-600">
+                    {user?.displayName} ({roleToJapanese(user?.role)})
+                  </span>
+                  <button
+                    onClick={logout}
+                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  >
+                    ログアウト
+                  </button>
+                </div>
+              </div>
+            </div>
+          </header>
+          
+          {/* メインコンテンツ */}
+          <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <div className="px-4 py-6 sm:px-0">
+              <div className="mb-8">
+                <h2 className="text-3xl font-bold text-gray-900 mb-2">ダッシュボード</h2>
+                <p className="text-gray-600">ようこそ、{user?.displayName}さん</p>
+              </div>
+              
+              {/* 統計カード */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                {[
+                  { label: 'システム稼働率', value: '99.8%', icon: '⚡', color: 'green' },
+                  { label: '管理資産数', value: '1,247', icon: '💻', color: 'blue' },
+                  { label: 'アクティブインシデント', value: '12', icon: '🚨', color: 'red' },
+                  { label: '承認待ち要求', value: '8', icon: '📋', color: 'yellow' }
+                ].map((stat, index) => (
+                  <div key={index} className="bg-white overflow-hidden shadow rounded-lg">
+                    <div className="p-5">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                          <div className={`w-8 h-8 bg-${stat.color}-500 rounded-full flex items-center justify-center text-white`}>
+                            {stat.icon}
+                          </div>
+                        </div>
+                        <div className="ml-5 w-0 flex-1">
+                          <dl>
+                            <dt className="text-sm font-medium text-gray-500 truncate">
+                              {stat.label}
+                            </dt>
+                            <dd className="text-2xl font-semibold text-gray-900">
+                              {stat.value}
+                            </dd>
+                          </dl>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* クイックアクション */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                  クイックアクション
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[
+                    { icon: '🚨', label: 'インシデント報告', color: 'blue' },
+                    { icon: '📝', label: 'サービス要求', color: 'green' },
+                    { icon: '💻', label: '資産管理', color: 'purple' },
+                    { icon: '📚', label: 'ナレッジベース', color: 'orange' }
+                  ].map((action, index) => (
+                    <button
+                      key={index}
+                      className={`bg-${action.color}-50 hover:bg-${action.color}-100 p-4 rounded-lg text-center transition-colors`}
+                    >
+                      <div className="text-2xl mb-2">{action.icon}</div>
+                      <div className="text-sm font-medium text-gray-900">{action.label}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      );
+    };
+    
+    // メインアプリ
+    const App = () => {
+      const { user, isLoading } = useAuth();
+      
+      useEffect(() => {
+        document.title = 'ServiceGrid ITSM Platform';
+      }, []);
+      
+      if (isLoading) {
+        return (
+          <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-xl text-gray-700">認証状態確認中...</p>
+            </div>
+          </div>
+        );
+      }
+      
+      return user ? <DashboardPage /> : <LoginPage />;
+    };
+    
+    // アプリケーション開始
+    const RootApp = () => (
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    );
+    
+    ReactDOM.render(<RootApp />, document.getElementById('root'));
+  </script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 import * as React from 'react';
 const { useState, memo, useCallback, useEffect, useRef } = React;
 type ReactNode = React.ReactNode;
-import { NavLink, useNavigate } from './RouterPlaceholder';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { APP_NAME } from '../constants';
 
@@ -133,7 +133,7 @@ const Sidebar = memo<SidebarProps>(({ isOpen, toggleSidebar }) => {
         <nav className="flex-grow overflow-y-auto" role="navigation" aria-label="主要機能">
           <ul role="list">
             {NAVIGATION_ITEMS.map((item, index) => (
-              <li key={item.name} className="mb-1.5">
+              <li key={item.label} className="mb-1.5">
                 <NavLink
                   ref={index === 0 ? firstLinkRef : undefined}
                   to={item.path}
@@ -150,15 +150,7 @@ const Sidebar = memo<SidebarProps>(({ isOpen, toggleSidebar }) => {
                     {item.icon}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <span className="block text-sm leading-tight truncate">{item.name}</span>
-                    {item.description && (
-                      <span 
-                        id={`nav-desc-${index}`}
-                        className="block text-xs text-slate-400 mt-0.5 leading-tight truncate"
-                      >
-                        {item.description}
-                      </span>
-                    )}
+                    <span className="block text-sm leading-tight truncate">{item.label}</span>
                   </div>
                 </NavLink>
               </li>

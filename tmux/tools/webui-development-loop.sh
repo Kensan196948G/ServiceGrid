@@ -412,6 +412,25 @@ execute_development_loop() {
     
     START_TIME=$(get_timestamp)
     
+    # 4フェーズ統合コーディネーター起動
+    local coordinator_script="$SCRIPT_DIR/webui-integration-coordinator.sh"
+    if [ -f "$coordinator_script" ]; then
+        print_info "4フェーズ統合コーディネーター実行中..."
+        "$coordinator_script" --start --max-loops "$MAX_LOOPS" --threshold "$QUALITY_THRESHOLD"
+        local coordinator_result=$?
+        
+        if [ $coordinator_result -eq 0 ]; then
+            save_final_report "integration_coordinator_success" "$QUALITY_THRESHOLD"
+            return 0
+        else
+            print_warning "統合コーディネーターが完了しましたが目標に未達です"
+        fi
+    else
+        print_warning "統合コーディネーターが見つかりません: $coordinator_script"
+        print_info "レガシーモードで4フェーズループを実行します..."
+    fi
+    
+    # レガシーモード: 従来の4フェーズループ実行
     for ((CURRENT_LOOP=1; CURRENT_LOOP<=MAX_LOOPS; CURRENT_LOOP++)); do
         print_info "==================== ループ $CURRENT_LOOP/$MAX_LOOPS 開始 ===================="
         

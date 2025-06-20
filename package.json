@@ -1,9 +1,13 @@
 {
   "name": "itsm-platform",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.1.0",
+  "description": "ITSM準拠IT運用システムプラットフォーム - ITILフレームワーク対応の統合IT運用管理システム",
+  "keywords": ["ITSM", "ITIL", "IT運用", "React", "TypeScript", "PowerShell", "Claude Code"],
+  "author": "ServiceGrid Development Team",
+  "license": "MIT",
   "scripts": {
-    "dev": "./node_modules/.bin/vite --config config/vite.config.ts --host 0.0.0.0 --port 3000",
+    "dev": "./node_modules/.bin/vite --config config/vite.config.ts --host 0.0.0.0 --port 3001",
     "build": "tsc --project config/tsconfig.json && vite build --config config/vite.config.ts",
     "preview": "vite preview --config config/vite.config.ts",
     "lint": "eslint src --ext .ts,.tsx --max-warnings 0",

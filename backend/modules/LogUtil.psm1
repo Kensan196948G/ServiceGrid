@@ -496,7 +496,7 @@ function Flush-LogBuffer {
             Add-Content -Path $logFile -Value $formattedEntries -Encoding UTF8
             
         } catch {
-            Write-Host "Batch log write failed for $logFile: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "Batch log write failed for ${logFile}: $($_.Exception.Message)" -ForegroundColor Red
         }
     }
     
@@ -555,7 +555,7 @@ function Invoke-LogRotation {
         Write-Host "Log rotated: $LogFile -> $firstBackup" -ForegroundColor Yellow
         
     } catch {
-        Write-Host "Log rotation failed for $LogFile: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "Log rotation failed for ${LogFile}: $($_.Exception.Message)" -ForegroundColor Red
     }
 }
 

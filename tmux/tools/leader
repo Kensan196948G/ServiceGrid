@@ -1,0 +1,283 @@
+#!/bin/bash
+
+# Feature-A統合リーダー安全実行スクリプト
+# tmuxペインを保護しながらWebUIコマンドを実行
+
+set -euo pipefail
+
+# =========================
+# 設定・定数定義
+# =========================
+
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+readonly COORDINATION_DIR="$PROJECT_ROOT/tmux/coordination"
+readonly WEBUI_LEADER_SCRIPT="$COORDINATION_DIR/webui-leader-commands.sh"
+
+# セッション・ペイン設定
+readonly TMUX_SESSION="itsm-requirement"
+readonly FEATURE_A_PANE=4
+
+# 色設定
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[0;33m'
+readonly BLUE='\033[0;34m'
+readonly BOLD='\033[1m'
+readonly NC='\033[0m'
+
+# =========================
+# ユーティリティ関数
+# =========================
+
+print_info() {
+    echo -e "${BLUE}[LEADER]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}[LEADER-OK]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[LEADER-ERROR]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[LEADER-WARN]${NC} $1"
+}
+
+# =========================
+# 安全実行関数
+# =========================
+
+safe_execute_in_pane() {
+    local pane="$1"
+    local command="$2"
+    local description="$3"
+    
+    # tmuxセッション存在確認
+    if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+        print_error "tmuxセッション '$TMUX_SESSION' が見つかりません"
+        print_info "セッションを開始してください: cd /mnt/e/ServiceGrid/tmux && ./start-development.sh"
+        return 1
+    fi
+    
+    # ペイン存在確認
+    if ! tmux list-panes -t "$TMUX_SESSION:0" 2>/dev/null | grep -q "^$pane:"; then
+        print_error "ペイン $pane が見つかりません"
+        return 1
+    fi
+    
+    print_info "$description"
+    
+    # 安全実行: エラーが発生してもペインを保護
+    local safe_command="($command) || (echo '❌ コマンド実行エラー: $command'; echo 'ペインは保護されています'; echo 'Enter キーを押して続行...')"
+    
+    tmux send-keys -t "$TMUX_SESSION:0.$pane" "$safe_command" Enter
+    
+    print_success "$description - 実行完了"
+}
+
+# =========================
+# WebUIコマンド安全実行
+# =========================
+
+execute_webui_command() {
+    local webui_command="$1"
+    
+    # スクリプト存在確認
+    if [ ! -f "$WEBUI_LEADER_SCRIPT" ]; then
+        print_error "WebUIリーダースクリプトが見つかりません: $WEBUI_LEADER_SCRIPT"
+        return 1
+    fi
+    
+    # 安全実行用のラッパー作成
+    local safe_webui_command="cd '$COORDINATION_DIR' && bash '$WEBUI_LEADER_SCRIPT' '$webui_command'"
+    
+    safe_execute_in_pane "$FEATURE_A_PANE" "$safe_webui_command" "WebUIコマンド実行: $webui_command"
+}
+
+# =========================
+# Feature別実行
+# =========================
+
+execute_feature_command() {
+    local feature="$1"
+    local command="$2"
+    
+    local pane=""
+    case "$feature" in
+        "ui"|"b"|"feature-b")
+            pane=0
+            ;;
+        "api"|"c"|"feature-c") 
+            pane=1
+            ;;
+        "ps"|"d"|"feature-d")
+            pane=2
+            ;;
+        "security"|"e"|"feature-e")
+            pane=3
+            ;;
+        "leader"|"a"|"feature-a")
+            pane=4
+            ;;
+        *)
+            print_error "不明なFeature: $feature"
+            return 1
+            ;;
+    esac
+    
+    safe_execute_in_pane "$pane" "$command" "Feature-${feature^^} コマンド実行"
+}
+
+# =========================
+# 全ペイン実行
+# =========================
+
+execute_all_panes() {
+    local command="$1"
+    
+    print_info "全ペインでコマンド実行: $command"
+    
+    for pane in 0 1 2 3 4; do
+        safe_execute_in_pane "$pane" "$command" "ペイン $pane でコマンド実行"
+        sleep 1
+    done
+}
+
+# =========================
+# 統合指示送信
+# =========================
+
+send_integrated_instruction() {
+    local instruction="$1"
+    local options="${2:-}"
+    
+    local send_script="$COORDINATION_DIR/send-to-all-fixed.sh"
+    
+    if [ ! -f "$send_script" ]; then
+        print_error "統合指示スクリプトが見つかりません: $send_script"
+        return 1
+    fi
+    
+    local send_command="cd '$COORDINATION_DIR' && bash '$send_script' $options '$instruction'"
+    
+    safe_execute_in_pane "$FEATURE_A_PANE" "$send_command" "統合指示送信"
+}
+
+# =========================
+# ヘルプ表示
+# =========================
+
+show_leader_help() {
+    echo -e "${BOLD}${BLUE}Feature-A統合リーダー 安全実行システム v2.0${NC}"
+    echo ""
+    echo -e "${YELLOW}WebUI専用コマンド:${NC}"
+    echo "  leader webui-development-loop           # 4フェーズ自動開発ループ"
+    echo "  leader webui-auto-dev-all               # 全Feature自動開発同時実行"
+    echo "  leader webui-loop-status                # 開発ループ進捗確認"
+    echo "  leader webui-monitor                    # 品質監視開始"
+    echo "  leader webui-emergency-stop             # 緊急停止"
+    echo ""
+    echo -e "${CYAN}Feature別実行:${NC}"
+    echo "  leader ui 'command'                     # Feature-B (UI)で実行"
+    echo "  leader api 'command'                    # Feature-C (API)で実行" 
+    echo "  leader ps 'command'                     # Feature-D (PowerShell)で実行"
+    echo "  leader security 'command'               # Feature-E (セキュリティ)で実行"
+    echo ""
+    echo -e "${PURPLE}統合指示:${NC}"
+    echo "  leader all 'instruction'                # 全ペインに指示送信"
+    echo "  leader all --auto-approve 'instruction' # 自動承認モード"
+    echo ""
+    echo -e "${GREEN}基本コマンド:${NC}"
+    echo "  leader status                           # tmux状況確認"
+    echo "  leader help                             # このヘルプ表示"
+    echo ""
+    echo -e "${YELLOW}使用例:${NC}"
+    echo "  leader webui-development-loop"
+    echo "  leader webui-loop-status"
+    echo "  leader ui 'npm run dev'"
+    echo "  leader all 'git status'"
+}
+
+# =========================
+# ステータス確認
+# =========================
+
+show_tmux_status() {
+    print_info "tmux セッション状況確認"
+    
+    if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+        print_success "tmuxセッション '$TMUX_SESSION' は実行中です"
+        
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "ペイン一覧:"
+        tmux list-panes -t "$TMUX_SESSION:0" -F "ペイン #{pane_index}: #{pane_current_command} (#{pane_width}x#{pane_height})"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    else
+        print_error "tmuxセッション '$TMUX_SESSION' が見つかりません"
+        print_info "開発環境を開始してください:"
+        echo "  cd /mnt/e/ServiceGrid/tmux"
+        echo "  ./start-development.sh"
+        echo "  tmux attach-session -t itsm-requirement"
+    fi
+}
+
+# =========================
+# メイン実行
+# =========================
+
+main() {
+    local command="${1:-help}"
+    
+    case "$command" in
+        # WebUI専用コマンド
+        "webui-development-loop"|"webui-auto-dev-all"|"webui-loop-status"|"webui-status"|"webui-monitor"|"webui-emergency-stop"|"webui-report"|"webui-comprehensive-report"|"webui-auto-dev-ui"|"webui-auto-dev-api"|"webui-auto-dev-ps"|"webui-auto-dev-security"|"webui-fix"|"webui-fix-all"|"webui-fix-ui"|"webui-fix-api"|"webui-fix-ps"|"webui-fix-security"|"webui-emergency")
+            execute_webui_command "$command"
+            ;;
+        
+        # Feature別実行
+        "ui"|"b"|"feature-b"|"api"|"c"|"feature-c"|"ps"|"d"|"feature-d"|"security"|"e"|"feature-e"|"leader"|"a"|"feature-a")
+            if [ $# -lt 2 ]; then
+                print_error "Feature別実行にはコマンドが必要です"
+                echo "使用例: leader ui 'npm run dev'"
+                exit 1
+            fi
+            execute_feature_command "$command" "$2"
+            ;;
+        
+        # 全ペイン実行
+        "all")
+            if [ $# -lt 2 ]; then
+                print_error "全ペイン実行にはコマンドが必要です"
+                echo "使用例: leader all 'git status'"
+                exit 1
+            fi
+            
+            # オプション処理
+            if [ "$2" = "--auto-approve" ] && [ $# -ge 3 ]; then
+                send_integrated_instruction "$3" "--auto-approve"
+            else
+                send_integrated_instruction "$2"
+            fi
+            ;;
+        
+        # システム関連
+        "status")
+            show_tmux_status
+            ;;
+        "help"|"-h"|"--help")
+            show_leader_help
+            ;;
+        *)
+            print_error "不明なコマンド: $command"
+            echo ""
+            show_leader_help
+            exit 1
+            ;;
+    esac
+}
+
+# スクリプト実行
+main "$@"
