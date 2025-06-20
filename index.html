@@ -4209,6 +4209,1546 @@
       );
     };
 
+    // ==========================================
+    // Change Management Page Component
+    // ==========================================
+
+    const ChangeManagementPage = () => {
+      const { user } = useAuth();
+      const { showSuccess, showError } = useToast();
+      
+      // State management
+      const [changeRequests, setChangeRequests] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [selectedChange, setSelectedChange] = useState(null);
+      const [isModalOpen, setIsModalOpen] = useState(false);
+      const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+      const [searchTerm, setSearchTerm] = useState('');
+      const [statusFilter, setStatusFilter] = useState('');
+      const [priorityFilter, setPriorityFilter] = useState('');
+      const [currentPage, setCurrentPage] = useState(1);
+      const itemsPerPage = 10;
+
+      // New change request form
+      const [newChange, setNewChange] = useState({
+        title: '',
+        description: '',
+        type: 'Standard',
+        priority: 'Medium',
+        impact: 'Medium',
+        urgency: 'Medium',
+        requestedBy: '',
+        assignedTo: '',
+        plannedStartDate: '',
+        plannedEndDate: '',
+        reason: '',
+        rollbackPlan: '',
+        testPlan: ''
+      });
+
+      // Fetch change requests from API
+      useEffect(() => {
+        const fetchChanges = async () => {
+          try {
+            setLoading(true);
+            console.log('Fetching change requests from:', `${API_BASE_URL}/api/changes`);
+            const response = await fetch(`${API_BASE_URL}/api/changes`);
+            if (response.ok) {
+              const data = await response.json();
+              console.log('Changes API Response:', data);
+              setChangeRequests(data.data);
+            } else {
+              console.error('Changes API Response not OK:', response.status, response.statusText);
+              showError('変更要求の取得に失敗しました');
+            }
+          } catch (error) {
+            console.error('Error fetching change requests:', error);
+            showError('APIエラーが発生しました: ' + error.message);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        fetchChanges();
+      }, []);
+
+      // Utility functions
+      const getStatusColor = (status) => {
+        const colors = {
+          'Requested': 'bg-blue-100 text-blue-800',
+          'Under Review': 'bg-yellow-100 text-yellow-800',
+          'Approved': 'bg-green-100 text-green-800',
+          'Rejected': 'bg-red-100 text-red-800',
+          'In Progress': 'bg-purple-100 text-purple-800',
+          'Implemented': 'bg-green-100 text-green-800',
+          'Closed': 'bg-gray-100 text-gray-800'
+        };
+        return colors[status] || 'bg-gray-100 text-gray-800';
+      };
+
+      const getPriorityColor = (priority) => {
+        const colors = {
+          'Critical': 'bg-red-100 text-red-800',
+          'High': 'bg-orange-100 text-orange-800',
+          'Medium': 'bg-yellow-100 text-yellow-800',
+          'Low': 'bg-green-100 text-green-800'
+        };
+        return colors[priority] || 'bg-gray-100 text-gray-800';
+      };
+
+      const getTypeIcon = (type) => {
+        const icons = {
+          'Standard': '📋',
+          'Emergency': '🚨',
+          'Normal': '📝',
+          'Major': '🔧',
+          'Minor': '🔨'
+        };
+        return icons[type] || '📋';
+      };
+
+      const getRiskLevel = (impact, urgency) => {
+        const riskMatrix = {
+          'High_High': 'Critical',
+          'High_Medium': 'High',
+          'High_Low': 'Medium',
+          'Medium_High': 'High',
+          'Medium_Medium': 'Medium',
+          'Medium_Low': 'Low',
+          'Low_High': 'Medium',
+          'Low_Medium': 'Low',
+          'Low_Low': 'Low'
+        };
+        return riskMatrix[`${impact}_${urgency}`] || 'Medium';
+      };
+
+      // Event handlers
+      const handleCreateChange = async () => {
+        if (!newChange.title.trim()) {
+          showError('タイトルを入力してください');
+          return;
+        }
+        if (!newChange.description.trim()) {
+          showError('説明を入力してください');
+          return;
+        }
+
+        try {
+          const changeData = {
+            ...newChange,
+            title: newChange.title.trim(),
+            description: newChange.description.trim(),
+            requestedBy: newChange.requestedBy.trim() || user?.displayName || '変更要求者',
+            assignedTo: newChange.assignedTo.trim() || '未割り当て',
+            status: 'Requested',
+            risk: getRiskLevel(newChange.impact, newChange.urgency),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+
+          const response = await fetch(`${API_BASE_URL}/api/changes`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(changeData)
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            setChangeRequests(prev => [result.data, ...prev]);
+            setNewChange({
+              title: '',
+              description: '',
+              type: 'Standard',
+              priority: 'Medium',
+              impact: 'Medium',
+              urgency: 'Medium',
+              requestedBy: '',
+              assignedTo: '',
+              plannedStartDate: '',
+              plannedEndDate: '',
+              reason: '',
+              rollbackPlan: '',
+              testPlan: ''
+            });
+            setIsCreateModalOpen(false);
+            showSuccess(`新規変更要求 ${result.data.id} を作成しました`);
+          } else {
+            showError('変更要求の作成に失敗しました');
+          }
+        } catch (error) {
+          console.error('Error creating change request:', error);
+          showError('作成エラー: ' + error.message);
+        }
+      };
+
+      const handleViewChange = (change) => {
+        setSelectedChange(change);
+        setIsModalOpen(true);
+      };
+
+      const handleStatusChange = async (changeId, newStatus) => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/changes/${changeId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: newStatus })
+          });
+
+          if (response.ok) {
+            setChangeRequests(prev => prev.map(change => 
+              change.id === changeId 
+                ? { 
+                    ...change, 
+                    status: newStatus,
+                    updatedAt: new Date().toISOString() 
+                  }
+                : change
+            ));
+            showSuccess(`変更要求 ${changeId} のステータスを「${newStatus}」に更新しました`);
+          } else {
+            showError('ステータス更新に失敗しました');
+          }
+        } catch (error) {
+          console.error('Error updating status:', error);
+          showError('ステータス更新エラー: ' + error.message);
+        }
+      };
+
+      // Filter and pagination logic
+      const filteredChanges = changeRequests.filter(change => {
+        const matchesSearch = !searchTerm || 
+          change.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          change.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          change.requestedBy.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          change.assignedTo.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesStatus = !statusFilter || change.status === statusFilter;
+        const matchesPriority = !priorityFilter || change.priority === priorityFilter;
+        
+        return matchesSearch && matchesStatus && matchesPriority;
+      });
+
+      const totalPages = Math.ceil(filteredChanges.length / itemsPerPage);
+      const paginatedChanges = filteredChanges.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+      );
+
+      if (loading) {
+        return (
+          <div className="flex items-center justify-center h-64">
+            <LoadingSpinner size="lg" />
+            <span className="ml-3 text-lg">変更要求を読み込み中...</span>
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">変更管理</h1>
+              <p className="text-gray-600 mt-1">変更要求・承認ワークフロー・リスク評価</p>
+            </div>
+            <Button onClick={() => setIsCreateModalOpen(true)} size="lg" className="bg-blue-600 hover:bg-blue-700">
+              <span className="mr-2">📝</span>
+              新規変更要求
+            </Button>
+          </div>
+
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {[
+              { 
+                label: '総要求数', 
+                count: changeRequests.length,
+                color: 'text-blue-600',
+                bgColor: 'bg-blue-50'
+              },
+              { 
+                label: '承認待ち', 
+                count: changeRequests.filter(change => change.status === 'Under Review').length,
+                color: 'text-yellow-600',
+                bgColor: 'bg-yellow-50'
+              },
+              { 
+                label: '承認済み', 
+                count: changeRequests.filter(change => change.status === 'Approved').length,
+                color: 'text-green-600',
+                bgColor: 'bg-green-50'
+              },
+              { 
+                label: '実装中', 
+                count: changeRequests.filter(change => change.status === 'In Progress').length,
+                color: 'text-purple-600',
+                bgColor: 'bg-purple-50'
+              },
+              { 
+                label: '高優先度', 
+                count: changeRequests.filter(change => change.priority === 'Critical' || change.priority === 'High').length,
+                color: 'text-red-600',
+                bgColor: 'bg-red-50'
+              }
+            ].map((stat, index) => (
+              <Card key={index} className={`p-4 ${stat.bgColor}`}>
+                <div className="text-center">
+                  <div className={`text-2xl font-bold ${stat.color}`}>{stat.count}</div>
+                  <div className="text-sm text-gray-600">{stat.label}</div>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          {/* Filters */}
+          <Card className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Input
+                placeholder="変更要求検索..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <Select
+                placeholder="ステータス"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                options={[
+                  { value: '', label: '全てのステータス' },
+                  { value: 'Requested', label: '要求済み' },
+                  { value: 'Under Review', label: '審査中' },
+                  { value: 'Approved', label: '承認済み' },
+                  { value: 'Rejected', label: '却下' },
+                  { value: 'In Progress', label: '実装中' },
+                  { value: 'Implemented', label: '実装完了' },
+                  { value: 'Closed', label: 'クローズ' }
+                ]}
+              />
+              <Select
+                placeholder="優先度"
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
+                options={[
+                  { value: '', label: '全ての優先度' },
+                  { value: 'Critical', label: 'Critical' },
+                  { value: 'High', label: 'High' },
+                  { value: 'Medium', label: 'Medium' },
+                  { value: 'Low', label: 'Low' }
+                ]}
+              />
+              <Button 
+                variant="secondary"
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('');
+                  setPriorityFilter('');
+                  setCurrentPage(1);
+                }}
+              >
+                クリア
+              </Button>
+            </div>
+          </Card>
+
+          {/* Change Requests List */}
+          <div className="space-y-4">
+            {paginatedChanges.map((change) => (
+              <Card key={change.id} className="p-6 hover:shadow-lg transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-4 flex-1">
+                    <div className="flex flex-col items-center">
+                      <span className="text-2xl">{getTypeIcon(change.type)}</span>
+                      <span className="text-xs text-gray-500 mt-1">{change.type}</span>
+                    </div>
+                    
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <h3 className="font-semibold text-lg text-gray-900">{change.title}</h3>
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(change.status)}`}>
+                          {change.status}
+                        </span>
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(change.priority)}`}>
+                          {change.priority}
+                        </span>
+                      </div>
+                      
+                      <p className="text-gray-700 mb-3">{change.description}</p>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium text-gray-600">要求者:</span>
+                          <div className="mt-1">{change.requestedBy}</div>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-600">担当者:</span>
+                          <div className="mt-1">{change.assignedTo}</div>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-600">リスク:</span>
+                          <div className="mt-1">
+                            <span className={`px-2 py-1 text-xs rounded ${
+                              change.risk === 'Critical' ? 'bg-red-100 text-red-800' :
+                              change.risk === 'High' ? 'bg-orange-100 text-orange-800' :
+                              change.risk === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-green-100 text-green-800'
+                            }`}>
+                              {change.risk}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-600">作成日:</span>
+                          <div className="mt-1">{new Date(change.createdAt).toLocaleDateString('ja-JP')}</div>
+                        </div>
+                      </div>
+
+                      {change.plannedStartDate && (
+                        <div className="mt-3 text-sm">
+                          <span className="font-medium text-gray-600">予定実装期間:</span>
+                          <span className="ml-2">
+                            {new Date(change.plannedStartDate).toLocaleDateString('ja-JP')} 
+                            {change.plannedEndDate && ` ～ ${new Date(change.plannedEndDate).toLocaleDateString('ja-JP')}`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col items-end space-y-2">
+                    <div className="text-right text-xs text-gray-500">
+                      ID: {change.id}
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button variant="ghost" size="sm" onClick={() => handleViewChange(change)}>
+                        詳細表示
+                      </Button>
+                      {change.status === 'Requested' && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleStatusChange(change.id, 'Under Review')}
+                        >
+                          審査開始
+                        </Button>
+                      )}
+                      {change.status === 'Under Review' && (
+                        <>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleStatusChange(change.id, 'Approved')}
+                          >
+                            承認
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleStatusChange(change.id, 'Rejected')}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            却下
+                          </Button>
+                        </>
+                      )}
+                      {change.status === 'Approved' && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleStatusChange(change.id, 'In Progress')}
+                        >
+                          実装開始
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
+              <div className="flex flex-1 justify-between sm:hidden">
+                <Button
+                  variant="secondary"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => prev - 1)}
+                >
+                  前へ
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                >
+                  次へ
+                </Button>
+              </div>
+              <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-gray-700">
+                    <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span>
+                    {' '}から{' '}
+                    <span className="font-medium">
+                      {Math.min(currentPage * itemsPerPage, filteredChanges.length)}
+                    </span>
+                    {' '}件を表示 (全{' '}
+                    <span className="font-medium">{filteredChanges.length}</span>
+                    {' '}件中)
+                  </p>
+                </div>
+                <div className="flex space-x-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                  >
+                    前へ
+                  </Button>
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    const page = currentPage <= 3 ? i + 1 : currentPage - 2 + i;
+                    if (page > totalPages) return null;
+                    return (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? 'primary' : 'secondary'}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    );
+                  })}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                  >
+                    次へ
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* No Results */}
+          {filteredChanges.length === 0 && !loading && (
+            <Card className="p-12 text-center">
+              <div className="text-6xl mb-4">📋</div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">変更要求が見つかりません</h3>
+              <p className="text-gray-600 mb-4">
+                {searchTerm || statusFilter || priorityFilter
+                  ? 'フィルタ条件に一致する変更要求がありません。条件を調整してください。'
+                  : 'まだ変更要求がありません。最初の変更要求を作成しましょう。'
+                }
+              </p>
+              {!searchTerm && !statusFilter && !priorityFilter && (
+                <Button onClick={() => setIsCreateModalOpen(true)}>
+                  最初の変更要求を作成
+                </Button>
+              )}
+            </Card>
+          )}
+
+          {/* Create Change Request Modal */}
+          <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="新規変更要求" size="xl">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="タイトル"
+                  required
+                  value={newChange.title}
+                  onChange={(e) => setNewChange(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="変更のタイトル"
+                />
+                <Select
+                  label="変更タイプ"
+                  required
+                  value={newChange.type}
+                  onChange={(e) => setNewChange(prev => ({ ...prev, type: e.target.value }))}
+                  options={[
+                    { value: 'Standard', label: 'Standard (標準)' },
+                    { value: 'Emergency', label: 'Emergency (緊急)' },
+                    { value: 'Normal', label: 'Normal (通常)' },
+                    { value: 'Major', label: 'Major (大規模)' },
+                    { value: 'Minor', label: 'Minor (小規模)' }
+                  ]}
+                />
+              </div>
+
+              <Textarea
+                label="説明"
+                required
+                rows={3}
+                value={newChange.description}
+                onChange={(e) => setNewChange(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="変更の詳細な説明"
+              />
+
+              <div className="grid grid-cols-3 gap-4">
+                <Select
+                  label="優先度"
+                  required
+                  value={newChange.priority}
+                  onChange={(e) => setNewChange(prev => ({ ...prev, priority: e.target.value }))}
+                  options={[
+                    { value: 'Critical', label: 'Critical (クリティカル)' },
+                    { value: 'High', label: 'High (高)' },
+                    { value: 'Medium', label: 'Medium (中)' },
+                    { value: 'Low', label: 'Low (低)' }
+                  ]}
+                />
+                <Select
+                  label="影響度"
+                  required
+                  value={newChange.impact}
+                  onChange={(e) => setNewChange(prev => ({ ...prev, impact: e.target.value }))}
+                  options={[
+                    { value: 'High', label: 'High (高)' },
+                    { value: 'Medium', label: 'Medium (中)' },
+                    { value: 'Low', label: 'Low (低)' }
+                  ]}
+                />
+                <Select
+                  label="緊急度"
+                  required
+                  value={newChange.urgency}
+                  onChange={(e) => setNewChange(prev => ({ ...prev, urgency: e.target.value }))}
+                  options={[
+                    { value: 'High', label: 'High (高)' },
+                    { value: 'Medium', label: 'Medium (中)' },
+                    { value: 'Low', label: 'Low (低)' }
+                  ]}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="要求者"
+                  value={newChange.requestedBy}
+                  onChange={(e) => setNewChange(prev => ({ ...prev, requestedBy: e.target.value }))}
+                  placeholder="変更要求者名"
+                />
+                <Input
+                  label="担当者"
+                  value={newChange.assignedTo}
+                  onChange={(e) => setNewChange(prev => ({ ...prev, assignedTo: e.target.value }))}
+                  placeholder="実装担当者名"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="予定開始日"
+                  type="date"
+                  value={newChange.plannedStartDate}
+                  onChange={(e) => setNewChange(prev => ({ ...prev, plannedStartDate: e.target.value }))}
+                />
+                <Input
+                  label="予定終了日"
+                  type="date"
+                  value={newChange.plannedEndDate}
+                  onChange={(e) => setNewChange(prev => ({ ...prev, plannedEndDate: e.target.value }))}
+                />
+              </div>
+
+              <Textarea
+                label="変更理由"
+                rows={2}
+                value={newChange.reason}
+                onChange={(e) => setNewChange(prev => ({ ...prev, reason: e.target.value }))}
+                placeholder="変更が必要な理由"
+              />
+
+              <Textarea
+                label="ロールバック計画"
+                rows={2}
+                value={newChange.rollbackPlan}
+                onChange={(e) => setNewChange(prev => ({ ...prev, rollbackPlan: e.target.value }))}
+                placeholder="問題発生時のロールバック手順"
+              />
+
+              <Textarea
+                label="テスト計画"
+                rows={2}
+                value={newChange.testPlan}
+                onChange={(e) => setNewChange(prev => ({ ...prev, testPlan: e.target.value }))}
+                placeholder="変更後のテスト計画"
+              />
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <Button variant="secondary" onClick={() => setIsCreateModalOpen(false)}>
+                  キャンセル
+                </Button>
+                <Button onClick={handleCreateChange}>
+                  変更要求を作成
+                </Button>
+              </div>
+            </div>
+          </Modal>
+
+          {/* Change Request Detail Modal */}
+          {selectedChange && (
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="変更要求詳細" size="xl">
+              <div className="space-y-6">
+                {/* Header Info */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center mb-3">
+                    <span className="text-2xl mr-3">{getTypeIcon(selectedChange.type)}</span>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-lg text-gray-900">{selectedChange.title}</h3>
+                      <p className="text-gray-600">{selectedChange.type}</p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(selectedChange.status)}`}>
+                        {selectedChange.status}
+                      </span>
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${getPriorityColor(selectedChange.priority)}`}>
+                        {selectedChange.priority}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-gray-700">{selectedChange.description}</p>
+                </div>
+
+                {/* Change Details */}
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-3">変更詳細</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium text-gray-700">要求者:</span>
+                      <div className="mt-1">{selectedChange.requestedBy}</div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700">担当者:</span>
+                      <div className="mt-1">{selectedChange.assignedTo}</div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700">影響度:</span>
+                      <div className="mt-1">{selectedChange.impact}</div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700">緊急度:</span>
+                      <div className="mt-1">{selectedChange.urgency}</div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700">リスクレベル:</span>
+                      <div className="mt-1">
+                        <span className={`px-2 py-1 text-xs rounded ${
+                          selectedChange.risk === 'Critical' ? 'bg-red-100 text-red-800' :
+                          selectedChange.risk === 'High' ? 'bg-orange-100 text-orange-800' :
+                          selectedChange.risk === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-green-100 text-green-800'
+                        }`}>
+                          {selectedChange.risk}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700">作成日:</span>
+                      <div className="mt-1">{new Date(selectedChange.createdAt).toLocaleString('ja-JP')}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Schedule Information */}
+                {(selectedChange.plannedStartDate || selectedChange.plannedEndDate) && (
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-3">スケジュール</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      {selectedChange.plannedStartDate && (
+                        <div>
+                          <span className="font-medium text-gray-700">予定開始日:</span>
+                          <div className="mt-1">{new Date(selectedChange.plannedStartDate).toLocaleDateString('ja-JP')}</div>
+                        </div>
+                      )}
+                      {selectedChange.plannedEndDate && (
+                        <div>
+                          <span className="font-medium text-gray-700">予定終了日:</span>
+                          <div className="mt-1">{new Date(selectedChange.plannedEndDate).toLocaleDateString('ja-JP')}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Additional Information */}
+                {(selectedChange.reason || selectedChange.rollbackPlan || selectedChange.testPlan) && (
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-3">追加情報</h4>
+                    <div className="space-y-4">
+                      {selectedChange.reason && (
+                        <div>
+                          <span className="font-medium text-gray-700">変更理由:</span>
+                          <div className="mt-1 p-3 bg-gray-50 rounded">{selectedChange.reason}</div>
+                        </div>
+                      )}
+                      {selectedChange.rollbackPlan && (
+                        <div>
+                          <span className="font-medium text-gray-700">ロールバック計画:</span>
+                          <div className="mt-1 p-3 bg-gray-50 rounded">{selectedChange.rollbackPlan}</div>
+                        </div>
+                      )}
+                      {selectedChange.testPlan && (
+                        <div>
+                          <span className="font-medium text-gray-700">テスト計画:</span>
+                          <div className="mt-1 p-3 bg-gray-50 rounded">{selectedChange.testPlan}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex justify-between">
+                  <div className="flex space-x-2">
+                    {selectedChange.status === 'Requested' && (
+                      <Button onClick={() => handleStatusChange(selectedChange.id, 'Under Review')}>
+                        審査開始
+                      </Button>
+                    )}
+                    {selectedChange.status === 'Under Review' && (
+                      <>
+                        <Button onClick={() => handleStatusChange(selectedChange.id, 'Approved')}>
+                          承認
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          onClick={() => handleStatusChange(selectedChange.id, 'Rejected')}
+                        >
+                          却下
+                        </Button>
+                      </>
+                    )}
+                    {selectedChange.status === 'Approved' && (
+                      <Button onClick={() => handleStatusChange(selectedChange.id, 'In Progress')}>
+                        実装開始
+                      </Button>
+                    )}
+                  </div>
+                  <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
+                    閉じる
+                  </Button>
+                </div>
+              </div>
+            </Modal>
+          )}
+        </div>
+      );
+    };
+
+    // Release Management Page Component
+    const ReleaseManagementPage = () => {
+      const { user } = useAuth();
+      const { showSuccess, showError } = useToast();
+      
+      // State management for releases
+      const [releases, setReleases] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [isModalOpen, setIsModalOpen] = useState(false);
+      const [editingRelease, setEditingRelease] = useState(null);
+      
+      // Filter and pagination state
+      const [statusFilter, setStatusFilter] = useState('');
+      const [typeFilter, setTypeFilter] = useState('');
+      const [currentPage, setCurrentPage] = useState(1);
+      const [itemsPerPage, setItemsPerPage] = useState(10);
+      
+      const releaseTypes = ['Major Release', 'Minor Release', 'Patch Release', 'Hotfix', 'Emergency Release'];
+      const releaseStatuses = ['Planning', 'Development', 'Testing', 'Staging', 'Production', 'Completed', 'Cancelled'];
+      const environments = ['Development', 'Testing', 'Staging', 'Production'];
+      const priorities = ['Low', 'Medium', 'High', 'Critical'];
+      
+      const itemsPerPageOptions = [
+        { value: 10, label: '10件' },
+        { value: 25, label: '25件' },
+        { value: 50, label: '50件' },
+        { value: 100, label: '100件' },
+      ];
+
+      const fetchReleases = useCallback(async () => {
+        setLoading(true);
+        try {
+          // Mock data for releases
+          const mockReleases = [
+            {
+              id: 'REL-001',
+              name: 'CRM System v2.1.0',
+              version: '2.1.0',
+              type: 'Minor Release',
+              status: 'Testing',
+              description: 'CRMシステムの新機能追加とバグ修正',
+              plannedDate: '2025-07-15',
+              actualDate: null,
+              environment: 'Testing',
+              priority: 'Medium',
+              releaseManager: 'manager1',
+              changeRequests: ['CHG-001', 'CHG-003'],
+              rollbackPlan: 'データベースバックアップからの復元手順',
+              testResults: 'テスト実行中',
+              createdAt: '2025-06-01T09:00:00Z',
+              updatedAt: '2025-06-20T15:30:00Z'
+            },
+            {
+              id: 'REL-002',
+              name: 'セキュリティパッチ適用',
+              version: '1.8.3',
+              type: 'Patch Release',
+              status: 'Production',
+              description: 'Critical セキュリティ脆弱性の修正',
+              plannedDate: '2025-06-18',
+              actualDate: '2025-06-18',
+              environment: 'Production',
+              priority: 'Critical',
+              releaseManager: 'security-admin',
+              changeRequests: ['CHG-005'],
+              rollbackPlan: '前バージョンへの自動ロールバック',
+              testResults: '全テストケース合格',
+              createdAt: '2025-06-15T14:00:00Z',
+              updatedAt: '2025-06-18T16:45:00Z'
+            },
+            {
+              id: 'REL-003',
+              name: 'Mobile App v3.0.0',
+              version: '3.0.0',
+              type: 'Major Release',
+              status: 'Planning',
+              description: 'モバイルアプリケーションの大幅リニューアル',
+              plannedDate: '2025-08-30',
+              actualDate: null,
+              environment: 'Development',
+              priority: 'High',
+              releaseManager: 'mobile-lead',
+              changeRequests: ['CHG-010', 'CHG-011', 'CHG-012'],
+              rollbackPlan: '旧バージョン保持、段階的切り戻し',
+              testResults: '計画中',
+              createdAt: '2025-06-10T10:00:00Z',
+              updatedAt: '2025-06-20T12:00:00Z'
+            }
+          ];
+          setReleases(mockReleases.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+        } catch (error) {
+          console.error("リリース情報の読み込みに失敗:", error);
+          showError('リリース情報の読み込みに失敗しました。');
+        } finally {
+          setLoading(false);
+        }
+      }, [showError]);
+
+      useEffect(() => {
+        fetchReleases();
+      }, [fetchReleases]);
+
+      // Filter releases
+      const filteredReleases = useMemo(() => {
+        let filtered = [...releases];
+        if (statusFilter) filtered = filtered.filter(rel => rel.status === statusFilter);
+        if (typeFilter) filtered = filtered.filter(rel => rel.type === typeFilter);
+        return filtered;
+      }, [releases, statusFilter, typeFilter]);
+
+      const paginatedReleases = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredReleases.slice(startIndex, startIndex + itemsPerPage);
+      }, [filteredReleases, currentPage, itemsPerPage]);
+      
+      const totalPages = Math.ceil(filteredReleases.length / itemsPerPage);
+
+      // Summary stats
+      const plannedCount = useMemo(() => releases.filter(r => r.status === 'Planning').length, [releases]);
+      const inProgressCount = useMemo(() => releases.filter(r => ['Development', 'Testing', 'Staging'].includes(r.status)).length, [releases]);
+      const completedCount = useMemo(() => releases.filter(r => r.status === 'Completed').length, [releases]);
+      const productionCount = useMemo(() => releases.filter(r => r.status === 'Production').length, [releases]);
+
+      const handleOpenModal = (release = null) => {
+        setEditingRelease(release ? { ...release } : {
+          name: '',
+          version: '',
+          type: 'Minor Release',
+          status: 'Planning',
+          description: '',
+          plannedDate: new Date().toISOString().split('T')[0],
+          environment: 'Development',
+          priority: 'Medium',
+          releaseManager: user?.username || '',
+          changeRequests: [],
+          rollbackPlan: '',
+          testResults: '未実施'
+        });
+        setIsModalOpen(true);
+      };
+
+      const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setEditingRelease(null);
+      };
+
+      const handleInputChange = (e) => {
+        if (editingRelease) {
+          const { name, value } = e.target;
+          if (name === 'changeRequests') {
+            setEditingRelease({ ...editingRelease, [name]: value.split(',').map(s => s.trim()).filter(s => s) });
+          } else {
+            setEditingRelease({ ...editingRelease, [name]: value });
+          }
+        }
+      };
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!editingRelease || !user) return;
+
+        try {
+          const releaseToSave = {
+            ...editingRelease,
+            releaseManager: editingRelease.releaseManager || user.username,
+          };
+
+          if (editingRelease.id) {
+            showSuccess('リリースが正常に更新されました。');
+          } else {
+            const newRelease = {
+              ...releaseToSave,
+              id: `REL-${String(releases.length + 1).padStart(3, '0')}`,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+            setReleases(prev => [newRelease, ...prev]);
+            showSuccess('リリースが正常に作成されました。');
+          }
+          handleCloseModal();
+        } catch (error) {
+          console.error("リリースの保存に失敗:", error);
+          showError('リリースの保存に失敗しました。');
+        }
+      };
+
+      const handleDelete = async (id) => {
+        if (window.confirm('このリリースを削除してもよろしいですか？')) {
+          setReleases(prev => prev.filter(r => r.id !== id));
+          showSuccess('リリースが正常に削除されました。');
+        }
+      };
+
+      const statusOptionsForFilter = useMemo(() => [
+        { value: '', label: 'すべてのステータス' },
+        ...releaseStatuses.map(s => ({ value: s, label: s }))
+      ], []);
+
+      const typeOptionsForFilter = useMemo(() => [
+        { value: '', label: 'すべてのタイプ' },
+        ...releaseTypes.map(t => ({ value: t, label: t }))
+      ], []);
+
+      const releaseColumns = [
+        { Header: 'リリースID', accessor: 'id' },
+        { Header: 'リリース名', accessor: 'name' },
+        { Header: 'バージョン', accessor: 'version' },
+        { Header: 'タイプ', accessor: 'type' },
+        { Header: 'ステータス', accessor: (row) => (
+          <span className={`px-2 py-1 rounded text-xs font-medium ${
+            row.status === 'Completed' ? 'bg-green-100 text-green-800' :
+            row.status === 'Production' ? 'bg-blue-100 text-blue-800' :
+            ['Development', 'Testing', 'Staging'].includes(row.status) ? 'bg-yellow-100 text-yellow-800' :
+            row.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
+            'bg-gray-100 text-gray-800'
+          }`}>
+            {row.status}
+          </span>
+        )},
+        { Header: '予定日', accessor: (row) => row.plannedDate ? new Date(row.plannedDate).toLocaleDateString() : 'N/A' },
+        { Header: '環境', accessor: 'environment' },
+        { Header: '優先度', accessor: (row) => (
+          <span className={`${
+            row.priority === 'Critical' ? 'text-red-600 font-semibold' :
+            row.priority === 'High' ? 'text-orange-600 font-semibold' :
+            row.priority === 'Medium' ? 'text-yellow-600' :
+            'text-green-600'
+          }`}>
+            {row.priority}
+          </span>
+        )},
+        { Header: '操作', accessor: (row) => (
+          <div className="flex items-center space-x-2">
+            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleOpenModal(row);}}>詳細/編集</Button>
+            {user?.role === 'administrator' && (
+              <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleDelete(row.id);}}>削除</Button>
+            )}
+          </div>
+        )},
+      ];
+
+      return (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-3xl font-semibold text-slate-800">リリース管理</h2>
+            <Button onClick={() => handleOpenModal()}>新規リリース作成</Button>
+          </div>
+
+          {/* Summary Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card title="計画中" className="text-center">
+              <p className="text-3xl font-bold text-blue-600">{plannedCount}件</p>
+            </Card>
+            <Card title="開発・テスト中" className="text-center">
+              <p className="text-3xl font-bold text-yellow-600">{inProgressCount}件</p>
+            </Card>
+            <Card title="本番稼働中" className="text-center">
+              <p className="text-3xl font-bold text-purple-600">{productionCount}件</p>
+            </Card>
+            <Card title="完了" className="text-center">
+              <p className="text-3xl font-bold text-green-600">{completedCount}件</p>
+            </Card>
+          </div>
+
+          {/* Filters */}
+          <Card title="リリースフィルター">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
+              <Select 
+                label="ステータス" 
+                value={statusFilter} 
+                onChange={e => {setStatusFilter(e.target.value); setCurrentPage(1);}} 
+                options={statusOptionsForFilter} 
+              />
+              <Select 
+                label="リリースタイプ" 
+                value={typeFilter} 
+                onChange={e => {setTypeFilter(e.target.value); setCurrentPage(1);}} 
+                options={typeOptionsForFilter} 
+              />
+              <div className="flex items-end">
+                <Button onClick={() => {setStatusFilter(''); setTypeFilter(''); setCurrentPage(1);}} variant="secondary" className="w-full">
+                  フィルタークリア
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          {/* Release List */}
+          <Card title="リリース一覧">
+            {loading ? (
+              <div className="flex justify-center p-8"><Spinner size="lg" /></div>
+            ) : paginatedReleases.length > 0 ? (
+              <>
+                <Table columns={releaseColumns} data={paginatedReleases} onRowClick={handleOpenModal}/>
+                <div className="flex flex-col md:flex-row justify-between items-center p-4 border-t border-slate-200">
+                  <div className="mb-2 md:mb-0">
+                    <Select
+                      label="表示件数:"
+                      value={itemsPerPage}
+                      onChange={e => {setItemsPerPage(Number(e.target.value)); setCurrentPage(1);}}
+                      options={itemsPerPageOptions}
+                      className="inline-block w-auto"
+                    />
+                    <span className="ml-2 text-sm text-slate-600">
+                      {filteredReleases.length}件中 {Math.min((currentPage - 1) * itemsPerPage + 1, filteredReleases.length)}-{Math.min(currentPage * itemsPerPage, filteredReleases.length)}件表示
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} size="sm">前へ</Button>
+                    <span className="text-sm text-slate-700">ページ {currentPage} / {totalPages || 1}</span>
+                    <Button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages || totalPages === 0} size="sm">次へ</Button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="p-4 text-slate-500 italic">条件に一致するリリースはありません。</p>
+            )}
+          </Card>
+
+          {/* Release Modal */}
+          {editingRelease && (
+            <Modal isOpen={isModalOpen} onClose={handleCloseModal} title={editingRelease.id ? 'リリース編集' : '新規リリース作成'} size="xl">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input label="リリース名" name="name" value={editingRelease.name || ''} onChange={handleInputChange} required />
+                  <Input label="バージョン" name="version" value={editingRelease.version || ''} onChange={handleInputChange} required />
+                </div>
+                <Textarea label="説明" name="description" value={editingRelease.description || ''} onChange={handleInputChange} required rows={3}/>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Select label="リリースタイプ" name="type" value={editingRelease.type || 'Minor Release'} onChange={handleInputChange} options={releaseTypes.map(t => ({value: t, label: t}))} required/>
+                  <Select label="ステータス" name="status" value={editingRelease.status || 'Planning'} onChange={handleInputChange} options={releaseStatuses.map(s => ({value: s, label: s}))} required/>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input label="予定リリース日" name="plannedDate" type="date" value={editingRelease.plannedDate || ''} onChange={handleInputChange} required />
+                  <Input label="実際のリリース日" name="actualDate" type="date" value={editingRelease.actualDate || ''} onChange={handleInputChange} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Select label="環境" name="environment" value={editingRelease.environment || 'Development'} onChange={handleInputChange} options={environments.map(e => ({value: e, label: e}))} required/>
+                  <Select label="優先度" name="priority" value={editingRelease.priority || 'Medium'} onChange={handleInputChange} options={priorities.map(p => ({value: p, label: p}))} required/>
+                </div>
+                <Input label="リリースマネージャー" name="releaseManager" value={editingRelease.releaseManager || user?.username || ''} onChange={handleInputChange} required />
+                <Input label="関連変更要求 (カンマ区切り)" name="changeRequests" value={editingRelease.changeRequests?.join(', ') || ''} onChange={handleInputChange} />
+                <Textarea label="ロールバック計画" name="rollbackPlan" value={editingRelease.rollbackPlan || ''} onChange={handleInputChange} required rows={3}/>
+                <Textarea label="テスト結果" name="testResults" value={editingRelease.testResults || ''} onChange={handleInputChange} rows={3}/>
+                <div className="flex justify-end space-x-2 pt-2">
+                  <Button type="button" variant="secondary" onClick={handleCloseModal}>キャンセル</Button>
+                  <Button type="submit" variant="primary">{editingRelease.id ? '更新' : '作成'}</Button>
+                </div>
+              </form>
+            </Modal>
+          )}
+        </div>
+      );
+    };
+
+    // Problem Management Page Component
+    const ProblemManagementPage = () => {
+      const { user } = useAuth();
+      const { showSuccess, showError } = useToast();
+      
+      // State management for problems
+      const [problems, setProblems] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [isModalOpen, setIsModalOpen] = useState(false);
+      const [editingProblem, setEditingProblem] = useState(null);
+      
+      // Filter and pagination state
+      const [statusFilter, setStatusFilter] = useState('');
+      const [priorityFilter, setPriorityFilter] = useState('');
+      const [currentPage, setCurrentPage] = useState(1);
+      const [itemsPerPage, setItemsPerPage] = useState(10);
+      
+      const problemStatuses = ['New', 'Investigating', 'Known Error', 'Resolved', 'Closed'];
+      const priorities = ['Low', 'Medium', 'High', 'Critical'];
+      const categories = ['システム', 'ネットワーク', 'アプリケーション', 'データベース', 'セキュリティ', 'インフラ'];
+      
+      const itemsPerPageOptions = [
+        { value: 10, label: '10件' },
+        { value: 25, label: '25件' },
+        { value: 50, label: '50件' },
+        { value: 100, label: '100件' },
+      ];
+
+      const fetchProblems = useCallback(async () => {
+        setLoading(true);
+        try {
+          // Mock data for problems
+          const mockProblems = [
+            {
+              id: 'PRB-001',
+              title: 'データベース接続タイムアウトの頻発',
+              description: '毎日午後2時頃にデータベース接続がタイムアウトする問題が頻発している',
+              status: 'Investigating',
+              priority: 'High',
+              category: 'データベース',
+              assignedTo: 'db-admin',
+              reportedBy: user?.username || 'system-admin',
+              relatedIncidents: ['INC-001', 'INC-003', 'INC-007'],
+              rootCause: '調査中：データベースサーバーのリソース不足が疑われる',
+              workaround: 'アプリケーション側でのタイムアウト時間延長とリトライ処理',
+              resolution: '',
+              knownErrorRecord: 'KE-001作成済み',
+              createdAt: '2025-06-15T14:00:00Z',
+              updatedAt: '2025-06-20T16:30:00Z',
+              targetResolution: '2025-06-25'
+            },
+            {
+              id: 'PRB-002',
+              title: 'メール送信の遅延問題',
+              description: 'システムからの自動メール送信に30分以上の遅延が発生',
+              status: 'Known Error',
+              priority: 'Medium',
+              category: 'システム',
+              assignedTo: 'mail-admin',
+              reportedBy: 'support-team',
+              relatedIncidents: ['INC-010', 'INC-015'],
+              rootCause: 'メールキュー処理のボトルネック：バッチ処理の並列化不足',
+              workaround: 'メール送信優先度の手動調整',
+              resolution: '',
+              knownErrorRecord: 'KE-002',
+              createdAt: '2025-06-12T09:00:00Z',
+              updatedAt: '2025-06-19T11:15:00Z',
+              targetResolution: '2025-07-01'
+            },
+            {
+              id: 'PRB-003',
+              title: 'ネットワーク切断エラー',
+              description: '特定の支社からのネットワークアクセスが不安定',
+              status: 'Resolved',
+              priority: 'Critical',
+              category: 'ネットワーク',
+              assignedTo: 'network-team',
+              reportedBy: 'branch-manager',
+              relatedIncidents: ['INC-020', 'INC-021'],
+              rootCause: 'VPNルーターのファームウェア不具合',
+              workaround: '手動でのVPN再接続',
+              resolution: 'VPNルーターのファームウェア更新とバックアップルート設定',
+              knownErrorRecord: 'KE-003',
+              createdAt: '2025-06-10T16:45:00Z',
+              updatedAt: '2025-06-18T14:20:00Z',
+              targetResolution: '2025-06-18'
+            }
+          ];
+          setProblems(mockProblems.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+        } catch (error) {
+          console.error("問題管理情報の読み込みに失敗:", error);
+          showError('問題管理情報の読み込みに失敗しました。');
+        } finally {
+          setLoading(false);
+        }
+      }, [showError, user?.username]);
+
+      useEffect(() => {
+        fetchProblems();
+      }, [fetchProblems]);
+
+      // Filter problems
+      const filteredProblems = useMemo(() => {
+        let filtered = [...problems];
+        if (statusFilter) filtered = filtered.filter(prob => prob.status === statusFilter);
+        if (priorityFilter) filtered = filtered.filter(prob => prob.priority === priorityFilter);
+        return filtered;
+      }, [problems, statusFilter, priorityFilter]);
+
+      const paginatedProblems = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredProblems.slice(startIndex, startIndex + itemsPerPage);
+      }, [filteredProblems, currentPage, itemsPerPage]);
+      
+      const totalPages = Math.ceil(filteredProblems.length / itemsPerPage);
+
+      // Summary stats
+      const newCount = useMemo(() => problems.filter(p => p.status === 'New').length, [problems]);
+      const investigatingCount = useMemo(() => problems.filter(p => p.status === 'Investigating').length, [problems]);
+      const knownErrorCount = useMemo(() => problems.filter(p => p.status === 'Known Error').length, [problems]);
+      const resolvedCount = useMemo(() => problems.filter(p => p.status === 'Resolved').length, [problems]);
+
+      const handleOpenModal = (problem = null) => {
+        setEditingProblem(problem ? { ...problem } : {
+          title: '',
+          description: '',
+          status: 'New',
+          priority: 'Medium',
+          category: 'システム',
+          assignedTo: '',
+          reportedBy: user?.username || '',
+          relatedIncidents: [],
+          rootCause: '',
+          workaround: '',
+          resolution: '',
+          knownErrorRecord: '',
+          targetResolution: new Date(Date.now() + 86400000 * 14).toISOString().split('T')[0]
+        });
+        setIsModalOpen(true);
+      };
+
+      const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setEditingProblem(null);
+      };
+
+      const handleInputChange = (e) => {
+        if (editingProblem) {
+          const { name, value } = e.target;
+          if (name === 'relatedIncidents') {
+            setEditingProblem({ ...editingProblem, [name]: value.split(',').map(s => s.trim()).filter(s => s) });
+          } else {
+            setEditingProblem({ ...editingProblem, [name]: value });
+          }
+        }
+      };
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!editingProblem || !user) return;
+
+        try {
+          const problemToSave = {
+            ...editingProblem,
+            reportedBy: editingProblem.reportedBy || user.username,
+          };
+
+          if (editingProblem.id) {
+            showSuccess('問題が正常に更新されました。');
+          } else {
+            const newProblem = {
+              ...problemToSave,
+              id: `PRB-${String(problems.length + 1).padStart(3, '0')}`,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+            setProblems(prev => [newProblem, ...prev]);
+            showSuccess('問題が正常に作成されました。');
+          }
+          handleCloseModal();
+        } catch (error) {
+          console.error("問題の保存に失敗:", error);
+          showError('問題の保存に失敗しました。');
+        }
+      };
+
+      const handleDelete = async (id) => {
+        if (window.confirm('この問題を削除してもよろしいですか？')) {
+          setProblems(prev => prev.filter(p => p.id !== id));
+          showSuccess('問題が正常に削除されました。');
+        }
+      };
+
+      const statusOptionsForFilter = useMemo(() => [
+        { value: '', label: 'すべてのステータス' },
+        ...problemStatuses.map(s => ({ value: s, label: s }))
+      ], []);
+
+      const priorityOptionsForFilter = useMemo(() => [
+        { value: '', label: 'すべての優先度' },
+        ...priorities.map(p => ({ value: p, label: p }))
+      ], []);
+
+      const problemColumns = [
+        { Header: '問題ID', accessor: 'id' },
+        { Header: 'タイトル', accessor: 'title' },
+        { Header: 'ステータス', accessor: (row) => (
+          <span className={`px-2 py-1 rounded text-xs font-medium ${
+            row.status === 'Resolved' ? 'bg-green-100 text-green-800' :
+            row.status === 'Known Error' ? 'bg-yellow-100 text-yellow-800' :
+            row.status === 'Investigating' ? 'bg-blue-100 text-blue-800' :
+            row.status === 'Closed' ? 'bg-gray-100 text-gray-800' :
+            'bg-red-100 text-red-800'
+          }`}>
+            {row.status}
+          </span>
+        )},
+        { Header: '優先度', accessor: (row) => (
+          <span className={`${
+            row.priority === 'Critical' ? 'text-red-600 font-semibold' :
+            row.priority === 'High' ? 'text-orange-600 font-semibold' :
+            row.priority === 'Medium' ? 'text-yellow-600' :
+            'text-green-600'
+          }`}>
+            {row.priority}
+          </span>
+        )},
+        { Header: 'カテゴリ', accessor: 'category' },
+        { Header: '担当者', accessor: 'assignedTo' },
+        { Header: '報告者', accessor: 'reportedBy' },
+        { Header: '解決予定日', accessor: (row) => row.targetResolution ? new Date(row.targetResolution).toLocaleDateString() : 'N/A' },
+        { Header: '操作', accessor: (row) => (
+          <div className="flex items-center space-x-2">
+            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleOpenModal(row);}}>詳細/編集</Button>
+            {user?.role === 'administrator' && (
+              <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleDelete(row.id);}}>削除</Button>
+            )}
+          </div>
+        )},
+      ];
+
+      return (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-3xl font-semibold text-slate-800">問題管理</h2>
+            <Button onClick={() => handleOpenModal()}>新規問題登録</Button>
+          </div>
+
+          {/* Summary Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card title="新規" className="text-center">
+              <p className="text-3xl font-bold text-red-600">{newCount}件</p>
+            </Card>
+            <Card title="調査中" className="text-center">
+              <p className="text-3xl font-bold text-blue-600">{investigatingCount}件</p>
+            </Card>
+            <Card title="既知のエラー" className="text-center">
+              <p className="text-3xl font-bold text-yellow-600">{knownErrorCount}件</p>
+            </Card>
+            <Card title="解決済み" className="text-center">
+              <p className="text-3xl font-bold text-green-600">{resolvedCount}件</p>
+            </Card>
+          </div>
+
+          {/* Filters */}
+          <Card title="問題フィルター">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
+              <Select 
+                label="ステータス" 
+                value={statusFilter} 
+                onChange={e => {setStatusFilter(e.target.value); setCurrentPage(1);}} 
+                options={statusOptionsForFilter} 
+              />
+              <Select 
+                label="優先度" 
+                value={priorityFilter} 
+                onChange={e => {setPriorityFilter(e.target.value); setCurrentPage(1);}} 
+                options={priorityOptionsForFilter} 
+              />
+              <div className="flex items-end">
+                <Button onClick={() => {setStatusFilter(''); setPriorityFilter(''); setCurrentPage(1);}} variant="secondary" className="w-full">
+                  フィルタークリア
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          {/* Problem List */}
+          <Card title="問題一覧">
+            {loading ? (
+              <div className="flex justify-center p-8"><Spinner size="lg" /></div>
+            ) : paginatedProblems.length > 0 ? (
+              <>
+                <Table columns={problemColumns} data={paginatedProblems} onRowClick={handleOpenModal}/>
+                <div className="flex flex-col md:flex-row justify-between items-center p-4 border-t border-slate-200">
+                  <div className="mb-2 md:mb-0">
+                    <Select
+                      label="表示件数:"
+                      value={itemsPerPage}
+                      onChange={e => {setItemsPerPage(Number(e.target.value)); setCurrentPage(1);}}
+                      options={itemsPerPageOptions}
+                      className="inline-block w-auto"
+                    />
+                    <span className="ml-2 text-sm text-slate-600">
+                      {filteredProblems.length}件中 {Math.min((currentPage - 1) * itemsPerPage + 1, filteredProblems.length)}-{Math.min(currentPage * itemsPerPage, filteredProblems.length)}件表示
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} size="sm">前へ</Button>
+                    <span className="text-sm text-slate-700">ページ {currentPage} / {totalPages || 1}</span>
+                    <Button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages || totalPages === 0} size="sm">次へ</Button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="p-4 text-slate-500 italic">条件に一致する問題はありません。</p>
+            )}
+          </Card>
+
+          {/* Problem Modal */}
+          {editingProblem && (
+            <Modal isOpen={isModalOpen} onClose={handleCloseModal} title={editingProblem.id ? '問題編集' : '新規問題登録'} size="xl">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <Input label="問題タイトル" name="title" value={editingProblem.title || ''} onChange={handleInputChange} required />
+                <Textarea label="問題の詳細説明" name="description" value={editingProblem.description || ''} onChange={handleInputChange} required rows={3}/>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Select label="ステータス" name="status" value={editingProblem.status || 'New'} onChange={handleInputChange} options={problemStatuses.map(s => ({value: s, label: s}))} required/>
+                  <Select label="優先度" name="priority" value={editingProblem.priority || 'Medium'} onChange={handleInputChange} options={priorities.map(p => ({value: p, label: p}))} required/>
+                  <Select label="カテゴリ" name="category" value={editingProblem.category || 'システム'} onChange={handleInputChange} options={categories.map(c => ({value: c, label: c}))} required/>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input label="担当者" name="assignedTo" value={editingProblem.assignedTo || ''} onChange={handleInputChange} />
+                  <Input label="報告者" name="reportedBy" value={editingProblem.reportedBy || user?.username || ''} onChange={handleInputChange} required />
+                </div>
+                <Input label="関連インシデント (カンマ区切り)" name="relatedIncidents" value={editingProblem.relatedIncidents?.join(', ') || ''} onChange={handleInputChange} />
+                <Input label="解決予定日" name="targetResolution" type="date" value={editingProblem.targetResolution || ''} onChange={handleInputChange} />
+                <Textarea label="根本原因" name="rootCause" value={editingProblem.rootCause || ''} onChange={handleInputChange} rows={3}/>
+                <Textarea label="暫定対処方法" name="workaround" value={editingProblem.workaround || ''} onChange={handleInputChange} rows={3}/>
+                <Textarea label="恒久対策・解決方法" name="resolution" value={editingProblem.resolution || ''} onChange={handleInputChange} rows={3}/>
+                <Input label="既知のエラー記録" name="knownErrorRecord" value={editingProblem.knownErrorRecord || ''} onChange={handleInputChange} />
+                <div className="flex justify-end space-x-2 pt-2">
+                  <Button type="button" variant="secondary" onClick={handleCloseModal}>キャンセル</Button>
+                  <Button type="submit" variant="primary">{editingProblem.id ? '更新' : '作成'}</Button>
+                </div>
+              </form>
+            </Modal>
+          )}
+        </div>
+      );
+    };
+
     // Placeholder Page Component
     const PlaceholderPage = ({ title, description }) => {
       const { showInfo } = useToast();
@@ -4372,22 +5912,13 @@
                       
                       {/* ITSM Process Pages */}
                       <Route path="/change-management">
-                        <PlaceholderPage 
-                          title="変更管理" 
-                          description="変更要求・承認ワークフロー"
-                        />
+                        <ChangeManagementPage />
                       </Route>
                       <Route path="/release-management">
-                        <PlaceholderPage 
-                          title="リリース管理" 
-                          description="ソフトウェア展開・追跡"
-                        />
+                        <ReleaseManagementPage />
                       </Route>
                       <Route path="/problem-management">
-                        <PlaceholderPage 
-                          title="問題管理" 
-                          description="根本原因分析・再発防止"
-                        />
+                        <ProblemManagementPage />
                       </Route>
                       <Route path="/service-level-management">
                         <PlaceholderPage 
@@ -4408,24 +5939,15 @@
                         />
                       </Route>
                       <Route path="/security-management">
-                        <PlaceholderPage 
-                          title="セキュリティ管理" 
-                          description="セキュリティインシデント・脆弱性"
-                        />
+                        <SecurityManagementPage />
                       </Route>
                       <Route path="/compliance-management">
-                        <PlaceholderPage 
-                          title="コンプライアンス管理" 
-                          description="ISO準拠・監査追跡"
-                        />
+                        <ComplianceManagementPage />
                       </Route>
                       
                       {/* System Management Pages */}
                       <Route path="/audit-log">
-                        <PlaceholderPage 
-                          title="監査ログ" 
-                          description="システム監査証跡・ユーザー活動"
-                        />
+                        <AuditLogPage />
                       </Route>
                       <Route path="/settings">
                         <SystemSettingsPage />
