@@ -12,7 +12,11 @@ FEATURE_NAME="Feature-A: 統合リーダー (Worktree対応)"
 
 # Claude Code自動起動設定
 setup_claude() {
-    echo "🤖 Claude Code自動起動中..."
+    if [ "$YOLO_MODE" = true ]; then
+        echo "🚀 YOLO MODE: Claude Code自動起動中..."
+    else
+        echo "🤖 Claude Code自動起動中..."
+    fi
     
     # .envからAPIキー読み込み
     if [ -f "$PROJECT_ROOT/.env" ]; then
@@ -20,31 +24,58 @@ setup_claude() {
     fi
     
     # プロンプト設定
-    export PS1='[Feature-A-Leader] \w$ '
-    echo "\033]0;Feature-A-Leader\007"
+    if [ "$YOLO_MODE" = true ]; then
+        export PS1='[YOLO-Feature-A-Leader] \w$ '
+        echo "\033]0;YOLO-Feature-A-Leader\007"
+    else
+        export PS1='[Feature-A-Leader] \w$ '
+        echo "\033]0;Feature-A-Leader\007"
+    fi
     
     # Claude Code環境確認
     if command -v claude &> /dev/null; then
         echo "✅ Claude Codeが利用可能です"
-        echo "🎯 Feature-A-Leader: 統合リーダーアシスタントとして動作中"
+        if [ "$YOLO_MODE" = true ]; then
+            echo "🚀 YOLO MODE: Feature-A-Leader自動統合リーダーアシスタントとして動作中"
+        else
+            echo "🎯 Feature-A-Leader: 統合リーダーアシスタントとして動作中"
+        fi
         echo ""
-        echo "💡 使用例:"
-        echo "  claude 'プロジェクトの全体状況を確認してください'"
-        echo "  claude 'アーキテクチャの一貫性をチェックしてください'"
-        echo "  claude '他のペインとの統合プランを作成してください'"
-        echo ""
+        if [ "$YOLO_MODE" != true ]; then
+            echo "💡 使用例:"
+            echo "  claude 'プロジェクトの全体状況を確認してください'"
+            echo "  claude 'アーキテクチャの一貫性をチェックしてください'"
+            echo "  claude '他のペインとの統合プランを作成してください'"
+            echo ""
+        fi
     else
         echo "⚠️ Claude Codeが見つかりません"
-        echo "💡 インストール方法: pip install claude-code"
+        if [ "$YOLO_MODE" != true ]; then
+            echo "💡 インストール方法: pip install claude-code"
+        fi
     fi
     
     # Claude起動
     if command -v claude &> /dev/null; then
-        echo "🎯 Feature-A専用Claude起動中..."
+        if [ "$YOLO_MODE" = true ]; then
+            echo "🚀 YOLO MODE: Feature-A専用Claude自動起動中..."
+        else
+            echo "🎯 Feature-A専用Claude起動中..."
+        fi
         echo "✅ Claude起動完了"
-        exec claude
+        
+        if [ "$YOLO_MODE" = true ]; then
+            # YOLO MODEでは非対話型でClaude起動
+            exec claude --non-interactive 2>/dev/null || exec claude
+        else
+            exec claude
+        fi
     else
         echo "⚠️ claudeコマンドが見つかりません"
+        if [ "$YOLO_MODE" = true ]; then
+            # YOLO MODEではメニューに進む
+            main_loop
+        fi
     fi
 }
 
@@ -623,7 +654,59 @@ main_loop() {
     done
 }
 
+# YOLO MODE チェック・初期化
+check_yolo_mode() {
+    if [ "$YOLO_MODE" = true ]; then
+        print_header
+        echo "🚀 YOLO MODE: Feature-A-Leader自動起動中..."
+        echo "📋 自動実行タスク一覧:"
+        echo "  1. Worktree環境確認・初期化"
+        echo "  2. プロジェクト全体状況自動確認"
+        echo "  3. アーキテクチャ整合性自動監視"
+        echo "  4. コード品質自動チェック"
+        echo "  5. 統合テスト自動実行準備"
+        echo ""
+        
+        # YOLO MODE自動実行シーケンス
+        yolo_auto_sequence
+        
+        # メニューループに移行
+        main_loop
+    else
+        # 通常モード
+        print_header
+        setup_claude
+        main_loop
+    fi
+}
+
+# YOLO MODE自動実行シーケンス
+yolo_auto_sequence() {
+    echo "🚀 YOLO MODE自動実行シーケンス開始..."
+    
+    # Worktree初期化確認
+    init_worktree
+    
+    # プロジェクト状況確認
+    echo "📊 プロジェクト全体状況自動確認中..."
+    check_project_status
+    
+    # アーキテクチャ監視
+    echo "🏗️ アーキテクチャ整合性自動監視中..."
+    monitor_architecture
+    
+    # コード品質チェック
+    echo "✨ コード品質自動チェック中..."
+    check_code_quality
+    
+    # 各ペイン状況確認
+    echo "🔍 各ペイン作業状況自動確認中..."
+    check_pane_status
+    
+    echo "🚀 YOLO MODE自動実行シーケンス完了"
+    echo "🎯 統合リーダーメニューに移行します..."
+    echo ""
+}
+
 # スクリプト開始
-print_header
-setup_claude
-main_loop
+check_yolo_mode

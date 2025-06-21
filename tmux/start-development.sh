@@ -11,6 +11,9 @@ PROJECT_ROOT="/mnt/e/ServiceGrid"
 TMUX_DIR="$PROJECT_ROOT/tmux"
 WORKTREE_ROOT="$PROJECT_ROOT/worktrees"
 
+# YOLO MODE設定
+YOLO_MODE=false
+
 # 色付きメッセージ関数
 print_info() {
     echo -e "\033[1;34m[INFO]\033[0m $1"
@@ -26,6 +29,10 @@ print_error() {
 
 print_warning() {
     echo -e "\033[1;33m[WARNING]\033[0m $1"
+}
+
+print_yolo() {
+    echo -e "\033[1;35m[🚀 YOLO]\033[0m $1"
 }
 
 # tmux環境チェック
@@ -112,9 +119,8 @@ check_worktree_environment() {
     if [ "$worktree_count" -eq 1 ]; then
         print_warning "Worktree環境が未初期化です"
         
-        read -p "Worktree環境を初期化しますか？ (y/N): " init_worktree
-        if [[ $init_worktree =~ ^[Yy]$ ]]; then
-            print_info "Worktree環境を初期化中..."
+        if [ "$YOLO_MODE" = true ]; then
+            print_yolo "YOLO MODE: Worktree環境を自動初期化します"
             bash "$TMUX_DIR/tools/worktree-manager.sh" init
             
             if [ $? -eq 0 ]; then
@@ -124,7 +130,20 @@ check_worktree_environment() {
                 exit 1
             fi
         else
-            print_warning "Worktree環境なしで開発環境を起動します"
+            read -p "Worktree環境を初期化しますか？ (y/N): " init_worktree
+            if [[ $init_worktree =~ ^[Yy]$ ]]; then
+                print_info "Worktree環境を初期化中..."
+                bash "$TMUX_DIR/tools/worktree-manager.sh" init
+                
+                if [ $? -eq 0 ]; then
+                    print_success "Worktree環境初期化完了"
+                else
+                    print_error "Worktree環境初期化に失敗しました"
+                    exit 1
+                fi
+            else
+                print_warning "Worktree環境なしで開発環境を起動します"
+            fi
         fi
     else
         print_success "Worktree環境確認完了 ($((worktree_count - 1)) worktrees)"
@@ -228,7 +247,11 @@ create_pane_layout() {
 
 # 各ペインに初期コマンド設定
 setup_pane_commands() {
-    print_info "各ペインにコマンドを設定中..."
+    if [ "$YOLO_MODE" = true ]; then
+        print_yolo "YOLO MODE: 各ペイン自動起動設定中..."
+    else
+        print_info "各ペインにコマンドを設定中..."
+    fi
     
     # ペイン数確認
     local pane_count=$(tmux list-panes -t "$SESSION_NAME:0" | wc -l)
@@ -248,26 +271,48 @@ setup_pane_commands() {
         
         # ペイン存在確認（範囲チェック付き）
         if [ "$pane_num" -lt "$pane_count" ]; then
-            print_info "ペイン$pane_num: $feature_name を設定中..."
+            if [ "$YOLO_MODE" = true ]; then
+                print_yolo "ペイン$pane_num: $feature_name YOLO自動起動中..."
+            else
+                print_info "ペイン$pane_num: $feature_name を設定中..."
+            fi
             
             # 基本情報表示とプロンプト設定
             tmux send-keys -t "$SESSION_NAME:0.$pane_num" "clear" C-m
             tmux send-keys -t "$SESSION_NAME:0.$pane_num" "cd $TMUX_DIR" C-m
-            tmux send-keys -t "$SESSION_NAME:0.$pane_num" "export PS1='[$feature_name] \\w$ '" C-m
-            tmux send-keys -t "$SESSION_NAME:0.$pane_num" "echo '=== $feature_name ==='" C-m
+            
+            if [ "$YOLO_MODE" = true ]; then
+                tmux send-keys -t "$SESSION_NAME:0.$pane_num" "export PS1='[YOLO-$feature_name] \\w$ '" C-m
+                tmux send-keys -t "$SESSION_NAME:0.$pane_num" "export YOLO_MODE=true" C-m
+                tmux send-keys -t "$SESSION_NAME:0.$pane_num" "export AUTO_APPROVE=true" C-m
+                tmux send-keys -t "$SESSION_NAME:0.$pane_num" "echo '🚀 YOLO MODE: $feature_name 自動起動完了'" C-m
+            else
+                tmux send-keys -t "$SESSION_NAME:0.$pane_num" "export PS1='[$feature_name] \\w$ '" C-m
+                tmux send-keys -t "$SESSION_NAME:0.$pane_num" "echo '=== $feature_name ==='" C-m
+            fi
+            
             tmux send-keys -t "$SESSION_NAME:0.$pane_num" "echo '$details'" C-m
             tmux send-keys -t "$SESSION_NAME:0.$pane_num" "echo ''" C-m
             
             # ペインタイトル設定
-            tmux select-pane -t "$SESSION_NAME:0.$pane_num" -T "$feature_name"
+            if [ "$YOLO_MODE" = true ]; then
+                tmux select-pane -t "$SESSION_NAME:0.$pane_num" -T "YOLO-$feature_name"
+            else
+                tmux select-pane -t "$SESSION_NAME:0.$pane_num" -T "$feature_name"
+            fi
             
             # スクリプト実行権限確認
             chmod +x "$TMUX_DIR/panes/$script_name" 2>/dev/null || true
             
             # スクリプト実行
             if [ -f "$TMUX_DIR/panes/$script_name" ]; then
-                tmux send-keys -t "$SESSION_NAME:0.$pane_num" "./panes/$script_name" C-m
-                print_success "ペイン$pane_num: $script_name 起動完了"
+                if [ "$YOLO_MODE" = true ]; then
+                    tmux send-keys -t "$SESSION_NAME:0.$pane_num" "YOLO_MODE=true AUTO_APPROVE=true ./panes/$script_name" C-m
+                    print_success "ペイン$pane_num: $script_name YOLO起動完了"
+                else
+                    tmux send-keys -t "$SESSION_NAME:0.$pane_num" "./panes/$script_name" C-m
+                    print_success "ペイン$pane_num: $script_name 起動完了"
+                fi
             else
                 tmux send-keys -t "$SESSION_NAME:0.$pane_num" "echo 'ERROR: $script_name が見つかりません'" C-m
                 tmux send-keys -t "$SESSION_NAME:0.$pane_num" "echo 'Press Enter to show menu...'" C-m
@@ -277,7 +322,11 @@ setup_pane_commands() {
             print_warning "ペイン$pane_num が存在しません - $feature_name をスキップ"
         fi
         
-        sleep 0.5  # ペイン間の処理間隔
+        if [ "$YOLO_MODE" = true ]; then
+            sleep 0.3  # YOLO MODEは高速化
+        else
+            sleep 0.5  # 通常モード
+        fi
     done
     
     print_success "ペインコマンド設定完了"
@@ -323,9 +372,86 @@ show_development_info() {
     echo ""
 }
 
+# YOLO MODE自動指示システム
+setup_yolo_auto_tasks() {
+    if [ "$YOLO_MODE" != true ]; then
+        return
+    fi
+    
+    print_yolo "YOLO MODE: 統合リーダー自動指示システム起動中..."
+    
+    # 2秒待機（各ペインの起動完了を待つ）
+    sleep 2
+    
+    # Feature-A-Leaderペイン（ペイン4）から自動指示送信
+    print_yolo "初期タスク自動送信中..."
+    
+    # 初期環境セットアップ指示
+    tmux send-keys -t "$SESSION_NAME:0.4" "cd $TMUX_DIR/coordination" C-m
+    tmux send-keys -t "$SESSION_NAME:0.4" "./leader-command.sh all --auto-approve '🚀 YOLO MODE: 初期環境セットアップを自動実行してください。各ペインで開発準備を整えてください。'" C-m
+    
+    sleep 1
+    
+    # 状況確認指示
+    tmux send-keys -t "$SESSION_NAME:0.4" "./leader-command.sh status" C-m
+    
+    print_success "YOLO MODE自動指示完了"
+}
+
+# オプション解析関数
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --yolo-mode|--yolo)
+                YOLO_MODE=true
+                print_yolo "YOLO MODEが有効化されました"
+                shift
+                ;;
+            --help|-h)
+                show_usage
+                exit 0
+                ;;
+            *)
+                print_warning "Unknown option: $1"
+                shift
+                ;;
+        esac
+    done
+}
+
+# 使用方法表示
+show_usage() {
+    echo "🚀 ITSM Platform 5ペイン並列開発環境"
+    echo ""
+    echo "使用方法:"
+    echo "  $0 [OPTIONS]"
+    echo ""
+    echo "オプション:"
+    echo "  --yolo-mode, --yolo    YOLO MODE（完全自動化）で起動"
+    echo "  --help, -h             このヘルプを表示"
+    echo ""
+    echo "実行例:"
+    echo "  $0                     # 通常モード"
+    echo "  $0 --yolo-mode         # YOLO MODE（自動化）"
+    echo ""
+    echo "🎯 YOLO MODE機能:"
+    echo "  • 全ての確認プロンプトを自動承認"
+    echo "  • 各ペイン自動起動・並列実行"
+    echo "  • Claude Code自動起動（可能な場合）"
+    echo "  • 統合リーダー自動指示送信"
+    echo "  • 高速化された処理"
+}
+
 # メイン実行関数
 main() {
-    print_info "ITSM Platform 5ペイン並列開発環境を開始します..."
+    # オプション解析
+    parse_arguments "$@"
+    
+    if [ "$YOLO_MODE" = true ]; then
+        print_yolo "ITSM Platform YOLO MODE 5ペイン並列開発環境を開始します..."
+    else
+        print_info "ITSM Platform 5ペイン並列開発環境を開始します..."
+    fi
     
     # 各種チェック
     check_tmux
@@ -345,24 +471,44 @@ main() {
     setup_pane_commands
     
     # Claude Code環境設定 (非対話型)
-    print_info "Claude Code環境を設定中..."
-    bash "$TMUX_DIR/setup-claude-noninteractive.sh" both
+    if [ "$YOLO_MODE" = true ]; then
+        print_yolo "Claude Code環境を自動設定中..."
+    else
+        print_info "Claude Code環境を設定中..."
+    fi
+    bash "$TMUX_DIR/setup-claude-noninteractive.sh" both 2>/dev/null || true
     
     # Feature-A-Leader統合リーダー機能設定
-    print_info "Feature-A-Leader統合リーダー機能設定中..."
-    bash "$TMUX_DIR/setup-leader-pane.sh" setup
+    if [ "$YOLO_MODE" = true ]; then
+        print_yolo "Feature-A-Leader統合リーダー機能自動設定中..."
+    else
+        print_info "Feature-A-Leader統合リーダー機能設定中..."
+    fi
+    bash "$TMUX_DIR/setup-leader-pane.sh" setup 2>/dev/null || true
     
     # tmux hook設定 (attach時自動起動)
-    print_info "tmux hook設定中..."
-    bash "$TMUX_DIR/auto-claude-hook.sh" setup
+    if [ "$YOLO_MODE" = true ]; then
+        print_yolo "tmux hook自動設定中..."
+    else
+        print_info "tmux hook設定中..."
+    fi
+    bash "$TMUX_DIR/auto-claude-hook.sh" setup 2>/dev/null || true
+    
+    # YOLO MODE自動タスク実行
+    setup_yolo_auto_tasks
     
     # 情報表示
     show_development_info
     
     # セッションにアタッチ
-    print_info "tmuxセッションにアタッチします..."
-    print_info "終了するには: Ctrl-b & (確認後 y)"
-    print_success "Claude Codeが各ペインで自動起動されました！"
+    if [ "$YOLO_MODE" = true ]; then
+        print_yolo "tmuxセッションにアタッチします..."
+        print_success "🚀 YOLO MODE起動完了！全ペインで自動並列開発が開始されました！"
+    else
+        print_info "tmuxセッションにアタッチします..."
+        print_info "終了するには: Ctrl-b & (確認後 y)"
+        print_success "Claude Codeが各ペインで自動起動されました！"
+    fi
     
     # セッションアタッチ
     tmux attach-session -t "$SESSION_NAME"

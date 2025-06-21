@@ -9,7 +9,11 @@ PROJECT_ROOT="/mnt/e/ServiceGrid"
 
 # Claude Code自動起動設定
 setup_claude() {
-    echo "🤖 Claude Code自動起動中..."
+    if [ "$YOLO_MODE" = true ]; then
+        echo "🚀 YOLO MODE: Claude Code自動起動中..."
+    else
+        echo "🤖 Claude Code自動起動中..."
+    fi
     
     # .envからAPIキー読み込み
     if [ -f "$PROJECT_ROOT/.env" ]; then
@@ -17,22 +21,35 @@ setup_claude() {
     fi
     
     # プロンプト設定
-    export PS1='[Feature-B-UI] \w$ '
-    echo "\033]0;Feature-B-UI\007"
+    if [ "$YOLO_MODE" = true ]; then
+        export PS1='[YOLO-Feature-B-UI] \w$ '
+        echo "\033]0;YOLO-Feature-B-UI\007"
+    else
+        export PS1='[Feature-B-UI] \w$ '
+        echo "\033]0;Feature-B-UI\007"
+    fi
     
     # Claude Code環境確認
     if command -v claude &> /dev/null; then
         echo "✅ Claude Codeが利用可能です"
-        echo "🎨 Feature-B-UI: フロントエンド開発アシスタントとして動作中"
+        if [ "$YOLO_MODE" = true ]; then
+            echo "🚀 YOLO MODE: Feature-B-UI自動フロントエンド開発アシスタントとして動作中"
+        else
+            echo "🎨 Feature-B-UI: フロントエンド開発アシスタントとして動作中"
+        fi
         echo ""
-        echo "💡 使用例:"
-        echo "  claude 'コンポーネントのテストを作成してください'"
-        echo "  claude 'コードレビューをお願いします'"
-        echo "  claude 'ESLintエラーを修正してください'"
-        echo ""
+        if [ "$YOLO_MODE" != true ]; then
+            echo "💡 使用例:"
+            echo "  claude 'コンポーネントのテストを作成してください'"
+            echo "  claude 'コードレビューをお願いします'"
+            echo "  claude 'ESLintエラーを修正してください'"
+            echo ""
+        fi
     else
         echo "⚠️ Claude Codeが見つかりません"
-        echo "💡 インストール方法: pip install claude-code"
+        if [ "$YOLO_MODE" != true ]; then
+            echo "💡 インストール方法: pip install claude-code"
+        fi
     fi
 }
 
@@ -146,15 +163,72 @@ main_loop() {
     done
 }
 
-# スクリプト開始
-setup_claude
-print_header
-print_success "Feature-B-UI: UI/テスト環境準備完了！"
-print_success "Claude Code: フロントエンド開発アシスタント準備完了！"
-echo ""
-echo "💡 Feature-B-UI待機中... Claude Codeで指示をお待ちしています"
-echo "📋 使用例: claude 'Reactコンポーネントを最適化してください'"
-echo ""
+# YOLO MODE自動実行シーケンス
+yolo_auto_sequence() {
+    echo "🚀 YOLO MODE: Feature-B-UI自動実行シーケンス開始..."
+    
+    # 開発サーバー自動起動
+    print_info "開発サーバー自動起動中..."
+    start_dev_server
+    
+    # TypeScript型チェック自動実行
+    echo "🔍 TypeScript型チェック自動実行中..."
+    cd "$PROJECT_ROOT"
+    npm run typecheck || print_warning "TypeScript型エラーが検出されました"
+    
+    # ESLint自動実行
+    echo "✨ ESLint自動実行中..."
+    npm run lint || print_warning "Lintエラーが検出されました"
+    
+    # テスト自動実行
+    echo "🧪 Jest テスト自動実行中..."
+    npm test -- --watchAll=false || print_warning "テストエラーが検出されました"
+    
+    echo "🚀 YOLO MODE: Feature-B-UI自動実行シーケンス完了"
+    echo "🎯 待機モードに移行します..."
+    echo ""
+}
 
-# 非対話型モード - Claude Code待機
-# メニューは表示せず、Claude Codeからの指示を待機
+# YOLO MODE チェック・初期化
+check_yolo_mode() {
+    if [ "$YOLO_MODE" = true ]; then
+        setup_claude
+        print_header
+        echo "🚀 YOLO MODE: Feature-B-UI自動起動中..."
+        echo "📋 自動実行タスク一覧:"
+        echo "  1. 開発サーバー自動起動"
+        echo "  2. TypeScript型チェック自動実行"
+        echo "  3. ESLint自動実行"
+        echo "  4. Jest テスト自動実行"
+        echo ""
+        
+        # YOLO MODE自動実行シーケンス
+        yolo_auto_sequence
+        
+        print_success "🚀 YOLO MODE: Feature-B-UI自動環境準備完了！"
+        print_success "Claude Code: フロントエンド開発アシスタント準備完了！"
+        echo ""
+        echo "💡 Feature-B-UI YOLO MODE待機中... Claude Codeで指示をお待ちしています"
+        echo "📋 使用例: claude 'Reactコンポーネントを最適化してください'"
+        echo ""
+        
+        # Claude Code待機モード（YOLO MODE）
+        exec claude --non-interactive 2>/dev/null || main_loop
+    else
+        # 通常モード
+        setup_claude
+        print_header
+        print_success "Feature-B-UI: UI/テスト環境準備完了！"
+        print_success "Claude Code: フロントエンド開発アシスタント準備完了！"
+        echo ""
+        echo "💡 Feature-B-UI待機中... Claude Codeで指示をお待ちしています"
+        echo "📋 使用例: claude 'Reactコンポーネントを最適化してください'"
+        echo ""
+        
+        # 非対話型モード - Claude Code待機
+        # メニューは表示せず、Claude Codeからの指示を待機
+    fi
+}
+
+# スクリプト開始
+check_yolo_mode

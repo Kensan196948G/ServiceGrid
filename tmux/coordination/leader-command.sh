@@ -102,6 +102,12 @@ case "${1:-help}" in
         shift
         echo "🎯 Feature-A統合リーダーより全ペインに指示送信..."
         check_leader_context
+        
+        # YOLO MODE対応
+        if [ "$YOLO_MODE" = true ] || [[ "$*" == *"--auto-approve"* ]]; then
+            echo "🚀 YOLO MODE: 自動承認モードで指示送信中..."
+        fi
+        
         "$SCRIPT_DIR/send-to-all-fixed.sh" "$@"
         ;;
     ui|b)
