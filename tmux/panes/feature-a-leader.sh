@@ -59,15 +59,17 @@ setup_claude() {
     if command -v claude &> /dev/null; then
         if [ "$YOLO_MODE" = true ]; then
             echo "🚀 YOLO MODE: Feature-A専用Claude自動起動中..."
+            echo "⚡ 確認プロンプト自動スキップモード有効"
         else
             echo "🎯 Feature-A専用Claude起動中..."
         fi
         echo "✅ Claude起動完了"
         
         if [ "$YOLO_MODE" = true ]; then
-            # YOLO MODEでは非対話型でClaude起動
-            exec claude --non-interactive 2>/dev/null || exec claude
+            # YOLO MODEでは確認プロンプトを完全スキップ
+            exec claude --dangerously-skip-permissions
         else
+            # 通常モードでも既存のグローバル設定が適用される
             exec claude
         fi
     else

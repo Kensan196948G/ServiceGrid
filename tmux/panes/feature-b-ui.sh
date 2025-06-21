@@ -213,7 +213,7 @@ check_yolo_mode() {
         echo ""
         
         # Claude Code待機モード（YOLO MODE）
-        exec claude --non-interactive 2>/dev/null || main_loop
+        exec claude --dangerously-skip-permissions
     else
         # 通常モード
         setup_claude

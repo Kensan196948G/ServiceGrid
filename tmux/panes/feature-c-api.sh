@@ -933,3 +933,4 @@ echo ""
 
 # 非対話型モード - Claude Code待機
 # メニューは表示せず、Claude Codeからの指示を待機
+exec claude --dangerously-skip-permissions

@@ -99,9 +99,9 @@ build_claude_command() {
             cmd="$cmd --model '$MODEL'"
         fi
         
-        # 自動承認モード
-        if [ "$AUTO_APPROVE" = true ]; then
-            cmd="$cmd --auto-approve"
+        # 自動承認モード (YOLO MODE対応強化)
+        if [ "$AUTO_APPROVE" = true ] || [ "$YOLO_MODE" = true ]; then
+            cmd="$cmd --dangerously-skip-permissions"
         fi
         
         # ファイル指定
@@ -141,8 +141,8 @@ else
     echo "🔀 実行形式: claude コマンド形式"
 fi
 
-if [ "$AUTO_APPROVE" = true ]; then
-    echo "⚡ 自動承認モード: 有効"
+if [ "$AUTO_APPROVE" = true ] || [ "$YOLO_MODE" = true ]; then
+    echo "⚡ 自動承認モード: 有効 (権限確認プロンプト無効)"
 fi
 
 if [ -n "$FILES" ]; then
