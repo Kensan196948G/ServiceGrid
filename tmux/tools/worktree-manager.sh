@@ -5,7 +5,7 @@
 
 set -e
 
-PROJECT_ROOT="/mnt/e/ServiceGrid"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 WORKTREE_ROOT="$PROJECT_ROOT/worktrees"
 TOOL_NAME="Git Worktree管理ツール"
 

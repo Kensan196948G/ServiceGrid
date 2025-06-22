@@ -5,7 +5,7 @@
 
 set -e
 
-PROJECT_ROOT="/mnt/e/ServiceGrid"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BACKEND_DIR="$PROJECT_ROOT/backend"
 TOOL_NAME="統合テストランナー"
 

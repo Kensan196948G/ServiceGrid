@@ -7,7 +7,7 @@ set -e
 
 # 設定
 SESSION_NAME="itsm-requirement"
-PROJECT_ROOT="/mnt/e/ServiceGrid"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMUX_DIR="$PROJECT_ROOT/tmux"
 WORKTREE_ROOT="$PROJECT_ROOT/worktrees"
 
