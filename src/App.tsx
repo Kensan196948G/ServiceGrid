@@ -7,6 +7,7 @@ import ToastContainer from './components/ToastContainer';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import IncidentPage from './pages/IncidentPage';
+import IncidentReportPage from './pages/IncidentReportPage';
 import ServiceRequestPage from './pages/ServiceRequestPage';
 import AssetPage from './pages/AssetPage';
 import KnowledgePage from './pages/KnowledgePage';
@@ -83,6 +84,7 @@ const AppContent: React.FC = () => {
                       {/* ITSMコアページ */}
                       <Route path="/dashboard" element={<DashboardPage />} />
                       <Route path="/incidents" element={<IncidentPage />} />
+                      <Route path="/incident-report" element={<IncidentReportPage />} />
                       <Route path="/requests" element={<ServiceRequestPage />} />
                       <Route path="/assets" element={<AssetPage />} />
                       <Route path="/knowledge" element={<KnowledgePage />} />

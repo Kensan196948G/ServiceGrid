@@ -1,3 +1,6 @@
+# TypeScriptファイルは型チェックのみでESLintはスキップ
+**/*.ts
+**/*.tsx
 dist/
 build/
 node_modules/

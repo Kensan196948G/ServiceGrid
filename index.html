@@ -4,11 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ServiceGrid ITSM - IT運用システムプラットフォーム</title>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -320,6 +319,7 @@
             const navigation = [
                 { id: 'dashboard', name: 'ダッシュボード', icon: '📊' },
                 { id: 'incidents', name: 'インシデント管理', icon: '🚨' },
+                { id: 'incident-report', name: 'インシデント報告', icon: '📢' },
                 { id: 'requests', name: 'サービス要求', icon: '📝' },
                 { id: 'changes', name: '変更管理', icon: '🔄' },
                 { id: 'assets', name: '資産管理', icon: '💼' },
@@ -394,24 +394,957 @@
             );
         };
 
-        // ページコンテンツ
-        const PageContent = ({ currentPage }) => {
-            const [data, setData] = useState([]);
-            const [loading, setLoading] = useState(false);
+        // 設定ページコンテンツ
+        const SettingsContent = ({ user }) => {
+            const [activeTab, setActiveTab] = useState('general');
+            const [settings, setSettings] = useState({
+                general: {
+                    siteName: 'ServiceGrid ITSM',
+                    timezone: 'Asia/Tokyo',
+                    language: 'ja',
+                    enableNotifications: true,
+                    sessionTimeout: 30
+                },
+                users: [],
+                security: {
+                    passwordPolicy: {
+                        minLength: 8,
+                        requireUppercase: true,
+                        requireNumbers: true,
+                        requireSymbols: false
+                    },
+                    mfaEnabled: false,
+                    auditLogging: true
+                },
+                integrations: {
+                    msGraphEnabled: false,
+                    msClientId: '',
+                    emailNotifications: true,
+                    smsNotifications: false
+                }
+            });
             const { showSuccess, showError } = useToast();
 
-            // モックデータ生成
+            useEffect(() => {
+                // モックユーザーデータ読み込み
+                const mockUsers = [
+                    { id: 1, username: 'admin', displayName: 'システム管理者', role: 'ADMIN', email: 'admin@servicegrid.com', lastLogin: '2025-06-22 09:30', status: 'active' },
+                    { id: 2, username: 'operator', displayName: 'ITオペレーター', role: 'USER', email: 'operator@servicegrid.com', lastLogin: '2025-06-22 08:45', status: 'active' },
+                    { id: 3, username: 'viewer', displayName: '閲覧者', role: 'READ_ONLY', email: 'viewer@servicegrid.com', lastLogin: '2025-06-21 17:20', status: 'inactive' }
+                ];
+                setSettings(prev => ({ ...prev, users: mockUsers }));
+            }, []);
+
+            const tabs = [
+                { id: 'general', name: '一般設定', icon: '⚙️' },
+                { id: 'users', name: 'ユーザー管理', icon: '👥' },
+                { id: 'security', name: 'セキュリティ', icon: '🔒' },
+                { id: 'integrations', name: '外部連携', icon: '🔗' },
+                { id: 'system', name: 'システム情報', icon: '💻' }
+            ];
+
+            const handleSettingChange = (category, key, value) => {
+                setSettings(prev => ({
+                    ...prev,
+                    [category]: {
+                        ...prev[category],
+                        [key]: value
+                    }
+                }));
+                showSuccess('設定を更新しました');
+            };
+
+            const renderTabContent = () => {
+                switch (activeTab) {
+                    case 'general':
+                        return React.createElement('div', { className: 'space-y-6' },
+                            React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-6' },
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'サイト名'),
+                                    React.createElement('input', {
+                                        type: 'text',
+                                        value: settings.general.siteName,
+                                        onChange: (e) => handleSettingChange('general', 'siteName', e.target.value),
+                                        className: 'w-full px-3 py-2 border border-gray-300 rounded-md'
+                                    })
+                                ),
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'タイムゾーン'),
+                                    React.createElement('select', {
+                                        value: settings.general.timezone,
+                                        onChange: (e) => handleSettingChange('general', 'timezone', e.target.value),
+                                        className: 'w-full px-3 py-2 border border-gray-300 rounded-md'
+                                    },
+                                        React.createElement('option', { value: 'Asia/Tokyo' }, '日本標準時 (JST)'),
+                                        React.createElement('option', { value: 'UTC' }, '協定世界時 (UTC)')
+                                    )
+                                )
+                            ),
+                            React.createElement('div', { className: 'flex items-center space-x-3' },
+                                React.createElement('input', {
+                                    type: 'checkbox',
+                                    id: 'notifications',
+                                    checked: settings.general.enableNotifications,
+                                    onChange: (e) => handleSettingChange('general', 'enableNotifications', e.target.checked),
+                                    className: 'h-4 w-4 text-blue-600 border-gray-300 rounded'
+                                }),
+                                React.createElement('label', { htmlFor: 'notifications', className: 'text-sm text-gray-700' }, '通知機能を有効にする')
+                            ),
+                            React.createElement('div', null,
+                                React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'セッションタイムアウト（分）'),
+                                React.createElement('input', {
+                                    type: 'number',
+                                    value: settings.general.sessionTimeout,
+                                    onChange: (e) => handleSettingChange('general', 'sessionTimeout', parseInt(e.target.value)),
+                                    className: 'w-32 px-3 py-2 border border-gray-300 rounded-md'
+                                })
+                            )
+                        );
+
+                    case 'users':
+                        return React.createElement('div', { className: 'space-y-6' },
+                            React.createElement('div', { className: 'flex justify-between items-center' },
+                                React.createElement('h3', { className: 'text-lg font-medium text-gray-900' }, 'ユーザー一覧'),
+                                React.createElement(Button, {
+                                    variant: 'primary',
+                                    onClick: () => showSuccess('ユーザー作成機能は開発中です')
+                                }, '新規ユーザー作成')
+                            ),
+                            React.createElement('div', { className: 'bg-white shadow overflow-hidden sm:rounded-md' },
+                                React.createElement('ul', { className: 'divide-y divide-gray-200' },
+                                    settings.users.map(user =>
+                                        React.createElement('li', { key: user.id },
+                                            React.createElement('div', { className: 'px-4 py-4 flex items-center justify-between' },
+                                                React.createElement('div', { className: 'flex items-center' },
+                                                    React.createElement('div', { className: 'flex-shrink-0 h-10 w-10' },
+                                                        React.createElement('div', { className: 'h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center' },
+                                                            React.createElement('span', { className: 'text-white font-medium' }, user.displayName.charAt(0))
+                                                        )
+                                                    ),
+                                                    React.createElement('div', { className: 'ml-4' },
+                                                        React.createElement('div', { className: 'text-sm font-medium text-gray-900' }, user.displayName),
+                                                        React.createElement('div', { className: 'text-sm text-gray-500' }, `@${user.username} | ${user.email}`),
+                                                        React.createElement('div', { className: 'text-xs text-gray-400' }, `最終ログイン: ${user.lastLogin}`)
+                                                    )
+                                                ),
+                                                React.createElement('div', { className: 'flex items-center space-x-3' },
+                                                    React.createElement('span', {
+                                                        className: `px-2 py-1 text-xs rounded-full ${
+                                                            user.role === 'ADMIN' ? 'bg-red-100 text-red-800' :
+                                                            user.role === 'USER' ? 'bg-blue-100 text-blue-800' :
+                                                            'bg-gray-100 text-gray-800'
+                                                        }`
+                                                    }, user.role),
+                                                    React.createElement('span', {
+                                                        className: `px-2 py-1 text-xs rounded-full ${
+                                                            user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                                        }`
+                                                    }, user.status === 'active' ? 'アクティブ' : '非アクティブ'),
+                                                    React.createElement(Button, {
+                                                        variant: 'ghost',
+                                                        size: 'sm',
+                                                        onClick: () => showSuccess('ユーザー編集機能は開発中です')
+                                                    }, '編集')
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        );
+
+                    case 'security':
+                        return React.createElement('div', { className: 'space-y-6' },
+                            React.createElement('div', null,
+                                React.createElement('h3', { className: 'text-lg font-medium text-gray-900 mb-4' }, 'パスワードポリシー'),
+                                React.createElement('div', { className: 'space-y-4' },
+                                    React.createElement('div', { className: 'flex items-center justify-between' },
+                                        React.createElement('span', { className: 'text-sm text-gray-700' }, '最小文字数'),
+                                        React.createElement('input', {
+                                            type: 'number',
+                                            value: settings.security.passwordPolicy.minLength,
+                                            onChange: (e) => {
+                                                const newPolicy = { ...settings.security.passwordPolicy, minLength: parseInt(e.target.value) };
+                                                handleSettingChange('security', 'passwordPolicy', newPolicy);
+                                            },
+                                            className: 'w-20 px-2 py-1 border border-gray-300 rounded'
+                                        })
+                                    ),
+                                    ['requireUppercase', 'requireNumbers', 'requireSymbols'].map(key =>
+                                        React.createElement('div', { key: key, className: 'flex items-center justify-between' },
+                                            React.createElement('span', { className: 'text-sm text-gray-700' },
+                                                key === 'requireUppercase' ? '大文字を必須とする' :
+                                                key === 'requireNumbers' ? '数字を必須とする' :
+                                                '記号を必須とする'
+                                            ),
+                                            React.createElement('input', {
+                                                type: 'checkbox',
+                                                checked: settings.security.passwordPolicy[key],
+                                                onChange: (e) => {
+                                                    const newPolicy = { ...settings.security.passwordPolicy, [key]: e.target.checked };
+                                                    handleSettingChange('security', 'passwordPolicy', newPolicy);
+                                                },
+                                                className: 'h-4 w-4 text-blue-600 border-gray-300 rounded'
+                                            })
+                                        )
+                                    )
+                                )
+                            ),
+                            React.createElement('div', null,
+                                React.createElement('h3', { className: 'text-lg font-medium text-gray-900 mb-4' }, 'セキュリティ機能'),
+                                React.createElement('div', { className: 'space-y-4' },
+                                    React.createElement('div', { className: 'flex items-center justify-between' },
+                                        React.createElement('span', { className: 'text-sm text-gray-700' }, '多要素認証'),
+                                        React.createElement('input', {
+                                            type: 'checkbox',
+                                            checked: settings.security.mfaEnabled,
+                                            onChange: (e) => handleSettingChange('security', 'mfaEnabled', e.target.checked),
+                                            className: 'h-4 w-4 text-blue-600 border-gray-300 rounded'
+                                        })
+                                    ),
+                                    React.createElement('div', { className: 'flex items-center justify-between' },
+                                        React.createElement('span', { className: 'text-sm text-gray-700' }, '監査ログ記録'),
+                                        React.createElement('input', {
+                                            type: 'checkbox',
+                                            checked: settings.security.auditLogging,
+                                            onChange: (e) => handleSettingChange('security', 'auditLogging', e.target.checked),
+                                            className: 'h-4 w-4 text-blue-600 border-gray-300 rounded'
+                                        })
+                                    )
+                                )
+                            )
+                        );
+
+                    case 'integrations':
+                        return React.createElement('div', { className: 'space-y-6' },
+                            React.createElement('div', null,
+                                React.createElement('h3', { className: 'text-lg font-medium text-gray-900 mb-4' }, 'Microsoft Graph API'),
+                                React.createElement('div', { className: 'space-y-4' },
+                                    React.createElement('div', { className: 'flex items-center space-x-3' },
+                                        React.createElement('input', {
+                                            type: 'checkbox',
+                                            checked: settings.integrations.msGraphEnabled,
+                                            onChange: (e) => handleSettingChange('integrations', 'msGraphEnabled', e.target.checked),
+                                            className: 'h-4 w-4 text-blue-600 border-gray-300 rounded'
+                                        }),
+                                        React.createElement('label', { className: 'text-sm text-gray-700' }, 'Microsoft Graph API連携を有効にする')
+                                    ),
+                                    settings.integrations.msGraphEnabled && React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'アプリケーションID'),
+                                        React.createElement('input', {
+                                            type: 'text',
+                                            value: settings.integrations.msClientId,
+                                            onChange: (e) => handleSettingChange('integrations', 'msClientId', e.target.value),
+                                            placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+                                            className: 'w-full px-3 py-2 border border-gray-300 rounded-md'
+                                        })
+                                    )
+                                )
+                            ),
+                            React.createElement('div', null,
+                                React.createElement('h3', { className: 'text-lg font-medium text-gray-900 mb-4' }, '通知設定'),
+                                React.createElement('div', { className: 'space-y-4' },
+                                    React.createElement('div', { className: 'flex items-center justify-between' },
+                                        React.createElement('span', { className: 'text-sm text-gray-700' }, 'メール通知'),
+                                        React.createElement('input', {
+                                            type: 'checkbox',
+                                            checked: settings.integrations.emailNotifications,
+                                            onChange: (e) => handleSettingChange('integrations', 'emailNotifications', e.target.checked),
+                                            className: 'h-4 w-4 text-blue-600 border-gray-300 rounded'
+                                        })
+                                    ),
+                                    React.createElement('div', { className: 'flex items-center justify-between' },
+                                        React.createElement('span', { className: 'text-sm text-gray-700' }, 'SMS通知'),
+                                        React.createElement('input', {
+                                            type: 'checkbox',
+                                            checked: settings.integrations.smsNotifications,
+                                            onChange: (e) => handleSettingChange('integrations', 'smsNotifications', e.target.checked),
+                                            className: 'h-4 w-4 text-blue-600 border-gray-300 rounded'
+                                        })
+                                    )
+                                )
+                            )
+                        );
+
+                    case 'system':
+                        const systemInfo = {
+                            version: 'ServiceGrid ITSM v2.1.0',
+                            buildDate: '2025-06-22',
+                            environment: 'Development',
+                            database: 'SQLite 3.45.0',
+                            nodeVersion: 'Node.js 20.11.0',
+                            reactVersion: 'React 18.3.1'
+                        };
+                        return React.createElement('div', { className: 'space-y-6' },
+                            React.createElement('div', null,
+                                React.createElement('h3', { className: 'text-lg font-medium text-gray-900 mb-4' }, 'システム情報'),
+                                React.createElement('div', { className: 'bg-gray-50 rounded-lg p-4' },
+                                    React.createElement('dl', { className: 'grid grid-cols-1 gap-4 sm:grid-cols-2' },
+                                        Object.entries(systemInfo).map(([key, value]) =>
+                                            React.createElement('div', { key: key },
+                                                React.createElement('dt', { className: 'text-sm font-medium text-gray-500' }, 
+                                                    key === 'version' ? 'バージョン' :
+                                                    key === 'buildDate' ? 'ビルド日' :
+                                                    key === 'environment' ? '環境' :
+                                                    key === 'database' ? 'データベース' :
+                                                    key === 'nodeVersion' ? 'Node.jsバージョン' :
+                                                    'Reactバージョン'
+                                                ),
+                                                React.createElement('dd', { className: 'mt-1 text-sm text-gray-900 font-mono' }, value)
+                                            )
+                                        )
+                                    )
+                                )
+                            ),
+                            React.createElement('div', null,
+                                React.createElement('h3', { className: 'text-lg font-medium text-gray-900 mb-4' }, 'システム操作'),
+                                React.createElement('div', { className: 'space-y-3' },
+                                    React.createElement(Button, {
+                                        variant: 'secondary',
+                                        onClick: () => showSuccess('データベースバックアップを開始しました')
+                                    }, '📦 データベースバックアップ'),
+                                    React.createElement(Button, {
+                                        variant: 'secondary',
+                                        onClick: () => showSuccess('ログファイルをクリアしました')
+                                    }, '🗑️ ログファイルクリア'),
+                                    React.createElement(Button, {
+                                        variant: 'danger',
+                                        onClick: () => showError('システム再起動権限がありません')
+                                    }, '🔄 システム再起動')
+                                )
+                            )
+                        );
+
+                    default:
+                        return React.createElement('div', { className: 'text-center py-8' },
+                            React.createElement('p', { className: 'text-gray-500' }, 'コンテンツを選択してください')
+                        );
+                }
+            };
+
+            return React.createElement('div', { className: 'space-y-6' },
+                React.createElement('div', { className: 'bg-white rounded-lg shadow-sm border border-gray-200 p-6' },
+                    React.createElement('h1', { className: 'text-2xl font-bold text-gray-900 mb-2' }, 'システム設定'),
+                    React.createElement('p', { className: 'text-sm text-gray-600' }, 'ServiceGrid ITSMプラットフォームの設定・管理を行います')
+                ),
+                React.createElement('div', { className: 'bg-white rounded-lg shadow-sm border border-gray-200' },
+                    React.createElement('div', { className: 'border-b border-gray-200' },
+                        React.createElement('nav', { className: 'flex space-x-8 px-6' },
+                            tabs.map(tab =>
+                                React.createElement('button', {
+                                    key: tab.id,
+                                    onClick: () => setActiveTab(tab.id),
+                                    className: `py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                                        activeTab === tab.id
+                                            ? 'border-blue-500 text-blue-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    }`
+                                }, `${tab.icon} ${tab.name}`)
+                            )
+                        )
+                    ),
+                    React.createElement('div', { className: 'p-6' }, renderTabContent())
+                )
+            );
+        };
+
+        // インシデント報告コンテンツ
+        const IncidentReportContent = () => {
+            const [formData, setFormData] = useState({
+                title: '',
+                description: '',
+                priority: 'Medium',
+                category: 'Other',
+                impact: 'Medium',
+                urgency: 'Medium',
+                affectedUsers: '',
+                stepsToReproduce: '',
+                expectedBehavior: '',
+                actualBehavior: '',
+                workaround: '',
+                relatedAssets: '',
+                tags: ''
+            });
+            const [isSubmitting, setIsSubmitting] = useState(false);
+            const [incidents, setIncidents] = useState([]);
+            const { showSuccess, showError } = useToast();
+            const { user } = useAuth();
+
+            const categories = [
+                { value: 'Infrastructure', label: 'インフラストラクチャ' },
+                { value: 'Application', label: 'アプリケーション' },
+                { value: 'Network', label: 'ネットワーク' },
+                { value: 'Hardware', label: 'ハードウェア' },
+                { value: 'Software', label: 'ソフトウェア' },
+                { value: 'Security', label: 'セキュリティ' },
+                { value: 'Account', label: 'アカウント' },
+                { value: 'Other', label: 'その他' }
+            ];
+
+            const priorities = [
+                { value: 'Low', label: '低' },
+                { value: 'Medium', label: '中' },
+                { value: 'High', label: '高' },
+                { value: 'Critical', label: '緊急' }
+            ];
+
+            const impactUrgencyOptions = [
+                { value: 'Low', label: '低' },
+                { value: 'Medium', label: '中' },
+                { value: 'High', label: '高' }
+            ];
+
+            // フォーム入力の処理
+            const handleInputChange = (e) => {
+                const { name, value } = e.target;
+                setFormData(prev => ({ ...prev, [name]: value }));
+            };
+
+            // インシデント報告の送信
+            const handleSubmitReport = async (e) => {
+                e.preventDefault();
+                if (!user) return;
+
+                setIsSubmitting(true);
+                try {
+                    // 新しいインシデントデータを作成
+                    const newIncident = {
+                        id: `INC-${Date.now()}`,
+                        title: formData.title,
+                        description: formData.description,
+                        reportedBy: user.username,
+                        priority: formData.priority,
+                        category: formData.category,
+                        status: 'オープン',
+                        impact: formData.impact,
+                        urgency: formData.urgency,
+                        affectedUsers: formData.affectedUsers ? parseInt(formData.affectedUsers) : undefined,
+                        workaround: formData.workaround || undefined,
+                        relatedAssets: formData.relatedAssets ? formData.relatedAssets.split(',').map(s => s.trim()).filter(s => s) : [],
+                        tags: formData.tags ? formData.tags.split(',').map(s => s.trim()).filter(s => s) : [],
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    };
+
+                    // 一覧に追加
+                    setIncidents(prev => [newIncident, ...prev]);
+                    
+                    showSuccess('インシデントが正常に報告されました');
+
+                    // フォームをリセット
+                    setFormData({
+                        title: '',
+                        description: '',
+                        priority: 'Medium',
+                        category: 'Other',
+                        impact: 'Medium',
+                        urgency: 'Medium',
+                        affectedUsers: '',
+                        stepsToReproduce: '',
+                        expectedBehavior: '',
+                        actualBehavior: '',
+                        workaround: '',
+                        relatedAssets: '',
+                        tags: ''
+                    });
+                } catch (error) {
+                    console.error('Failed to submit incident report:', error);
+                    showError('インシデントの報告に失敗しました');
+                } finally {
+                    setIsSubmitting(false);
+                }
+            };
+
+            // インシデント完了
+            const handleCompleteIncident = (incidentId) => {
+                setIncidents(prev => 
+                    prev.map(inc => 
+                        inc.id === incidentId 
+                            ? { ...inc, status: '解決済み', updatedAt: new Date().toISOString() }
+                            : inc
+                    )
+                );
+                showSuccess('インシデントが完了状態に変更されました');
+            };
+
+            // インシデント削除
+            const handleDeleteIncident = (incidentId) => {
+                if (window.confirm('このインシデントを削除してもよろしいですか？')) {
+                    setIncidents(prev => prev.filter(inc => inc.id !== incidentId));
+                    showSuccess('インシデントが削除されました');
+                }
+            };
+
+            return React.createElement('div', { className: 'space-y-6' },
+                // インシデント報告フォーム
+                React.createElement(Card, { title: '新しいインシデントを報告' },
+                    React.createElement('form', { onSubmit: handleSubmitReport, className: 'space-y-6 p-6' },
+                        // 基本情報
+                        React.createElement('div', { className: 'bg-gray-50 p-4 rounded-lg' },
+                            React.createElement('h3', { className: 'text-lg font-semibold text-gray-800 mb-4' }, '基本情報'),
+                            React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4' },
+                                React.createElement('div', { className: 'md:col-span-2' },
+                                    React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'インシデントタイトル'),
+                                    React.createElement('input', {
+                                        type: 'text',
+                                        name: 'title',
+                                        value: formData.title,
+                                        onChange: handleInputChange,
+                                        placeholder: '問題の簡潔な説明を入力してください',
+                                        required: true,
+                                        className: 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                    })
+                                ),
+                                React.createElement('div', { className: 'md:col-span-2' },
+                                    React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, '詳細な説明'),
+                                    React.createElement('textarea', {
+                                        name: 'description',
+                                        value: formData.description,
+                                        onChange: handleInputChange,
+                                        placeholder: '問題の詳細な説明、発生した状況、エラーメッセージなどを入力してください',
+                                        rows: 4,
+                                        required: true,
+                                        className: 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                    })
+                                ),
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'カテゴリ'),
+                                    React.createElement('select', {
+                                        name: 'category',
+                                        value: formData.category,
+                                        onChange: handleInputChange,
+                                        className: 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                    }, categories.map(cat => 
+                                        React.createElement('option', { key: cat.value, value: cat.value }, cat.label)
+                                    ))
+                                ),
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, '優先度'),
+                                    React.createElement('select', {
+                                        name: 'priority',
+                                        value: formData.priority,
+                                        onChange: handleInputChange,
+                                        className: 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                    }, priorities.map(pri => 
+                                        React.createElement('option', { key: pri.value, value: pri.value }, pri.label)
+                                    ))
+                                )
+                            )
+                        ),
+
+                        // 影響度・緊急度
+                        React.createElement('div', { className: 'bg-white border rounded-lg p-4' },
+                            React.createElement('h3', { className: 'text-lg font-semibold text-gray-800 mb-4' }, '影響度・緊急度'),
+                            React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-4' },
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, '影響度'),
+                                    React.createElement('select', {
+                                        name: 'impact',
+                                        value: formData.impact,
+                                        onChange: handleInputChange,
+                                        className: 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                    }, impactUrgencyOptions.map(opt => 
+                                        React.createElement('option', { key: opt.value, value: opt.value }, opt.label)
+                                    ))
+                                ),
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, '緊急度'),
+                                    React.createElement('select', {
+                                        name: 'urgency',
+                                        value: formData.urgency,
+                                        onChange: handleInputChange,
+                                        className: 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                    }, impactUrgencyOptions.map(opt => 
+                                        React.createElement('option', { key: opt.value, value: opt.value }, opt.label)
+                                    ))
+                                ),
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, '影響ユーザー数'),
+                                    React.createElement('input', {
+                                        type: 'number',
+                                        name: 'affectedUsers',
+                                        value: formData.affectedUsers,
+                                        onChange: handleInputChange,
+                                        placeholder: '影響を受けるユーザー数',
+                                        min: '0',
+                                        className: 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                    })
+                                )
+                            )
+                        ),
+
+                        // 関連情報
+                        React.createElement('div', { className: 'bg-white border rounded-lg p-4' },
+                            React.createElement('h3', { className: 'text-lg font-semibold text-gray-800 mb-4' }, '関連情報'),
+                            React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4' },
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, '関連資産 (任意)'),
+                                    React.createElement('input', {
+                                        type: 'text',
+                                        name: 'relatedAssets',
+                                        value: formData.relatedAssets,
+                                        onChange: handleInputChange,
+                                        placeholder: '関連するサーバー、アプリケーション等をカンマ区切りで入力',
+                                        className: 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                    })
+                                ),
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'タグ (任意)'),
+                                    React.createElement('input', {
+                                        type: 'text',
+                                        name: 'tags',
+                                        value: formData.tags,
+                                        onChange: handleInputChange,
+                                        placeholder: 'タグをカンマ区切りで入力 (例: 緊急,ネットワーク)',
+                                        className: 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                    })
+                                )
+                            )
+                        ),
+
+                        React.createElement('div', { className: 'flex justify-end space-x-3 pt-4 border-t' },
+                            React.createElement('button', {
+                                type: 'button',
+                                onClick: () => setFormData({
+                                    title: '',
+                                    description: '',
+                                    priority: 'Medium',
+                                    category: 'Other',
+                                    impact: 'Medium',
+                                    urgency: 'Medium',
+                                    affectedUsers: '',
+                                    stepsToReproduce: '',
+                                    expectedBehavior: '',
+                                    actualBehavior: '',
+                                    workaround: '',
+                                    relatedAssets: '',
+                                    tags: ''
+                                }),
+                                className: 'px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-md'
+                            }, 'リセット'),
+                            React.createElement('button', {
+                                type: 'submit',
+                                disabled: isSubmitting || !formData.title || !formData.description,
+                                className: `px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed ${isSubmitting ? 'cursor-wait' : ''}`
+                            }, isSubmitting ? '送信中...' : 'インシデントを報告')
+                        )
+                    )
+                ),
+
+                // 報告済みインシデント一覧
+                React.createElement(Card, { title: '報告済みインシデント一覧' },
+                    incidents.length === 0 
+                        ? React.createElement('div', { className: 'p-8 text-center text-gray-500' }, 'まだインシデントが報告されていません')
+                        : React.createElement('div', { className: 'overflow-x-auto' },
+                            React.createElement('table', { className: 'min-w-full divide-y divide-gray-200' },
+                                React.createElement('thead', { className: 'bg-gray-50' },
+                                    React.createElement('tr', null,
+                                        React.createElement('th', { className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'ID'),
+                                        React.createElement('th', { className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'タイトル'),
+                                        React.createElement('th', { className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'ステータス'),
+                                        React.createElement('th', { className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, '優先度'),
+                                        React.createElement('th', { className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, '報告者'),
+                                        React.createElement('th', { className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, '作成日時'),
+                                        React.createElement('th', { className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'アクション')
+                                    )
+                                ),
+                                React.createElement('tbody', { className: 'bg-white divide-y divide-gray-200' },
+                                    incidents.map(incident =>
+                                        React.createElement('tr', { key: incident.id, className: 'hover:bg-gray-50' },
+                                            React.createElement('td', { className: 'px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900' }, incident.id),
+                                            React.createElement('td', { className: 'px-6 py-4 whitespace-nowrap' },
+                                                React.createElement('div', null,
+                                                    React.createElement('div', { className: 'text-sm font-medium text-gray-900' }, incident.title),
+                                                    React.createElement('div', { className: 'text-sm text-gray-500 truncate max-w-xs' }, incident.description.slice(0, 50) + '...')
+                                                )
+                                            ),
+                                            React.createElement('td', { className: 'px-6 py-4 whitespace-nowrap' },
+                                                React.createElement('span', {
+                                                    className: `inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                        incident.status === 'オープン' ? 'bg-yellow-100 text-yellow-800' :
+                                                        incident.status === '対応中' ? 'bg-blue-100 text-blue-800' :
+                                                        incident.status === '解決済み' ? 'bg-green-100 text-green-800' :
+                                                        'bg-gray-100 text-gray-800'
+                                                    }`
+                                                }, incident.status)
+                                            ),
+                                            React.createElement('td', { className: 'px-6 py-4 whitespace-nowrap' },
+                                                React.createElement('span', {
+                                                    className: `inline-flex px-2 py-1 text-xs font-semibold rounded ${
+                                                        incident.priority === 'Critical' ? 'bg-red-100 text-red-800' :
+                                                        incident.priority === 'High' ? 'bg-orange-100 text-orange-800' :
+                                                        incident.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                                        'bg-green-100 text-green-800'
+                                                    }`
+                                                }, priorities.find(p => p.value === incident.priority)?.label || incident.priority)
+                                            ),
+                                            React.createElement('td', { className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-900' }, incident.reportedBy),
+                                            React.createElement('td', { className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-500' }, new Date(incident.createdAt).toLocaleString('ja-JP')),
+                                            React.createElement('td', { className: 'px-6 py-4 whitespace-nowrap text-sm font-medium' },
+                                                React.createElement('div', { className: 'flex space-x-2' },
+                                                    incident.status !== '解決済み' && React.createElement('button', {
+                                                        onClick: () => handleCompleteIncident(incident.id),
+                                                        className: 'text-green-600 hover:text-green-900 px-2 py-1 bg-green-50 hover:bg-green-100 rounded text-xs'
+                                                    }, '完了'),
+                                                    React.createElement('button', {
+                                                        onClick: () => handleDeleteIncident(incident.id),
+                                                        className: 'text-red-600 hover:text-red-900 px-2 py-1 bg-red-50 hover:bg-red-100 rounded text-xs'
+                                                    }, '削除')
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                )
+            );
+        };
+
+        // ページコンテンツ
+        const PageContent = ({ currentPage }) => {
+            // 設定ページの場合は専用コンテンツを表示
+            if (currentPage === 'settings') {
+                return React.createElement(SettingsContent, { user: null });
+            }
+
+            // インシデント報告ページの場合は専用コンテンツを表示
+            if (currentPage === 'incident-report') {
+                return React.createElement(IncidentReportContent);
+            }
+
+            const [data, setData] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [showModal, setShowModal] = useState(false);
+            const [selectedItem, setSelectedItem] = useState(null);
+            const [filterStatus, setFilterStatus] = useState('all');
+            const [searchQuery, setSearchQuery] = useState('');
+            const { showSuccess, showError } = useToast();
+
+            // 詳細なモックデータ生成
             const generateMockData = (type) => {
                 const baseData = {
                     incidents: [
-                        { id: 1, title: 'メールサーバー障害', status: '対応中', priority: '高', createdAt: '2025-06-22 09:30' },
-                        { id: 2, title: 'ネットワーク接続不良', status: '解決済み', priority: '中', createdAt: '2025-06-22 08:15' },
-                        { id: 3, title: 'プリンター印刷エラー', status: 'オープン', priority: '低', createdAt: '2025-06-22 07:45' }
+                        { 
+                            id: 'INC-001', 
+                            title: 'メールサーバー応答遅延', 
+                            description: 'Exchange Serverからのメール送信に平均30秒の遅延が発生しています。',
+                            status: '対応中', 
+                            priority: '高', 
+                            category: 'サーバー',
+                            reportedBy: '田中太郎',
+                            assignedTo: '佐藤花子',
+                            createdAt: '2025-06-22 09:30',
+                            updatedAt: '2025-06-22 11:15',
+                            sla: '2時間以内',
+                            impact: '高',
+                            urgency: '高'
+                        },
+                        { 
+                            id: 'INC-002', 
+                            title: 'ネットワーク間欠的切断', 
+                            description: '3階フロアのネットワーク接続が10分間隔で切断される問題が報告されています。',
+                            status: '解決済み', 
+                            priority: '中', 
+                            category: 'ネットワーク',
+                            reportedBy: '山田次郎',
+                            assignedTo: '鈴木一郎',
+                            createdAt: '2025-06-22 08:15',
+                            resolvedAt: '2025-06-22 10:30',
+                            sla: '4時間以内',
+                            impact: '中',
+                            urgency: '中'
+                        },
+                        { 
+                            id: 'INC-003', 
+                            title: 'プリンター用紙詰まり頻発', 
+                            description: '2階のカラープリンターで用紙詰まりが1日5回以上発生しています。',
+                            status: 'オープン', 
+                            priority: '低', 
+                            category: 'ハードウェア',
+                            reportedBy: '高橋美咲',
+                            assignedTo: '未割り当て',
+                            createdAt: '2025-06-22 07:45',
+                            sla: '8時間以内',
+                            impact: '低',
+                            urgency: '低'
+                        }
+                    ],
+                    requests: [
+                        {
+                            id: 'REQ-001',
+                            title: '新入社員向けPCセットアップ',
+                            description: '4月入社予定の新入社員5名分のPC環境構築をお願いします。',
+                            category: 'ハードウェア要求',
+                            priority: '中',
+                            status: '承認待ち',
+                            requestedBy: '人事部 - 佐々木部長',
+                            assignedTo: 'IT運用チーム',
+                            requestedDate: '2025-06-20',
+                            dueDate: '2025-03-25',
+                            estimatedCost: '¥500,000',
+                            approver: '情報システム部長'
+                        },
+                        {
+                            id: 'REQ-002',
+                            title: 'ソフトウェアライセンス追加',
+                            description: 'Adobe Creative Suite 3ライセンスの追加購入が必要です。',
+                            category: 'ソフトウェア要求',
+                            priority: '高',
+                            status: '実装中',
+                            requestedBy: 'デザイン部 - 田中マネージャー',
+                            assignedTo: 'ライセンス管理チーム',
+                            requestedDate: '2025-06-21',
+                            dueDate: '2025-06-25',
+                            estimatedCost: '¥180,000',
+                            approver: '承認済み'
+                        }
                     ],
                     assets: [
-                        { id: 1, name: 'SRV-001', type: 'サーバー', location: '東京DC', status: '稼働中' },
-                        { id: 2, name: 'LAP-001', type: 'ノートPC', location: '総務部', status: '稼働中' },
-                        { id: 3, name: 'NET-001', type: 'ルーター', location: '東京DC', status: 'メンテナンス中' }
+                        { 
+                            id: 'SRV-001', 
+                            name: 'メインWebサーバー', 
+                            assetTag: 'SRV-001',
+                            type: 'サーバー', 
+                            manufacturer: 'Dell',
+                            model: 'PowerEdge R740',
+                            serialNumber: 'PE740-2025-001',
+                            location: '東京DC - ラック A-01',
+                            owner: 'IT運用部',
+                            status: '稼働中',
+                            purchaseDate: '2023-04-15',
+                            warrantyExpiry: '2026-04-15',
+                            ipAddress: '192.168.1.10',
+                            os: 'Windows Server 2022',
+                            cpu: 'Intel Xeon Gold 6238R',
+                            memory: '64GB DDR4',
+                            storage: '2TB SSD RAID1'
+                        },
+                        { 
+                            id: 'LAP-001', 
+                            name: '営業部ノートPC', 
+                            assetTag: 'LAP-001',
+                            type: 'ノートPC', 
+                            manufacturer: 'Lenovo',
+                            model: 'ThinkPad X1 Carbon',
+                            serialNumber: 'TP-X1C-2024-045',
+                            location: '総務部 - 田中太郎',
+                            owner: '田中太郎',
+                            status: '稼働中',
+                            purchaseDate: '2024-01-20',
+                            warrantyExpiry: '2027-01-20',
+                            os: 'Windows 11 Pro',
+                            cpu: 'Intel Core i7-1365U',
+                            memory: '16GB LPDDR5',
+                            storage: '512GB NVMe SSD'
+                        },
+                        { 
+                            id: 'NET-001', 
+                            name: 'メインルーター', 
+                            assetTag: 'NET-001',
+                            type: 'ネットワーク機器', 
+                            manufacturer: 'Cisco',
+                            model: 'ISR 4331',
+                            serialNumber: 'CSC-4331-2023-012',
+                            location: '東京DC - ネットワークラック',
+                            owner: 'ネットワーク運用チーム',
+                            status: 'メンテナンス中',
+                            purchaseDate: '2023-08-10',
+                            warrantyExpiry: '2026-08-10',
+                            ipAddress: '192.168.1.1',
+                            firmwareVersion: 'IOS XE 17.06.04',
+                            ports: '4x GigabitEthernet, 2x SFP+',
+                            throughput: '100 Mbps'
+                        }
+                    ],
+                    changes: [
+                        {
+                            id: 'CHG-001',
+                            title: 'Webサーバーセキュリティパッチ適用',
+                            description: 'Apache HTTP Server 2.4.54のセキュリティパッチを適用します。',
+                            category: 'セキュリティ更新',
+                            priority: '高',
+                            status: 'スケジュール済み',
+                            requestedBy: 'セキュリティチーム',
+                            changeManager: '佐藤部長',
+                            plannedStart: '2025-06-25 02:00',
+                            plannedEnd: '2025-06-25 04:00',
+                            actualStart: null,
+                            actualEnd: null,
+                            riskLevel: '中',
+                            impactedServices: ['Webサイト', 'API'],
+                            rollbackPlan: 'パッチ削除、バックアップからの復元',
+                            approvalStatus: '承認済み'
+                        }
+                    ],
+                    knowledge: [
+                        {
+                            id: 'KB-001',
+                            title: 'Outlookメール設定手順',
+                            category: 'メール設定',
+                            description: '新入社員向けのOutlookメールアカウント設定の詳細手順書です。',
+                            content: '1. Outlookを起動\n2. ファイル→アカウント設定\n3. 新しいアカウントを追加...',
+                            author: 'IT運用チーム',
+                            createdDate: '2025-01-15',
+                            lastUpdated: '2025-06-20',
+                            viewCount: 145,
+                            helpfulCount: 23,
+                            tags: ['メール', 'Outlook', '設定', '新入社員'],
+                            status: '承認済み'
+                        },
+                        {
+                            id: 'KB-002',
+                            title: 'VPN接続トラブルシューティング',
+                            category: 'ネットワーク',
+                            description: 'リモートワーク時のVPN接続問題の解決方法をまとめています。',
+                            content: '接続できない場合の確認事項：\n1. インターネット接続確認\n2. VPNクライアント再起動...',
+                            author: 'ネットワークチーム',
+                            createdDate: '2024-12-10',
+                            lastUpdated: '2025-06-18',
+                            viewCount: 89,
+                            helpfulCount: 17,
+                            tags: ['VPN', 'リモートワーク', 'トラブルシューティング'],
+                            status: '承認済み'
+                        }
+                    ],
+                    security: [
+                        {
+                            id: 'SEC-001',
+                            title: 'ランサムウェア検知アラート',
+                            type: 'セキュリティインシデント',
+                            severity: '高',
+                            status: '調査中',
+                            detectedAt: '2025-06-22 10:30',
+                            source: 'EDRシステム',
+                            affectedSystems: ['PC-DEV-001', 'FILE-SRV-02'],
+                            description: '開発部のPCでランサムウェアの疑いがある活動を検知しました。',
+                            actionTaken: 'ネットワーク隔離、フォレンジック調査開始',
+                            assignedTo: 'セキュリティチーム'
+                        }
+                    ],
+                    audit: [
+                        {
+                            id: 'AUD-001',
+                            timestamp: '2025-06-22 11:45:23',
+                            user: 'admin',
+                            action: 'ログイン',
+                            resource: 'ITSM システム',
+                            ipAddress: '192.168.1.100',
+                            userAgent: 'Chrome/91.0 Windows 10',
+                            result: '成功',
+                            details: '管理者権限でシステムにログイン'
+                        },
+                        {
+                            id: 'AUD-002',
+                            timestamp: '2025-06-22 11:30:15',
+                            user: 'tanaka.taro',
+                            action: 'インシデント作成',
+                            resource: 'INC-003',
+                            ipAddress: '192.168.1.150',
+                            userAgent: 'Firefox/89.0 Windows 10',
+                            result: '成功',
+                            details: 'プリンター用紙詰まりインシデントを作成'
+                        }
                     ]
                 };
                 return baseData[type] || [];
@@ -429,60 +1362,391 @@
                 return React.createElement(DashboardContent, null);
             }
 
-            const pageTitle = {
-                incidents: 'インシデント管理',
-                requests: 'サービス要求',
-                changes: '変更管理',
-                assets: '資産管理',
-                releases: 'リリース管理',
-                problems: '問題管理',
-                knowledge: 'ナレッジ管理',
-                sla: 'SLA管理',
-                capacity: 'キャパシティ管理',
-                availability: '可用性管理',
-                security: 'セキュリティ管理',
-                compliance: 'コンプライアンス管理',
-                audit: '監査ログ',
-                settings: '設定'
+            // フィルタリングされたデータ
+            const filteredData = data.filter(item => {
+                const matchesStatus = filterStatus === 'all' || item.status === filterStatus;
+                const matchesSearch = !searchQuery || 
+                    Object.values(item).some(value => 
+                        String(value).toLowerCase().includes(searchQuery.toLowerCase())
+                    );
+                return matchesStatus && matchesSearch;
+            });
+
+            // 詳細モーダル
+            const DetailModal = ({ item, onClose }) => {
+                if (!item) return null;
+
+                const renderDetailContent = () => {
+                    switch(currentPage) {
+                        case 'incidents':
+                            return React.createElement('div', { className: 'space-y-4' },
+                                React.createElement('div', { className: 'grid grid-cols-2 gap-4' },
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, 'インシデントID'),
+                                        React.createElement('p', { className: 'mt-1 text-sm text-gray-900' }, item.id)
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, 'ステータス'),
+                                        React.createElement('span', { 
+                                            className: `inline-block px-2 py-1 text-xs rounded-full ${
+                                                item.status === '対応中' ? 'bg-blue-100 text-blue-800' :
+                                                item.status === '解決済み' ? 'bg-green-100 text-green-800' :
+                                                'bg-gray-100 text-gray-800'
+                                            }`
+                                        }, item.status)
+                                    )
+                                ),
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, 'タイトル'),
+                                    React.createElement('p', { className: 'mt-1 text-sm text-gray-900' }, item.title)
+                                ),
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, '詳細説明'),
+                                    React.createElement('p', { className: 'mt-1 text-sm text-gray-900 bg-gray-50 p-3 rounded' }, item.description)
+                                ),
+                                React.createElement('div', { className: 'grid grid-cols-3 gap-4' },
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, '優先度'),
+                                        React.createElement('span', { 
+                                            className: `inline-block px-2 py-1 text-xs rounded-full ${
+                                                item.priority === '高' ? 'bg-red-100 text-red-800' :
+                                                item.priority === '中' ? 'bg-yellow-100 text-yellow-800' :
+                                                'bg-green-100 text-green-800'
+                                            }`
+                                        }, item.priority)
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, '影響度'),
+                                        React.createElement('p', { className: 'mt-1 text-sm text-gray-900' }, item.impact)
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, '緊急度'),
+                                        React.createElement('p', { className: 'mt-1 text-sm text-gray-900' }, item.urgency)
+                                    )
+                                ),
+                                React.createElement('div', { className: 'grid grid-cols-2 gap-4' },
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, '報告者'),
+                                        React.createElement('p', { className: 'mt-1 text-sm text-gray-900' }, item.reportedBy)
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, '担当者'),
+                                        React.createElement('p', { className: 'mt-1 text-sm text-gray-900' }, item.assignedTo)
+                                    )
+                                ),
+                                React.createElement('div', { className: 'grid grid-cols-2 gap-4' },
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, '作成日時'),
+                                        React.createElement('p', { className: 'mt-1 text-sm text-gray-900' }, item.createdAt)
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, 'SLA'),
+                                        React.createElement('p', { className: 'mt-1 text-sm text-gray-900' }, item.sla)
+                                    )
+                                )
+                            );
+                        case 'assets':
+                            return React.createElement('div', { className: 'space-y-4' },
+                                React.createElement('div', { className: 'grid grid-cols-2 gap-4' },
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, '資産タグ'),
+                                        React.createElement('p', { className: 'mt-1 text-sm text-gray-900 font-mono' }, item.assetTag)
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, 'ステータス'),
+                                        React.createElement('span', { 
+                                            className: `inline-block px-2 py-1 text-xs rounded-full ${
+                                                item.status === '稼働中' ? 'bg-green-100 text-green-800' :
+                                                item.status === 'メンテナンス中' ? 'bg-yellow-100 text-yellow-800' :
+                                                'bg-gray-100 text-gray-800'
+                                            }`
+                                        }, item.status)
+                                    )
+                                ),
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, '資産名'),
+                                    React.createElement('p', { className: 'mt-1 text-lg font-semibold text-gray-900' }, item.name)
+                                ),
+                                React.createElement('div', { className: 'grid grid-cols-3 gap-4' },
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, 'メーカー'),
+                                        React.createElement('p', { className: 'mt-1 text-sm text-gray-900' }, item.manufacturer)
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, 'モデル'),
+                                        React.createElement('p', { className: 'mt-1 text-sm text-gray-900' }, item.model)
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, 'シリアル番号'),
+                                        React.createElement('p', { className: 'mt-1 text-sm text-gray-900 font-mono' }, item.serialNumber)
+                                    )
+                                ),
+                                React.createElement('div', { className: 'grid grid-cols-2 gap-4' },
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, '設置場所'),
+                                        React.createElement('p', { className: 'mt-1 text-sm text-gray-900' }, item.location)
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, '所有者'),
+                                        React.createElement('p', { className: 'mt-1 text-sm text-gray-900' }, item.owner)
+                                    )
+                                ),
+                                item.os && React.createElement('div', { className: 'bg-blue-50 p-4 rounded-lg' },
+                                    React.createElement('h4', { className: 'font-medium text-blue-900 mb-2' }, 'システム仕様'),
+                                    React.createElement('div', { className: 'grid grid-cols-2 gap-4 text-sm' },
+                                        item.os && React.createElement('div', null,
+                                            React.createElement('span', { className: 'font-medium text-blue-700' }, 'OS: '),
+                                            React.createElement('span', { className: 'text-blue-800' }, item.os)
+                                        ),
+                                        item.cpu && React.createElement('div', null,
+                                            React.createElement('span', { className: 'font-medium text-blue-700' }, 'CPU: '),
+                                            React.createElement('span', { className: 'text-blue-800' }, item.cpu)
+                                        ),
+                                        item.memory && React.createElement('div', null,
+                                            React.createElement('span', { className: 'font-medium text-blue-700' }, 'メモリ: '),
+                                            React.createElement('span', { className: 'text-blue-800' }, item.memory)
+                                        ),
+                                        item.storage && React.createElement('div', null,
+                                            React.createElement('span', { className: 'font-medium text-blue-700' }, 'ストレージ: '),
+                                            React.createElement('span', { className: 'text-blue-800' }, item.storage)
+                                        )
+                                    )
+                                ),
+                                React.createElement('div', { className: 'grid grid-cols-2 gap-4' },
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, '購入日'),
+                                        React.createElement('p', { className: 'mt-1 text-sm text-gray-900' }, item.purchaseDate)
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, '保証期限'),
+                                        React.createElement('p', { className: 'mt-1 text-sm text-gray-900' }, item.warrantyExpiry)
+                                    )
+                                )
+                            );
+                        default:
+                            return React.createElement('div', { className: 'space-y-4' },
+                                Object.entries(item).map(([key, value]) =>
+                                    React.createElement('div', { key: key },
+                                        React.createElement('label', { className: 'block text-sm font-medium text-gray-700' }, key),
+                                        React.createElement('p', { className: 'mt-1 text-sm text-gray-900' }, String(value))
+                                    )
+                                )
+                            );
+                    }
+                };
+
+                return React.createElement(Modal, {
+                    isOpen: true,
+                    onClose: onClose,
+                    title: `${item.title || item.name || item.id} - 詳細情報`,
+                    size: 'lg'
+                }, renderDetailContent());
+            };
+
+            // ページタイトルとアクションの設定
+            const pageConfig = {
+                incidents: {
+                    title: 'インシデント管理',
+                    description: 'システム障害やサービス中断の管理・追跡を行います',
+                    createButton: 'インシデント報告',
+                    statusOptions: ['all', 'オープン', '対応中', '解決済み', 'クローズ']
+                },
+                'incident-report': {
+                    title: 'インシデント報告',
+                    description: '新しいインシデントを報告・登録します',
+                    createButton: '報告送信',
+                    statusOptions: []
+                },
+                requests: {
+                    title: 'サービス要求管理',
+                    description: 'ユーザーからのサービス要求・申請の管理を行います',
+                    createButton: '要求申請',
+                    statusOptions: ['all', '承認待ち', '実装中', '完了', '却下']
+                },
+                assets: {
+                    title: '資産管理（CMDB）',
+                    description: 'IT資産の構成情報・ライフサイクル管理を行います',
+                    createButton: '資産登録',
+                    statusOptions: ['all', '稼働中', 'メンテナンス中', '廃棄予定', '廃棄済み']
+                },
+                changes: {
+                    title: '変更管理',
+                    description: 'システム変更の計画・承認・実装管理を行います',
+                    createButton: '変更申請',
+                    statusOptions: ['all', '申請中', 'スケジュール済み', '実装中', '完了']
+                },
+                knowledge: {
+                    title: 'ナレッジ管理',
+                    description: '技術文書・手順書・FAQ等の知識資産を管理します',
+                    createButton: '記事作成',
+                    statusOptions: ['all', '下書き', 'レビュー中', '承認済み', '廃止']
+                },
+                security: {
+                    title: 'セキュリティ管理',
+                    description: 'セキュリティインシデント・脅威の監視・対応を行います',
+                    createButton: 'セキュリティ報告',
+                    statusOptions: ['all', '検知', '調査中', '対応中', '解決済み']
+                },
+                audit: {
+                    title: '監査ログ',
+                    description: 'システム操作・アクセスログの監査証跡を管理します',
+                    createButton: 'ログ検索',
+                    statusOptions: ['all', '成功', '失敗', '警告']
+                }
+            };
+
+            const config = pageConfig[currentPage] || {
+                title: currentPage,
+                description: '',
+                createButton: '新規作成',
+                statusOptions: ['all']
             };
 
             return React.createElement('div', { className: 'space-y-6' },
-                React.createElement(Card, { 
-                    title: pageTitle[currentPage] || currentPage,
-                    actions: React.createElement(Button, { size: 'sm' }, '新規作成')
-                },
-                    loading ? React.createElement('div', { className: 'text-center py-8' },
-                        React.createElement('div', { className: 'loading-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4' }),
-                        React.createElement('p', { className: 'text-gray-600' }, '読み込み中...')
-                    ) : data.length > 0 ? React.createElement('div', { className: 'overflow-x-auto' },
-                        React.createElement('table', { className: 'min-w-full divide-y divide-gray-200' },
-                            React.createElement('thead', { className: 'bg-gray-50' },
-                                React.createElement('tr', null,
-                                    Object.keys(data[0]).map(key =>
-                                        React.createElement('th', {
-                                            key: key,
-                                            className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'
-                                        }, key === 'id' ? 'ID' : key === 'title' ? 'タイトル' : key === 'name' ? '名前' : key === 'status' ? 'ステータス' : key === 'priority' ? '優先度' : key === 'type' ? 'タイプ' : key === 'location' ? '場所' : key === 'createdAt' ? '作成日時' : key)
+                // ヘッダーセクション
+                React.createElement('div', { className: 'bg-white rounded-lg shadow-sm border border-gray-200 p-6' },
+                    React.createElement('div', { className: 'flex justify-between items-start mb-4' },
+                        React.createElement('div', null,
+                            React.createElement('h1', { className: 'text-2xl font-bold text-gray-900' }, config.title),
+                            React.createElement('p', { className: 'mt-1 text-sm text-gray-600' }, config.description)
+                        ),
+                        React.createElement('div', { className: 'flex space-x-3' },
+                            React.createElement(Button, {
+                                variant: 'primary',
+                                onClick: () => showSuccess(`${config.createButton}機能は開発中です`)
+                            }, `🆕 ${config.createButton}`),
+                            React.createElement(Button, {
+                                variant: 'secondary',
+                                onClick: () => {
+                                    setLoading(true);
+                                    setTimeout(() => {
+                                        setData(generateMockData(currentPage));
+                                        setLoading(false);
+                                        showSuccess('データを更新しました');
+                                    }, 1000);
+                                }
+                            }, '🔄 更新')
+                        )
+                    ),
+                    // フィルターとサーチ
+                    React.createElement('div', { className: 'flex flex-col sm:flex-row gap-4' },
+                        React.createElement('div', { className: 'flex-1' },
+                            React.createElement(Input, {
+                                placeholder: `${config.title}を検索...`,
+                                value: searchQuery,
+                                onChange: (e) => setSearchQuery(e.target.value),
+                                className: 'w-full'
+                            })
+                        ),
+                        React.createElement('div', { className: 'min-w-[150px]' },
+                            React.createElement('select', {
+                                value: filterStatus,
+                                onChange: (e) => setFilterStatus(e.target.value),
+                                className: 'block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm'
+                            },
+                                config.statusOptions.map(status =>
+                                    React.createElement('option', { key: status, value: status },
+                                        status === 'all' ? '全てのステータス' : status
                                     )
                                 )
-                            ),
-                            React.createElement('tbody', { className: 'bg-white divide-y divide-gray-200' },
-                                data.map(item =>
-                                    React.createElement('tr', { key: item.id, className: 'hover:bg-gray-50' },
-                                        Object.values(item).map((value, index) =>
-                                            React.createElement('td', {
-                                                key: index,
-                                                className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-900'
-                                            }, value)
+                            )
+                        )
+                    )
+                ),
+
+                // データテーブル
+                React.createElement(Card, null,
+                    loading ? React.createElement('div', { className: 'text-center py-12' },
+                        React.createElement('div', { className: 'loading-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4' }),
+                        React.createElement('p', { className: 'text-gray-600 text-lg' }, `${config.title}データを読み込み中...`)
+                    ) : filteredData.length > 0 ? React.createElement('div', null,
+                        React.createElement('div', { className: 'mb-4 flex justify-between items-center' },
+                            React.createElement('p', { className: 'text-sm text-gray-700' },
+                                `${filteredData.length}件の${config.title}が見つかりました`
+                            )
+                        ),
+                        React.createElement('div', { className: 'overflow-x-auto' },
+                            React.createElement('table', { className: 'min-w-full divide-y divide-gray-200' },
+                                React.createElement('thead', { className: 'bg-gray-50' },
+                                    React.createElement('tr', null,
+                                        ['ID', 'タイトル/名前', 'ステータス', '優先度/タイプ', '担当者', '日時', 'アクション'].map(header =>
+                                            React.createElement('th', {
+                                                key: header,
+                                                className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'
+                                            }, header)
+                                        )
+                                    )
+                                ),
+                                React.createElement('tbody', { className: 'bg-white divide-y divide-gray-200' },
+                                    filteredData.map(item =>
+                                        React.createElement('tr', { 
+                                            key: item.id, 
+                                            className: 'hover:bg-gray-50 cursor-pointer transition-colors',
+                                            onClick: () => setSelectedItem(item)
+                                        },
+                                            React.createElement('td', { className: 'px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900' }, item.id),
+                                            React.createElement('td', { className: 'px-6 py-4 text-sm text-gray-900' },
+                                                React.createElement('div', null,
+                                                    React.createElement('div', { className: 'font-medium' }, item.title || item.name),
+                                                    item.category && React.createElement('div', { className: 'text-gray-500 text-xs' }, item.category)
+                                                )
+                                            ),
+                                            React.createElement('td', { className: 'px-6 py-4 whitespace-nowrap' },
+                                                React.createElement('span', { 
+                                                    className: `inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                                                        (item.status === '稼働中' || item.status === '解決済み' || item.status === '完了' || item.status === '成功') ? 'bg-green-100 text-green-800' :
+                                                        (item.status === '対応中' || item.status === '実装中' || item.status === '調査中') ? 'bg-blue-100 text-blue-800' :
+                                                        (item.status === 'メンテナンス中' || item.status === '承認待ち') ? 'bg-yellow-100 text-yellow-800' :
+                                                        (item.status === 'オープン' || item.status === '申請中') ? 'bg-red-100 text-red-800' :
+                                                        'bg-gray-100 text-gray-800'
+                                                    }`
+                                                }, item.status)
+                                            ),
+                                            React.createElement('td', { className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-900' }, 
+                                                item.priority || item.type || item.severity || '-'
+                                            ),
+                                            React.createElement('td', { className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-900' }, 
+                                                item.assignedTo || item.owner || item.author || '-'
+                                            ),
+                                            React.createElement('td', { className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-500' }, 
+                                                item.createdAt || item.requestedDate || item.timestamp || item.createdDate || '-'
+                                            ),
+                                            React.createElement('td', { className: 'px-6 py-4 whitespace-nowrap text-sm font-medium' },
+                                                React.createElement('button', {
+                                                    onClick: (e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedItem(item);
+                                                    },
+                                                    className: 'text-blue-600 hover:text-blue-900'
+                                                }, '詳細')
+                                            )
                                         )
                                     )
                                 )
                             )
                         )
-                    ) : React.createElement('div', { className: 'text-center py-8' },
-                        React.createElement('p', { className: 'text-gray-500' }, 'データがありません')
+                    ) : React.createElement('div', { className: 'text-center py-12' },
+                        React.createElement('div', { className: 'text-6xl mb-4' }, '📋'),
+                        React.createElement('h3', { className: 'text-lg font-medium text-gray-900 mb-2' }, 
+                            searchQuery || filterStatus !== 'all' ? '検索条件に一致するデータがありません' : `${config.title}データがありません`
+                        ),
+                        React.createElement('p', { className: 'text-gray-500 mb-6' }, 
+                            searchQuery || filterStatus !== 'all' ? 
+                                '検索条件を変更してもう一度お試しください' : 
+                                `最初の${config.title}を作成してください`
+                        ),
+                        React.createElement(Button, {
+                            variant: 'primary',
+                            onClick: () => showSuccess(`${config.createButton}機能は開発中です`)
+                        }, config.createButton)
                     )
-                )
+                ),
+
+                // 詳細モーダル
+                selectedItem && React.createElement(DetailModal, {
+                    item: selectedItem,
+                    onClose: () => setSelectedItem(null)
+                })
             );
         };
 

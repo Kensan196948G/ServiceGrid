@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   leftIcon?: ReactNode;
@@ -30,6 +30,7 @@ export const Button = memo(forwardRef<HTMLButtonElement, ButtonProps>((
   const variantStyles = useMemo(() => ({
     primary: 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white focus:ring-blue-500',
     secondary: 'bg-slate-600 hover:bg-slate-700 active:bg-slate-800 text-white focus:ring-slate-500',
+    success: 'bg-green-600 hover:bg-green-700 active:bg-green-800 text-white focus:ring-green-500',
     danger: 'bg-red-600 hover:bg-red-700 active:bg-red-800 text-white focus:ring-red-500',
     ghost: 'bg-transparent hover:bg-slate-200 active:bg-slate-300 text-slate-700 focus:ring-slate-500 border border-slate-300',
   }), []);

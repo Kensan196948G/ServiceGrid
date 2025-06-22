@@ -22,7 +22,5 @@ module.exports = {
     'prefer-const': 'error',
     'no-undef': 'off',
     'no-var': 'error'
-  },
-  // TypeScriptファイルは型チェックのみでESLintはスキップ
-  ignorePatterns: ['**/*.ts', '**/*.tsx']
+  }
 };

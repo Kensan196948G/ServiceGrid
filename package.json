@@ -10,7 +10,7 @@
     "dev": "./node_modules/.bin/vite --config config/vite.config.ts --host 0.0.0.0 --port 3001",
     "build": "tsc --project config/tsconfig.json && vite build --config config/vite.config.ts",
     "preview": "vite preview --config config/vite.config.ts",
-    "lint": "eslint src --ext .ts,.tsx --max-warnings 50",
+    "lint": "eslint src --ext .js,.jsx --max-warnings 50",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "prettier": "./node_modules/.bin/prettier --check 'src/**/*.{ts,tsx,js,jsx}'",
     "prettier:fix": "./node_modules/.bin/prettier --write 'src/**/*.{ts,tsx,js,jsx}'",

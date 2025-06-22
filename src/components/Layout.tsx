@@ -9,6 +9,7 @@ import { APP_NAME } from '../constants';
 const NAVIGATION_ITEMS = [
   { path: '/dashboard', label: 'ダッシュボード', icon: '📊' },
   { path: '/incidents', label: 'インシデント管理', icon: '🚨' },
+  { path: '/incident-report', label: 'インシデント報告', icon: '📢' },
   { path: '/requests', label: 'サービス要求', icon: '📝' },
   { path: '/assets', label: '資産管理', icon: '💻' },
   { path: '/change-management', label: '変更管理', icon: '🔄' },

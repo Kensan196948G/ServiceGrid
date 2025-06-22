@@ -52,10 +52,68 @@ const DashboardPage: React.FC = () => {
     criticalAlerts: 0
   });
   
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [chartData, setChartData] = useState<ChartData[]>([]);
-  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([
+    {
+      id: '1',
+      type: 'incident',
+      title: 'サーバー応答速度低下',
+      status: 'In Progress',
+      timestamp: '2025-06-22T10:30:00Z',
+      priority: 'High'
+    },
+    {
+      id: '2',
+      type: 'request',
+      title: 'Adobe Creative Suite ライセンス申請',
+      status: 'Pending',
+      timestamp: '2025-06-22T09:15:00Z'
+    },
+    {
+      id: '3',
+      type: 'asset',
+      title: '新規ノートPC資産登録',
+      status: 'Active',
+      timestamp: '2025-06-22T08:45:00Z'
+    },
+    {
+      id: '4',
+      type: 'change',
+      title: 'ファイアウォール設定変更',
+      status: 'Approved',
+      timestamp: '2025-06-21T16:20:00Z',
+      priority: 'Medium'
+    }
+  ]);
   const [performanceData, setPerformanceData] = useState<any[]>([]);
+
+  // 詳細なチャートデータ
+  const incidentTrendData = [
+    { name: '6月17日', incidents: 12, resolved: 10 },
+    { name: '6月18日', incidents: 8, resolved: 15 },
+    { name: '6月19日', incidents: 15, resolved: 12 },
+    { name: '6月20日', incidents: 6, resolved: 8 },
+    { name: '6月21日', incidents: 9, resolved: 14 },
+    { name: '6月22日', incidents: 11, resolved: 6 }
+  ];
+
+  const assetDistributionData = [
+    { name: 'サーバー', value: 45, color: '#4F46E5' },
+    { name: 'デスクトップ', value: 120, color: '#06B6D4' },
+    { name: 'ノートPC', value: 85, color: '#10B981' },
+    { name: 'ネットワーク機器', value: 32, color: '#F59E0B' },
+    { name: 'その他', value: 28, color: '#EF4444' }
+  ];
+
+  const systemPerformanceData = [
+    { name: '00:00', cpu: 45, memory: 60, disk: 30 },
+    { name: '04:00', cpu: 35, memory: 55, disk: 32 },
+    { name: '08:00', cpu: 75, memory: 70, disk: 45 },
+    { name: '12:00', cpu: 85, memory: 80, disk: 50 },
+    { name: '16:00', cpu: 90, memory: 85, disk: 55 },
+    { name: '20:00', cpu: 65, memory: 75, disk: 40 }
+  ];
 
   // Color schemes for charts
   const COLORS = ['#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
