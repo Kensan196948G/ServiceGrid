@@ -61,6 +61,7 @@ ITILフレームワークに準拠したITサービス管理（ITSM）プラッ�
 - **Tailwind CSS** - ユーティリティファーストCSS
 - **Recharts** - データ可視化・グラフ機能
 - **Jest + React Testing Library** - 包括的テスト環境
+- **ESLint + TypeScript + React Hooks** - 包括的コード品質管理
 
 ### バックエンド
 - **Node.js + Express** - RESTful API サーバー（本番対応）

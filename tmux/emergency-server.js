@@ -20,11 +20,13 @@ const frontendServer = http.createServer((req, res) => {
   try {
     if (fs.existsSync(path.join(__dirname, filePath))) {
       const content = fs.readFileSync(path.join(__dirname, filePath), 'utf8');
-      res.writeHead(200, {'Content-Type': 'text/html'});
+      res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
       res.end(`
         <!DOCTYPE html>
-        <html>
+        <html lang="ja">
         <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>ITSM Platform - Emergency Mode</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }

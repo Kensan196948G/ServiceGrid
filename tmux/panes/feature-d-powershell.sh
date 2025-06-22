@@ -5,7 +5,9 @@
 
 set -e
 
-PROJECT_ROOT="/mnt/e/ServiceGrid"
+# プロジェクトルート自動検出
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 FEATURE_NAME="Feature-D: PowerShell API修復"
 BACKEND_DIR="$PROJECT_ROOT/backend"
 
@@ -1048,4 +1050,5 @@ echo ""
 
 # 非対話型モード - Claude Code待機
 # メニューは表示せず、Claude Codeからの指示を待機
-exec claude --dangerously-skip-permissions
+claude --dangerously-skip-permissions || true
+echo "🔄 Claude終了 - Feature-D-PowerShell待機モードに戻ります"

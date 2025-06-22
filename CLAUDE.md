@@ -254,10 +254,15 @@ created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 #### 1. 開発環境起動
 
 ```bash
-cd /mnt/e/ServiceGrid/tmux
-./start-development.sh  # 5ペイン並列開発環境起動（3段構成）
+cd /mnt/f/ServiceGrid-1/tmux  # プロジェクトルート/tmux
+./start-development.sh        # 通常モード（5ペイン並列開発環境）
+./start-development.sh --yolo-mode  # YOLO MODE（完全自動化）
 tmux attach-session -t itsm-requirement  # セッション接続
 ```
+
+**YOLO MODE vs 通常モード:**
+- **YOLO MODE**: 全ペイン自動起動、Feature-B/C/D/E即座にClaude実行
+- **通常モード**: 手動設定、段階的な起動
 
 #### 2. 統合指示システム
 
@@ -297,21 +302,27 @@ leader all \
 
 #### 3. 開発ワークフロー
 
-1. **環境起動**: `./start-development.sh`
+1. **環境起動**: `./start-development.sh --yolo-mode`
 2. **セッション接続**: `tmux attach-session -t itsm-requirement`
-3. **各ペインでClaude起動**: 自動起動済み（非対話型）
+3. **各ペインの動作**:
+   - **Feature-A-Leader**: メニュー表示 → 手動で`claude`コマンド実行
+   - **Feature-B/C/D/E**: 自動的にClaude待機モード起動済み
 4. **統合指示**: Feature-A-Leaderペイン4から`leader`コマンドで指示送信
 5. **並列開発**: 各ペインで同時作業実行
 6. **品質チェック**: 自動lint + テスト実行
 7. **統合テスト**: エンドツーエンドテスト
 
+**Claude終了時の動作**:
+- **Feature-A**: メニューに戻る（統合管理とClaude作業を切り替え可能）
+- **Feature-B/C/D/E**: 待機モードメッセージ表示（即座に再開可能）
+
 ### 主要ファイル
 
 | ファイル | 機能 |
 |---------|------|
-| `tmux/start-development.sh` | 4ペイン開発環境起動 |
+| `tmux/start-development.sh` | 5ペイン開発環境起動（bash版・相対パス対応） |
 | `tmux/coordination/send-to-all-fixed.sh` | 統合指示スクリプト（拡張版） |
-| `tmux/panes/feature-*.sh` | 各Feature設定スクリプト |
+| `tmux/panes/feature-*.sh` | 各Feature設定スクリプト（相対パス・Claude自動起動対応） |
 | `tmux/README.md` | tmux環境詳細ガイド |
 
 ### tmuxペイン操作

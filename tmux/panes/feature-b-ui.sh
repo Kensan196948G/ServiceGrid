@@ -5,7 +5,9 @@
 
 set -e
 
-PROJECT_ROOT="/mnt/e/ServiceGrid"
+# プロジェクトルート自動検出
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Claude Code自動起動設定
 setup_claude() {
@@ -213,7 +215,8 @@ check_yolo_mode() {
         echo ""
         
         # Claude Code待機モード（YOLO MODE）
-        exec claude --dangerously-skip-permissions
+        claude --dangerously-skip-permissions || true
+        echo "🔄 Claude終了 - Feature-B-UI待機モードに戻ります"
     else
         # 通常モード
         setup_claude

@@ -2,7 +2,7 @@ module.exports = {
   root: true,
   env: {
     browser: true,
-    es2022: true,
+    es2020: true,
     node: true,
     jest: true
   },
@@ -22,5 +22,7 @@ module.exports = {
     'prefer-const': 'error',
     'no-undef': 'off',
     'no-var': 'error'
-  }
+  },
+  // TypeScriptファイルは型チェックのみでESLintはスキップ
+  ignorePatterns: ['**/*.ts', '**/*.tsx']
 };

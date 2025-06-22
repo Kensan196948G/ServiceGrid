@@ -1,6 +1,6 @@
 import * as React from 'react';
 const { useState } = React;
-import { useNavigate } from '../components/RouterPlaceholder';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button, Input, Card } from '../components/CommonUI';
 

@@ -5,7 +5,9 @@
 
 set -e
 
-PROJECT_ROOT="/mnt/e/ServiceGrid"
+# プロジェクトルート自動検出
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 WORKTREE_ROOT="$PROJECT_ROOT/worktrees"
 LEADER_WORKTREE="$WORKTREE_ROOT/feature-a-leader"
 FEATURE_NAME="Feature-A: 統合リーダー (Worktree対応)"
@@ -66,11 +68,16 @@ setup_claude() {
         echo "✅ Claude起動完了"
         
         if [ "$YOLO_MODE" = true ]; then
-            # YOLO MODEでは確認プロンプトを完全スキップ
-            exec claude --dangerously-skip-permissions
+            # YOLO MODEでは確認プロンプトを完全スキップしてメニューに戻る
+            echo "🚀 YOLO MODE: Claude Codeを起動します（終了後はメニューに戻ります）"
+            claude --dangerously-skip-permissions || true
+            echo "🔄 Claude終了 - メニューに戻ります"
+            main_loop
         else
-            # 通常モードでも既存のグローバル設定が適用される
-            exec claude
+            # 通常モードではClaude起動後メニューループ
+            claude || true
+            echo "🔄 Claude終了 - メニューに戻ります"
+            main_loop
         fi
     else
         echo "⚠️ claudeコマンドが見つかりません"

@@ -9,10 +9,9 @@ Feature別に4つのペインで同時開発を行い、Feature-A統合リーダ
 ## 🚀 クイックスタート
 
 ```bash
-cd /mnt/e/ServiceGrid/tmux
-./quick-connect.sh  # 5ペイン3段並列開発環境起動
-# または
-./start-development.sh  # 手動起動
+cd /mnt/f/ServiceGrid-1/tmux  # プロジェクトルート/tmux
+./start-development.sh        # 通常モード（5ペイン並列開発環境）
+./start-development.sh --yolo-mode  # YOLO MODE（完全自動化）
 tmux attach-session -t itsm-requirement  # セッション接続
 ```
 
@@ -146,7 +145,9 @@ tmux/
 
 ### 1. 環境起動
 ```bash
-./quick-connect.sh
+./start-development.sh --yolo-mode  # 完全自動化
+# または
+./start-development.sh             # 通常モード
 ```
 
 ### 2. Feature別並列開発
@@ -228,8 +229,8 @@ tmux list-sessions              # セッション一覧確認
 
 **Q: Claude Codeが応答しない**
 ```bash
-echo $ANTHROPIC_API_KEY        # API キー確認
-source /mnt/e/ServiceGrid/.env # 環境変数再読み込み
+echo $ANTHROPIC_API_KEY             # API キー確認
+source /mnt/f/ServiceGrid-1/.env   # 環境変数再読み込み
 ```
 
 ## 📞 サポート

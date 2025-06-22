@@ -48,5 +48,9 @@
     "jsdom": "^26.1.0",
     "supertest": "^7.1.1",
     "vite": "^6.3.5"
+  },
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
   }
 }
