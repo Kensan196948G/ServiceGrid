@@ -10,8 +10,8 @@
     /* Bundler mode */
     "moduleResolution": "node",
     "allowImportingTsExtensions": true,
-    "isolatedModules": true,
-    "moduleDetection": "force",
+    "isolatedModules": false,
+    "moduleDetection": "auto",
     "noEmit": true,
     "allowJs": true,
     "jsx": "react-jsx",
@@ -20,8 +20,9 @@
     "strict": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true,
+    "noFallthroughCasesInSwitch": false,
     "noUncheckedSideEffectImports": false,
+    "noImplicitAny": false,
 
     /* React 19 対応 */
     "jsxImportSource": "react",

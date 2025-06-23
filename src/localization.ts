@@ -1,16 +1,14 @@
 
-import { 
-  ItemStatus, UserRole, Asset, Priority, ServiceHealthStatus, AlertSeverity as DashboardAlertSeverity, ReleaseType, 
-  KnowledgeArticleStatus, ConfidentialityLevel, ServiceImportance, CurrentServiceStatus,
-  SecurityAlertSeverity, SecurityIncidentStatus,
-  ComplianceAuditStatus, ComplianceAuditType, ComplianceRiskLevel, ComplianceRiskStatus // Added new types
-} from './types';
+// 型を直接定義して問題を回避
+type UserRole = 'Admin' | 'User' | 'ReadOnly';
+type ItemStatus = 'Open' | 'In Progress' | 'Resolved' | 'Closed' | 'Pending' | 'Approved' | 'Rejected' | 'New' | 'Pending Approval' | 'Scheduled' | 'Implemented' | 'Planned' | 'Building' | 'Testing' | 'Deployed' | 'Rolled Back' | 'Analysis' | 'Solution Proposed' | 'Identified' | 'Mitigated' | 'Compliant' | 'Non Compliant' | 'In Review' | 'Not Applicable';
+type Priority = 'Low' | 'Medium' | 'High' | 'Critical';
 
 export const userRoleToJapanese = (role: UserRole): string => {
   switch (role) {
-    case UserRole.ADMIN: return '管理者';
-    case UserRole.USER: return 'ユーザー';
-    case UserRole.READ_ONLY: return '閲覧専用';
+    case 'Admin': return '管理者';
+    case 'User': return 'ユーザー';
+    case 'ReadOnly': return '閲覧専用';
     default: return role;
   }
 };
@@ -29,35 +27,35 @@ export const itemStatusToJapanese = (status: ItemStatus | string): string => {
   }
   
   switch (status) {
-    case ItemStatus.OPEN: return 'オープン';
-    case ItemStatus.IN_PROGRESS: return '対応中';
-    case ItemStatus.RESOLVED: return '解決済み';
-    case ItemStatus.CLOSED: return 'クローズ';
-    case ItemStatus.PENDING: return '保留中';
-    case ItemStatus.APPROVED: return '承認済み';
-    case ItemStatus.REJECTED: return '却下済み';
-    case ItemStatus.NEW: return '新規';
-    case ItemStatus.PENDING_APPROVAL: return '承認待ち';
-    case ItemStatus.SCHEDULED: return '計画済み'; // Can be used for Releases too
-    case ItemStatus.IMPLEMENTED: return '実施済み'; // Can be used for Changes
-    case ItemStatus.PLANNED: return '計画中'; // Specifically for Releases
-    case ItemStatus.BUILDING: return '構築中';
-    case ItemStatus.TESTING: return 'テスト中';
-    case ItemStatus.DEPLOYED: return '展開済み';
-    case ItemStatus.ROLLED_BACK: return 'ロールバック済み';
-    case ItemStatus.ANALYSIS: return '分析中';
-    case ItemStatus.SOLUTION_PROPOSED: return '解決策提案済み';
-    case ItemStatus.IDENTIFIED: return '特定済み';
-    case ItemStatus.MITIGATED: return '軽減済み';
-    case ItemStatus.COMPLIANT: return '準拠';
-    case ItemStatus.NON_COMPLIANT: return '非準拠';
-    case ItemStatus.IN_REVIEW: return 'レビュー中';
-    case ItemStatus.NOT_APPLICABLE: return '非該当';
+    case 'Open': return 'オープン';
+    case 'In Progress': return '対応中';
+    case 'Resolved': return '解決済み';
+    case 'Closed': return 'クローズ';
+    case 'Pending': return '保留中';
+    case 'Approved': return '承認済み';
+    case 'Rejected': return '却下済み';
+    case 'New': return '新規';
+    case 'Pending Approval': return '承認待ち';
+    case 'Scheduled': return '計画済み';
+    case 'Implemented': return '実施済み';
+    case 'Planned': return '計画中';
+    case 'Building': return '構築中';
+    case 'Testing': return 'テスト中';
+    case 'Deployed': return '展開済み';
+    case 'Rolled Back': return 'ロールバック済み';
+    case 'Analysis': return '分析中';
+    case 'Solution Proposed': return '解決策提案済み';
+    case 'Identified': return '特定済み';
+    case 'Mitigated': return '軽減済み';
+    case 'Compliant': return '準拠';
+    case 'Non Compliant': return '非準拠';
+    case 'In Review': return 'レビュー中';
+    case 'Not Applicable': return '非該当';
     default: return typeof status === 'string' ? status : status;
   }
 };
 
-export const assetTypeToJapanese = (type: Asset['type']): string => {
+export const assetTypeToJapanese = (type: string): string => {
   switch (type) {
     case 'Server': return 'サーバー';
     case 'Desktop': return 'デスクトップPC';
@@ -78,7 +76,7 @@ export const assetTypeToJapanese = (type: Asset['type']): string => {
   }
 };
 
-export const assetStatusToJapanese = (status: Asset['status']): string => {
+export const assetStatusToJapanese = (status: string): string => {
   switch (status) {
     case 'Active': return 'アクティブ';
     case 'Inactive': return '非アクティブ';

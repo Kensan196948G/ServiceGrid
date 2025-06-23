@@ -8,16 +8,47 @@ import { APP_NAME } from '../constants';
 // Enhanced navigation items with dashboard first
 const NAVIGATION_ITEMS = [
   { path: '/dashboard', label: 'ダッシュボード', icon: '📊' },
-  { path: '/incidents', label: 'インシデント管理', icon: '🚨' },
-  { path: '/incident-report', label: 'インシデント報告', icon: '📢' },
   { path: '/requests', label: 'サービス要求', icon: '📝' },
-  { path: '/assets', label: '資産管理', icon: '💻' },
+  { path: '/assets', label: '資産管理 [TEST_MARKER]', icon: '💻' },
   { path: '/change-management', label: '変更管理', icon: '🔄' },
+  { path: '/release-management', label: 'リリース管理', icon: '🚀' },
+  { path: '/problem-management', label: '問題管理', icon: '🔍' },
   { path: '/knowledge', label: 'ナレッジ管理', icon: '📚' },
+  { path: '/service-level-management', label: 'サービスレベル管理', icon: '📈' },
+  { path: '/capacity-management', label: 'キャパシティ管理', icon: '⚡' },
+  { path: '/availability-management', label: '可用性管理', icon: '🟢' },
+  { path: '/security-management', label: 'セキュリティ管理', icon: '🔒' },
+  { path: '/compliance-management', label: 'コンプライアンス管理', icon: '📋' },
+  { path: '/audit-log', label: '監査ログ', icon: '📜' },
   { path: '/settings', label: 'システム設定', icon: '⚙️' },
 ];
-import { Button } from './CommonUI';
-import { userRoleToJapanese } from '../localization';
+// 簡単な Button コンポーネント定義
+const Button: React.FC<{ 
+  onClick?: () => void; 
+  variant?: string; 
+  className?: string; 
+  role?: string;
+  children: React.ReactNode;
+}> = ({ onClick, children, className = '', ...props }) => {
+  return (
+    <button 
+      onClick={onClick} 
+      className={`px-4 py-2 text-sm ${className}`}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+};
+// ローカルで userRoleToJapanese 関数を定義
+const userRoleToJapanese = (role: string): string => {
+  switch (role) {
+    case 'Admin': return '管理者';
+    case 'User': return 'ユーザー';
+    case 'ReadOnly': return '閲覧専用';
+    default: return role;
+  }
+};
 
 const UserCircleIcon = memo(() => (
   <svg 

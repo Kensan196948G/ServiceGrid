@@ -522,12 +522,6 @@ const DashboardPage: React.FC = () => {
         <Card className="p-6">
           <h3 className="text-xl font-semibold text-gray-900 mb-4">クイックアクション</h3>
           <div className="space-y-3">
-            <Link to="/incidents/new">
-              <Button variant="outline" className="w-full justify-start">
-                <span className="mr-2">🚨</span>
-                インシデント報告
-              </Button>
-            </Link>
             
             <Link to="/service-requests/new">
               <Button variant="outline" className="w-full justify-start">

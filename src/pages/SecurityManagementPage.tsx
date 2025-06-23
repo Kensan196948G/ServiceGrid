@@ -206,7 +206,7 @@ const SecurityManagementPage: React.FC = () => {
         setIsReportIncidentModalOpen(false);
         setQuickActionFormData({});
     } catch (error) {
-        setNotification({message: 'インシデント報告に失敗しました。', type: NotificationType.ERROR});
+        setNotification({message: 'セキュリティインシデント報告に失敗しました。', type: NotificationType.ERROR});
     }
   };
   const handleGenericQuickAction = async (actionName: string, details: string, modalCloseFn: () => void ) => {
@@ -821,7 +821,7 @@ const SecurityManagementPage: React.FC = () => {
       <Card title="⚙️ クイックアクション">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <Button variant="secondary" onClick={() => openQuickActionModal(setIsEmergencyProcedureModalOpen)}>緊急時対応手順</Button>
-          <Button variant="secondary" onClick={() => openQuickActionModal(setIsReportIncidentModalOpen)}>インシデント報告</Button>
+          <Button variant="secondary" onClick={() => openQuickActionModal(setIsReportIncidentModalOpen)}>セキュリティインシデント報告</Button>
           <Button variant="secondary" onClick={() => openQuickActionModal(setIsSecurityReportModalOpen)}>レポート生成</Button>
           <Button variant="secondary" onClick={() => openQuickActionModal(setIsAccessSuspendModalOpen)}>アクセス権限緊急停止</Button>
           <Button variant="secondary" onClick={() => openQuickActionModal(setIsThreatShareModalOpen)}>脅威情報共有</Button>

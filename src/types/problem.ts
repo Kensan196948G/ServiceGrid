@@ -61,6 +61,8 @@ export type ProblemStatus = 'Logged' | 'In Progress' | 'Known Error' | 'Resolved
 
 export type Priority = 'Low' | 'Medium' | 'High' | 'Critical';
 
+export type ProblemCategory = 'Hardware' | 'Software' | 'Network' | 'Database' | 'Security' | 'Performance' | 'Configuration' | 'Other';
+
 export interface ProblemStats {
   total: number;
   by_status: Record<string, number>;

@@ -13,14 +13,6 @@ const ENHANCED_NAVIGATION_ITEMS = [
     features: ['KPI監視', 'アクティビティログ', 'パフォーマンス分析']
   },
   { 
-    path: '/incidents', 
-    label: 'インシデント管理', 
-    icon: '🚨',
-    description: 'ITIL準拠のインシデント処理・SLA監視・根本原因分析',
-    category: 'operations',
-    features: ['SLA追跡', 'エスカレーション', '自動分類']
-  },
-  { 
     path: '/requests', 
     label: 'サービス要求', 
     icon: '📝',

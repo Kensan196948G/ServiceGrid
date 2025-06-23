@@ -33,7 +33,6 @@ export interface NavigationItemType {
 
 export const NAVIGATION_ITEMS: NavigationItemType[] = [
   { name: 'ダッシュボード', description: 'システムの概要と統計', path: '/', icon: <HomeIcon /> },
-  { name: 'インシデント管理', description: '障害/問い合わせ受付、進捗管理、記録', path: '/incidents', icon: <ExclamationTriangleIcon /> },
   { name: 'サービス要求管理', description: 'ユーザー申請、アカウント／権限変更等', path: '/requests', icon: <DocumentTextIcon /> },
   { name: '変更管理', description: '設定変更・申請の記録、承認フロー', path: '/change-management', icon: <ArrowsRightLeftIcon /> },
   { name: '構成管理', description: '資産台帳管理、ライセンス・機器管理', path: '/assets', icon: <CubeIcon /> },

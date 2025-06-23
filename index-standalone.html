@@ -234,7 +234,7 @@
             const [isLoading, setIsLoading] = useState(false);
             const [error, setError] = useState('');
             const { login } = useAuth();
-            const { showError: toastError } = useToast();
+            const { showError } = useToast();
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
@@ -245,7 +245,7 @@
                     await login(formData.username, formData.password);
                 } catch (err) {
                     setError(err.message);
-                    toastError(err.message);
+                    showError(err.message);
                 } finally {
                     setIsLoading(false);
                 }
@@ -688,7 +688,7 @@
             const [sidebarOpen, setSidebarOpen] = useState(true);
             const [currentPage, setCurrentPage] = useState('dashboard');
             const { user, logout } = useAuth();
-            const { showSuccess: layoutToastSuccess } = useToast();
+            const { showSuccess } = useToast();
 
             const navigation = [
                 { id: 'dashboard', name: 'ダッシュボード', icon: '📊' },
@@ -710,7 +710,7 @@
 
             const handleLogout = () => {
                 logout();
-                layoutToastSuccess('ログアウトしました');
+                showSuccess('ログアウトしました');
             };
 
             return React.createElement('div', { className: 'flex h-screen bg-gray-100' },
@@ -775,7 +775,7 @@
             const [showUserCreateModal, setShowUserCreateModal] = useState(false);
             const [editingUser, setEditingUser] = useState(null);
             const [userModalMode, setUserModalMode] = useState('view');
-            const { showSuccess: userModalToastSuccess } = useToast();
+            const { showSuccess } = useToast();
             const [settings, setSettings] = useState({
                 general: {
                     siteName: 'ServiceGrid ITSM',
@@ -908,7 +908,7 @@
                     smsNotifications: false
                 }
             });
-            const { showSuccess: settingsToastSuccess, showError: settingsToastError } = useToast();
+            const { showSuccess, showError } = useToast();
 
             useEffect(() => {
                 // モックユーザーデータ読み込み
@@ -936,7 +936,7 @@
                         [key]: value
                     }
                 }));
-                settingsToastSuccess('設定を更新しました');
+                showSuccess('設定を更新しました');
             };
 
             const renderTabContent = () => {
@@ -1094,7 +1094,7 @@
                                                                         ...prev,
                                                                         users: prev.users.filter(u => u.id !== user.id)
                                                                     }));
-                                                                    settingsToastSuccess('ユーザーを削除しました');
+                                                                    showSuccess('ユーザーを削除しました');
                                                                 }
                                                             },
                                                             className: 'text-red-600 hover:text-red-900'
@@ -1256,15 +1256,15 @@
                                 React.createElement('div', { className: 'space-y-3' },
                                     React.createElement(Button, {
                                         variant: 'secondary',
-                                        onClick: () => settingsToastSuccess('データベースバックアップを開始しました')
+                                        onClick: () => showSuccess('データベースバックアップを開始しました')
                                     }, '📦 データベースバックアップ'),
                                     React.createElement(Button, {
                                         variant: 'secondary',
-                                        onClick: () => settingsToastSuccess('ログファイルをクリアしました')
+                                        onClick: () => showSuccess('ログファイルをクリアしました')
                                     }, '🗑️ ログファイルクリア'),
                                     React.createElement(Button, {
                                         variant: 'danger',
-                                        onClick: () => settingsToastError('システム再起動権限がありません')
+                                        onClick: () => showError('システム再起動権限がありません')
                                     }, '🔄 システム再起動')
                                 )
                             )
@@ -1332,13 +1332,13 @@
                                 ...prev,
                                 users: [...prev.users, newUser]
                             }));
-                            settingsToastSuccess('新規ユーザーを作成しました');
+                            showSuccess('新規ユーザーを作成しました');
                         } else {
                             setSettings(prev => ({
                                 ...prev,
                                 users: prev.users.map(u => u.id === userData.id ? userData : u)
                             }));
-                            settingsToastSuccess('ユーザー情報を更新しました');
+                            showSuccess('ユーザー情報を更新しました');
                         }
                         setShowUserCreateModal(false);
                         setEditingUser(null);
@@ -1367,7 +1367,7 @@
             });
             const [isSubmitting, setIsSubmitting] = useState(false);
             const [incidents, setIncidents] = useState([]);
-            const { showSuccess: incidentToastSuccess, showError: incidentToastError } = useToast();
+            const { showSuccess, showError } = useToast();
             const { user } = useAuth();
 
             const categories = [
@@ -1429,7 +1429,7 @@
                     // 一覧に追加
                     setIncidents(prev => [newIncident, ...prev]);
                     
-                    incidentToastSuccess('インシデントが正常に報告されました');
+                    showSuccess('インシデントが正常に報告されました');
 
                     // フォームをリセット
                     setFormData({
@@ -1449,7 +1449,7 @@
                     });
                 } catch (error) {
                     console.error('Failed to submit incident report:', error);
-                    incidentToastError('インシデントの報告に失敗しました');
+                    showError('インシデントの報告に失敗しました');
                 } finally {
                     setIsSubmitting(false);
                 }
@@ -1464,14 +1464,14 @@
                             : inc
                     )
                 );
-                incidentToastSuccess('インシデントが完了状態に変更されました');
+                showSuccess('インシデントが完了状態に変更されました');
             };
 
             // インシデント削除
             const handleDeleteIncident = (incidentId) => {
                 if (window.confirm('このインシデントを削除してもよろしいですか？')) {
                     setIncidents(prev => prev.filter(inc => inc.id !== incidentId));
-                    incidentToastSuccess('インシデントが削除されました');
+                    showSuccess('インシデントが削除されました');
                 }
             };
 
@@ -1722,7 +1722,7 @@
             const [showCreateModal, setShowCreateModal] = useState(false);
             const [showEditModal, setShowEditModal] = useState(false);
             const [editingItem, setEditingItem] = useState(null);
-            const { showSuccess: genericToastSuccess, showError: genericToastError } = useToast();
+            const { showSuccess, showError } = useToast();
 
             // 詳細なモックデータ生成
             const generateMockData = (type) => {
@@ -2869,7 +2869,7 @@
                                     setTimeout(() => {
                                         setData(generateMockData(currentPage));
                                         setLoading(false);
-                                        genericToastSuccess('データを更新しました');
+                                        showSuccess('データを更新しました');
                                     }, 1000);
                                 }
                             }, '🔄 更新')
@@ -2967,7 +2967,7 @@
                                                                     e.stopPropagation();
                                                                     if (confirm(`${item.title || item.name || item.id}を削除してもよろしいですか？`)) {
                                                                         setData(prev => prev.filter(d => d.id !== item.id));
-                                                                        genericToastSuccess('削除しました');
+                                                                        showSuccess('削除しました');
                                                                     }
                                                                 },
                                                                 className: 'text-red-600 hover:text-red-900'
@@ -3076,7 +3076,7 @@
                     onSave: (newItem) => {
                         setData(prev => [newItem, ...prev]);
                         setShowCreateModal(false);
-                        genericToastSuccess('新規作成しました');
+                        showSuccess('新規作成しました');
                     },
                     type: currentPage,
                     title: `新規${config.createButton}`
@@ -3095,7 +3095,7 @@
                         ));
                         setShowEditModal(false);
                         setEditingItem(null);
-                        genericToastSuccess('更新しました');
+                        showSuccess('更新しました');
                     },
                     type: currentPage,
                     title: `${editingItem?.title || editingItem?.name || editingItem?.id}を編集`,
