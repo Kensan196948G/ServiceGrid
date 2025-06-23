@@ -23,7 +23,7 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
-    port: 3000,
+    port: 3001,
     proxy: {
       '/api': {
         target: 'http://localhost:8082',
@@ -34,6 +34,64 @@ export default defineConfig({
     // Enable HMR
     hmr: {
       overlay: true
+    },
+    // Configure middleware for IP restrictions
+    middlewareMode: false,
+    // Custom middleware to restrict access to local networks only
+    configureServer(server) {
+      server.middlewares.use('/', (req, res, next) => {
+        const clientIP = req.headers['x-forwarded-for'] || 
+                        req.connection?.remoteAddress || 
+                        req.socket?.remoteAddress ||
+                        req.ip;
+        
+        // Extract actual IP from potential IPv6 mapped format
+        const actualIP = String(clientIP).replace(/^::ffff:/, '');
+        
+        // Allow localhost and private IP ranges
+        const isLocalhost = actualIP === '127.0.0.1' || actualIP === '::1' || actualIP === 'localhost';
+        const isPrivateIPv4 = /^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/.test(actualIP);
+        const isPrivateIPv6 = /^(fe80:|fd|fc)/.test(actualIP);
+        const isLinkLocal = /^169\.254\./.test(actualIP); // Link-local addresses
+        
+        if (isLocalhost || isPrivateIPv4 || isPrivateIPv6 || isLinkLocal) {
+          next();
+        } else {
+          console.warn(`🚫 Access denied from IP: ${actualIP} (not in allowed ranges)`);
+          res.statusCode = 403;
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          res.end(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <title>アクセス拒否 - ServiceGrid ITSM</title>
+              <meta charset="utf-8">
+              <style>
+                body { font-family: 'Yu Gothic', sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
+                .container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                h1 { color: #e74c3c; margin-bottom: 20px; }
+                p { color: #666; line-height: 1.6; }
+                .ip { font-family: monospace; background: #f8f9fa; padding: 5px 10px; border-radius: 4px; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <h1>🔒 アクセス拒否</h1>
+                <p>このServiceGrid ITSMシステムは、セキュリティ上の理由により<strong>ローカルネットワークからのアクセスのみ</strong>を許可しています。</p>
+                <p>あなたのIPアドレス: <span class="ip">${actualIP}</span></p>
+                <p>許可されているアクセス範囲:</p>
+                <ul style="text-align: left; color: #666;">
+                  <li>localhost (127.0.0.1, ::1)</li>
+                  <li>プライベートIPアドレス (10.x.x.x, 172.16-31.x.x, 192.168.x.x)</li>
+                  <li>リンクローカルアドレス (169.254.x.x)</li>
+                </ul>
+                <p style="margin-top: 30px; font-size: 14px; color: #999;">ServiceGrid ITSM Platform - セキュリティ保護</p>
+              </div>
+            </body>
+            </html>
+          `);
+        }
+      });
     }
   },
   build: {
